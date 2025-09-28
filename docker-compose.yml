@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # PostgreSQL Database
   postgres:
@@ -16,6 +14,12 @@ services:
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     networks:
       - agricultural-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ekumen_assistant"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # Redis Cache
   redis:
@@ -27,6 +31,11 @@ services:
       - redis_data:/data
     networks:
       - agricultural-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   # FastAPI Backend
   backend:
@@ -40,16 +49,25 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
       - WEATHER_API_KEY=${WEATHER_API_KEY}
+      - SECRET_KEY=${SECRET_KEY}
     ports:
       - "8000:8000"
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - ./Ekumen-assistant:/app
     networks:
       - agricultural-network
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # React Frontend
   frontend:
@@ -65,6 +83,9 @@ services:
     networks:
       - agricultural-network
     command: npm run dev
+    depends_on:
+      - backend
+    restart: unless-stopped
 
 volumes:
   postgres_data:
