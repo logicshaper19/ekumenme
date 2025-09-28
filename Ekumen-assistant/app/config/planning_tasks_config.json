@@ -1,17 +1,260 @@
 {
   "metadata": {
-    "version": "1.0.0",
+    "version": "1.0",
+    "description": "Configuration for agricultural planning task templates",
     "last_updated": "2024-09-28",
-    "description": "Planning tasks configuration"
+    "data_source": "extracted_from_generate_planning_tasks_tool"
   },
-  "default_priority_threshold": 3,
-  "require_crops": true,
-  "validate_surface_area": true,
-  "validate_planning_objective": true,
-  "min_surface_ha": 0.1,
-  "max_surface_ha": 1000.0,
-  "min_crops": 1,
-  "max_crops": 10,
-  "strict_validation": true,
-  "return_validation_errors": true
+  "validation_rules": {
+    "default_priority_threshold": 3,
+    "require_crops": true,
+    "validate_surface_area": true,
+    "validate_planning_objective": true,
+    "min_surface_ha": 0.1,
+    "max_surface_ha": 1000.0,
+    "min_crops": 1,
+    "max_crops": 10,
+    "strict_validation": true,
+    "return_validation_errors": true
+  },
+  "task_templates": {
+    "blé": {
+      "crop_name": "Blé",
+      "category": "céréales",
+      "tasks": [
+        {
+          "name": "Préparation sol",
+          "duration_hours": 2.0,
+          "equipment": "tracteur_120cv",
+          "priority": 1,
+          "dependencies": [],
+          "cost_per_hectare": 45.0,
+          "yield_impact": 0.05,
+          "description": "Préparation du sol pour le semis de blé",
+          "optimal_period": "septembre-octobre",
+          "weather_constraints": ["sol_sec", "pas_de_gel"]
+        },
+        {
+          "name": "Semis",
+          "duration_hours": 3.0,
+          "equipment": "tracteur_120cv",
+          "priority": 2,
+          "dependencies": ["Préparation sol"],
+          "cost_per_hectare": 85.0,
+          "yield_impact": 0.12,
+          "description": "Semis du blé avec semoir",
+          "optimal_period": "octobre-novembre",
+          "weather_constraints": ["sol_ressuyé", "température_positive"]
+        },
+        {
+          "name": "Fertilisation",
+          "duration_hours": 1.5,
+          "equipment": "tracteur_80cv",
+          "priority": 3,
+          "dependencies": ["Semis"],
+          "cost_per_hectare": 280.0,
+          "yield_impact": 0.15,
+          "description": "Apport d'engrais pour la croissance",
+          "optimal_period": "février-mars",
+          "weather_constraints": ["pas_de_pluie_forte", "sol_portant"]
+        },
+        {
+          "name": "Protection phytosanitaire",
+          "duration_hours": 1.0,
+          "equipment": "tracteur_80cv",
+          "priority": 4,
+          "dependencies": ["Fertilisation"],
+          "cost_per_hectare": 120.0,
+          "yield_impact": 0.08,
+          "description": "Traitement contre maladies et ravageurs",
+          "optimal_period": "avril-mai",
+          "weather_constraints": ["vent_faible", "pas_de_pluie_24h"]
+        },
+        {
+          "name": "Récolte",
+          "duration_hours": 4.0,
+          "equipment": "moissonneuse",
+          "priority": 5,
+          "dependencies": ["Protection phytosanitaire"],
+          "cost_per_hectare": 80.0,
+          "yield_impact": 0.0,
+          "description": "Récolte du blé à maturité",
+          "optimal_period": "juillet-août",
+          "weather_constraints": ["temps_sec", "humidité_grain_optimale"]
+        }
+      ]
+    },
+    "maïs": {
+      "crop_name": "Maïs",
+      "category": "céréales",
+      "tasks": [
+        {
+          "name": "Préparation sol",
+          "duration_hours": 2.5,
+          "equipment": "tracteur_120cv",
+          "priority": 1,
+          "dependencies": [],
+          "cost_per_hectare": 50.0,
+          "yield_impact": 0.05,
+          "description": "Préparation du sol pour le semis de maïs",
+          "optimal_period": "mars-avril",
+          "weather_constraints": ["sol_ressuyé", "température_sol_8c"]
+        },
+        {
+          "name": "Semis",
+          "duration_hours": 2.0,
+          "equipment": "tracteur_120cv",
+          "priority": 2,
+          "dependencies": ["Préparation sol"],
+          "cost_per_hectare": 220.0,
+          "yield_impact": 0.12,
+          "description": "Semis du maïs avec semoir de précision",
+          "optimal_period": "avril-mai",
+          "weather_constraints": ["température_sol_10c", "humidité_suffisante"]
+        },
+        {
+          "name": "Fertilisation",
+          "duration_hours": 1.0,
+          "equipment": "tracteur_80cv",
+          "priority": 3,
+          "dependencies": ["Semis"],
+          "cost_per_hectare": 350.0,
+          "yield_impact": 0.20,
+          "description": "Apport d'engrais azoté pour la croissance",
+          "optimal_period": "mai-juin",
+          "weather_constraints": ["pas_de_lessivage", "sol_portant"]
+        },
+        {
+          "name": "Désherbage",
+          "duration_hours": 1.5,
+          "equipment": "tracteur_80cv",
+          "priority": 4,
+          "dependencies": ["Fertilisation"],
+          "cost_per_hectare": 150.0,
+          "yield_impact": 0.10,
+          "description": "Traitement herbicide contre les adventices",
+          "optimal_period": "mai-juin",
+          "weather_constraints": ["vent_faible", "température_modérée"]
+        },
+        {
+          "name": "Récolte",
+          "duration_hours": 5.0,
+          "equipment": "moissonneuse",
+          "priority": 5,
+          "dependencies": ["Désherbage"],
+          "cost_per_hectare": 100.0,
+          "yield_impact": 0.0,
+          "description": "Récolte du maïs grain",
+          "optimal_period": "octobre-novembre",
+          "weather_constraints": ["humidité_grain_25", "temps_sec"]
+        }
+      ]
+    },
+    "colza": {
+      "crop_name": "Colza",
+      "category": "oléagineux",
+      "tasks": [
+        {
+          "name": "Préparation sol",
+          "duration_hours": 2.0,
+          "equipment": "tracteur_120cv",
+          "priority": 1,
+          "dependencies": [],
+          "cost_per_hectare": 45.0,
+          "yield_impact": 0.05,
+          "description": "Préparation du sol pour le semis de colza",
+          "optimal_period": "juillet-août",
+          "weather_constraints": ["sol_ferme", "pas_de_compaction"]
+        },
+        {
+          "name": "Semis",
+          "duration_hours": 2.5,
+          "equipment": "tracteur_120cv",
+          "priority": 2,
+          "dependencies": ["Préparation sol"],
+          "cost_per_hectare": 65.0,
+          "yield_impact": 0.15,
+          "description": "Semis du colza d'hiver",
+          "optimal_period": "août-septembre",
+          "weather_constraints": ["humidité_suffisante", "température_fraîche"]
+        },
+        {
+          "name": "Fertilisation",
+          "duration_hours": 1.0,
+          "equipment": "tracteur_80cv",
+          "priority": 3,
+          "dependencies": ["Semis"],
+          "cost_per_hectare": 320.0,
+          "yield_impact": 0.18,
+          "description": "Apport d'engrais phospho-potassique",
+          "optimal_period": "février-mars",
+          "weather_constraints": ["reprise_végétation", "sol_portant"]
+        },
+        {
+          "name": "Protection phytosanitaire",
+          "duration_hours": 1.5,
+          "equipment": "tracteur_80cv",
+          "priority": 4,
+          "dependencies": ["Fertilisation"],
+          "cost_per_hectare": 180.0,
+          "yield_impact": 0.12,
+          "description": "Traitement contre sclérotinia et insectes",
+          "optimal_period": "avril-mai",
+          "weather_constraints": ["floraison", "vent_faible"]
+        },
+        {
+          "name": "Récolte",
+          "duration_hours": 3.5,
+          "equipment": "moissonneuse",
+          "priority": 5,
+          "dependencies": ["Protection phytosanitaire"],
+          "cost_per_hectare": 90.0,
+          "yield_impact": 0.0,
+          "description": "Récolte du colza à maturité",
+          "optimal_period": "juillet",
+          "weather_constraints": ["siliques_mûres", "temps_sec"]
+        }
+      ]
+    }
+  },
+  "equipment_specifications": {
+    "tracteur_120cv": {
+      "name": "Tracteur 120 CV",
+      "power_hp": 120,
+      "fuel_consumption_l_h": 12.0,
+      "operating_cost_eur_h": 45.0,
+      "availability": "high"
+    },
+    "tracteur_80cv": {
+      "name": "Tracteur 80 CV",
+      "power_hp": 80,
+      "fuel_consumption_l_h": 8.0,
+      "operating_cost_eur_h": 35.0,
+      "availability": "high"
+    },
+    "moissonneuse": {
+      "name": "Moissonneuse-batteuse",
+      "power_hp": 200,
+      "fuel_consumption_l_h": 20.0,
+      "operating_cost_eur_h": 120.0,
+      "availability": "seasonal"
+    }
+  },
+  "configuration_rules": {
+    "task_scheduling": {
+      "max_daily_hours": 10,
+      "weather_delay_days": 3,
+      "equipment_maintenance_interval": 50
+    },
+    "cost_calculation": {
+      "fuel_price_eur_l": 1.45,
+      "labor_cost_eur_h": 25.0,
+      "overhead_percentage": 0.15
+    },
+    "yield_optimization": {
+      "timing_penalty_per_day": 0.002,
+      "weather_penalty_factor": 0.05,
+      "equipment_efficiency_factor": 0.95
+    }
+  }
 }

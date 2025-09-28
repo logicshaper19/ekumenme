@@ -41,7 +41,8 @@ from .crop_health_agent import (
     GenerateTreatmentPlanTool
 )
 from .regulatory_agent import (
-    LookupAMMTool,
+    DatabaseIntegratedAMMLookupTool,
+    LookupAMMTool,  # Legacy tool
     CheckRegulatoryComplianceTool,
     GetSafetyGuidelinesTool,
     CheckEnvironmentalRegulationsTool
@@ -81,8 +82,9 @@ __all__ = [
     "AnalyzeNutrientDeficiencyTool",
     "GenerateTreatmentPlanTool",
     
-    # Regulatory Agent Tools (Organized - One Tool, One Job)
-    "LookupAMMTool",
+    # Regulatory Agent Tools (Database-Integrated)
+    "DatabaseIntegratedAMMLookupTool",  # Primary tool with real EPHY data
+    "LookupAMMTool",  # Legacy tool (deprecated)
     "CheckRegulatoryComplianceTool",
     "GetSafetyGuidelinesTool",
     "CheckEnvironmentalRegulationsTool",

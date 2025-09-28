@@ -1,0 +1,220 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "description": "Configuration for agricultural regulatory compliance rules",
+    "last_updated": "2024-09-28",
+    "data_source": "extracted_from_check_regulatory_compliance_tool",
+    "jurisdiction": "France",
+    "regulatory_authority": "ANSES"
+  },
+  "practice_rules": {
+    "spraying": {
+      "name": "Pulvérisation phytosanitaire",
+      "category": "protection_phytosanitaire",
+      "environmental_limits": {
+        "wind_speed_limit": {
+          "value": 20,
+          "unit": "km/h",
+          "description": "Vitesse de vent maximale autorisée"
+        },
+        "temperature_limit": {
+          "value": 25,
+          "unit": "°C",
+          "description": "Température maximale autorisée"
+        },
+        "humidity_limit": {
+          "value": 80,
+          "unit": "%",
+          "description": "Humidité relative minimale"
+        },
+        "znt_distance": {
+          "value": 5,
+          "unit": "meters",
+          "description": "Distance de Zone Non Traitée"
+        }
+      },
+      "required_equipment": [
+        "EPI",
+        "pulvérisateur_contrôlé"
+      ],
+      "restricted_products": [
+        "glyphosate",
+        "néonicotinoïdes"
+      ],
+      "timing_restrictions": [
+        "interdiction_nuit",
+        "interdiction_weekend"
+      ],
+      "penalties": {
+        "restricted_product_use": {
+          "amount": 1500,
+          "currency": "EUR",
+          "description": "Utilisation de produit restreint"
+        },
+        "environmental_violation": {
+          "amount": 750,
+          "currency": "EUR",
+          "description": "Non-respect des conditions environnementales"
+        },
+        "timing_violation": {
+          "amount": 500,
+          "currency": "EUR",
+          "description": "Non-respect des restrictions horaires"
+        }
+      }
+    },
+    "fertilization": {
+      "name": "Fertilisation",
+      "category": "nutrition_végétale",
+      "environmental_limits": {
+        "nitrogen_limit": {
+          "value": 200,
+          "unit": "kg/ha/year",
+          "description": "Limite annuelle d'azote"
+        },
+        "phosphorus_limit": {
+          "value": 150,
+          "unit": "kg/ha/year",
+          "description": "Limite annuelle de phosphore"
+        }
+      },
+      "application_timing": [
+        "interdiction_hiver",
+        "interdiction_pluie"
+      ],
+      "required_equipment": [
+        "épandeur_contrôlé",
+        "dosage_précis"
+      ],
+      "restricted_products": [
+        "engrais_azoté_libre"
+      ],
+      "timing_restrictions": [
+        "interdiction_automne",
+        "interdiction_printemps"
+      ],
+      "penalties": {
+        "nitrogen_excess": {
+          "amount": 2000,
+          "currency": "EUR",
+          "description": "Dépassement de la limite d'azote"
+        },
+        "timing_violation": {
+          "amount": 800,
+          "currency": "EUR",
+          "description": "Épandage en période interdite"
+        }
+      }
+    },
+    "irrigation": {
+      "name": "Irrigation",
+      "category": "gestion_eau",
+      "environmental_limits": {
+        "water_usage_limit": {
+          "value": 1000,
+          "unit": "m³/ha/year",
+          "description": "Limite annuelle d'utilisation d'eau"
+        }
+      },
+      "timing_restrictions": [
+        "interdiction_jour",
+        "interdiction_été"
+      ],
+      "required_equipment": [
+        "compteur_eau",
+        "système_contrôlé"
+      ],
+      "restricted_products": [
+        "eau_traitée"
+      ],
+      "penalties": {
+        "water_excess": {
+          "amount": 1200,
+          "currency": "EUR",
+          "description": "Dépassement du quota d'eau"
+        },
+        "timing_violation": {
+          "amount": 400,
+          "currency": "EUR",
+          "description": "Irrigation en période interdite"
+        }
+      }
+    },
+    "harvesting": {
+      "name": "Récolte",
+      "category": "récolte",
+      "timing_restrictions": [
+        "interdiction_nuit",
+        "interdiction_weekend"
+      ],
+      "required_equipment": [
+        "moissonneuse_contrôlée",
+        "séparateur"
+      ],
+      "restricted_products": [
+        "produits_contaminés"
+      ],
+      "penalties": {
+        "timing_violation": {
+          "amount": 300,
+          "currency": "EUR",
+          "description": "Récolte en période interdite"
+        },
+        "contamination": {
+          "amount": 5000,
+          "currency": "EUR",
+          "description": "Récolte de produits contaminés"
+        }
+      }
+    }
+  },
+  "compliance_scoring": {
+    "thresholds": {
+      "compliant": 0.8,
+      "warning": 0.6,
+      "non_compliant": 0.6
+    },
+    "weights": {
+      "product_compliance": 0.3,
+      "timing_compliance": 0.25,
+      "equipment_compliance": 0.25,
+      "environmental_compliance": 0.2
+    }
+  },
+  "timing_definitions": {
+    "interdiction_nuit": {
+      "start_time": "22:00",
+      "end_time": "06:00",
+      "description": "Interdiction nocturne"
+    },
+    "interdiction_weekend": {
+      "days": ["saturday", "sunday"],
+      "description": "Interdiction week-end"
+    },
+    "interdiction_hiver": {
+      "start_date": "2024-12-01",
+      "end_date": "2025-02-28",
+      "description": "Période hivernale interdite"
+    },
+    "interdiction_été": {
+      "start_date": "2024-07-15",
+      "end_date": "2024-08-31",
+      "description": "Période estivale interdite"
+    }
+  },
+  "regional_variations": {
+    "zones_vulnerables": {
+      "nitrogen_limit_reduction": 0.8,
+      "additional_restrictions": [
+        "couverture_hivernale_obligatoire",
+        "bandes_enherbées_renforcées"
+      ]
+    },
+    "zones_natura2000": {
+      "additional_restrictions": [
+        "évaluation_impact_obligatoire",
+        "produits_bio_uniquement"
+      ]
+    }
+  }
+}

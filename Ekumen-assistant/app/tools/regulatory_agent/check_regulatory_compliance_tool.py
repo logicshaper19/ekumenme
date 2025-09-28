@@ -18,6 +18,7 @@ from typing import Dict, List, Any, Optional
 from langchain.tools import BaseTool
 import logging
 import json
+import os
 from dataclasses import dataclass, asdict
 
 logger = logging.getLogger(__name__)
@@ -42,7 +43,20 @@ class CheckRegulatoryComplianceTool(BaseTool):
     """
     
     name: str = "check_regulatory_compliance_tool"
-    description: str = "Vérifie la conformité réglementaire des pratiques agricoles"
+    description: str = "Vérifie la conformité réglementaire des pratiques agricoles à partir de la configuration"
+
+    @property
+    def config(self):
+        """Load compliance rules configuration."""
+        if not hasattr(self, '_config'):
+            config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'compliance_rules_config.json')
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    self._config = json.load(f)
+            except Exception as e:
+                logger.error(f"Failed to load compliance rules config: {e}")
+                self._config = self._get_fallback_config()
+        return self._config
     
     def _run(
         self,
@@ -92,41 +106,68 @@ class CheckRegulatoryComplianceTool(BaseTool):
             return json.dumps({"error": f"Erreur lors de la vérification de conformité: {str(e)}"})
     
     def _get_regulatory_database(self) -> Dict[str, Any]:
-        """Get regulatory database with compliance rules."""
-        regulatory_database = {
+        """Get regulatory database with compliance rules from configuration."""
+        # Get practice rules from configuration
+        practice_rules = self.config.get("practice_rules", {})
+
+        # Convert configuration format to legacy format for compatibility
+        regulatory_database = {}
+
+        for practice_type, rules in practice_rules.items():
+            converted_rules = {}
+
+            # Convert environmental limits
+            env_limits = rules.get("environmental_limits", {})
+            for limit_name, limit_data in env_limits.items():
+                if isinstance(limit_data, dict) and "value" in limit_data:
+                    converted_rules[limit_name] = limit_data["value"]
+                else:
+                    converted_rules[limit_name] = limit_data
+
+            # Copy other rule types directly
+            for rule_type in ["required_equipment", "restricted_products", "timing_restrictions"]:
+                if rule_type in rules:
+                    converted_rules[rule_type] = rules[rule_type]
+
+            # Handle application_timing (for fertilization)
+            if "application_timing" in rules:
+                converted_rules["application_timing"] = rules["application_timing"]
+
+            regulatory_database[practice_type] = converted_rules
+
+        return regulatory_database if regulatory_database else self._get_fallback_regulatory_database()
+
+    def _get_fallback_config(self) -> Dict[str, Any]:
+        """Fallback configuration if config file cannot be loaded."""
+        return {
+            "practice_rules": {
+                "spraying": {
+                    "environmental_limits": {
+                        "wind_speed_limit": {"value": 20, "unit": "km/h"},
+                        "temperature_limit": {"value": 25, "unit": "°C"},
+                        "humidity_limit": {"value": 80, "unit": "%"},
+                        "znt_distance": {"value": 5, "unit": "meters"}
+                    },
+                    "required_equipment": ["EPI", "pulvérisateur_contrôlé"],
+                    "restricted_products": ["glyphosate", "néonicotinoïdes"],
+                    "timing_restrictions": ["interdiction_nuit", "interdiction_weekend"]
+                }
+            }
+        }
+
+    def _get_fallback_regulatory_database(self) -> Dict[str, Any]:
+        """Fallback regulatory database when configuration is not available."""
+        return {
             "spraying": {
-                "wind_speed_limit": 20,  # km/h
-                "temperature_limit": 25,  # °C
-                "humidity_limit": 80,  # %
-                "znt_distance": 5,  # meters
+                "wind_speed_limit": 20,
+                "temperature_limit": 25,
+                "humidity_limit": 80,
+                "znt_distance": 5,
                 "required_equipment": ["EPI", "pulvérisateur_contrôlé"],
                 "restricted_products": ["glyphosate", "néonicotinoïdes"],
                 "timing_restrictions": ["interdiction_nuit", "interdiction_weekend"]
-            },
-            "fertilization": {
-                "nitrogen_limit": 200,  # kg/ha/year
-                "phosphorus_limit": 150,  # kg/ha/year
-                "application_timing": ["interdiction_hiver", "interdiction_pluie"],
-                "required_equipment": ["épandeur_contrôlé", "dosage_précis"],
-                "restricted_products": ["engrais_azoté_libre"],
-                "timing_restrictions": ["interdiction_automne", "interdiction_printemps"]
-            },
-            "irrigation": {
-                "water_usage_limit": 1000,  # m³/ha/year
-                "timing_restrictions": ["interdiction_jour", "interdiction_été"],
-                "required_equipment": ["compteur_eau", "système_contrôlé"],
-                "restricted_products": ["eau_traitée"],
-                "timing_restrictions": ["interdiction_été", "interdiction_jour"]
-            },
-            "harvesting": {
-                "timing_restrictions": ["interdiction_nuit", "interdiction_weekend"],
-                "required_equipment": ["moissonneuse_contrôlée", "séparateur"],
-                "restricted_products": ["produits_contaminés"],
-                "timing_restrictions": ["interdiction_nuit", "interdiction_weekend"]
             }
         }
-        
-        return regulatory_database
     
     def _check_compliance(self, practice_type: str, products_used: List[str], location: str, timing: str, regulatory_database: Dict[str, Any]) -> List[ComplianceCheck]:
         """Check compliance for specific practice."""

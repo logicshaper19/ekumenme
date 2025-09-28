@@ -18,7 +18,11 @@ from typing import Dict, List, Any, Optional
 from langchain.tools import BaseTool
 import logging
 import json
+import asyncio
+from datetime import datetime
 from dataclasses import dataclass, asdict
+
+from ...services.knowledge_base_service import KnowledgeBaseService
 
 logger = logging.getLogger(__name__)
 
@@ -34,15 +38,22 @@ class DiseaseDiagnosis:
 
 class DiagnoseDiseaseTool(BaseTool):
     """
-    Tool: Diagnose crop diseases from symptoms and conditions.
-    
-    Job: Take crop symptoms and environmental conditions to diagnose diseases.
+    Tool: Diagnose crop diseases using database-backed knowledge and semantic search.
+
+    Job: Take crop symptoms and environmental conditions to diagnose diseases from database.
     Input: crop_type, symptoms, environmental_conditions
-    Output: JSON string with disease diagnosis
+    Output: JSON string with disease diagnosis from database knowledge
     """
-    
+
     name: str = "diagnose_disease_tool"
-    description: str = "Diagnostique les maladies des cultures à partir des symptômes"
+    description: str = "Diagnostique les maladies des cultures à partir des symptômes en utilisant la base de données"
+
+    @property
+    def knowledge_service(self):
+        """Get knowledge service instance."""
+        if not hasattr(self, '_knowledge_service'):
+            self._knowledge_service = KnowledgeBaseService()
+        return self._knowledge_service
     
     def _run(
         self,
@@ -60,34 +71,109 @@ class DiagnoseDiseaseTool(BaseTool):
             environmental_conditions: Environmental conditions (humidity, temperature, etc.)
         """
         try:
-            # Get disease knowledge base
-            disease_knowledge = self._get_disease_knowledge_base(crop_type)
-            
-            # Diagnose diseases
-            diagnoses = self._diagnose_diseases(symptoms, disease_knowledge, environmental_conditions)
-            
-            # Calculate diagnosis confidence
-            diagnosis_confidence = self._calculate_diagnosis_confidence(diagnoses)
-            
-            # Generate treatment recommendations
-            treatment_recommendations = self._generate_treatment_recommendations(diagnoses)
-            
-            result = {
-                "crop_type": crop_type,
-                "symptoms_observed": symptoms,
-                "environmental_conditions": environmental_conditions or {},
-                "diagnoses": [asdict(diagnosis) for diagnosis in diagnoses],
-                "diagnosis_confidence": diagnosis_confidence,
-                "treatment_recommendations": treatment_recommendations,
-                "total_diagnoses": len(diagnoses)
-            }
-            
-            return json.dumps(result, ensure_ascii=False)
-            
+            # Try database-backed diagnosis first
+            try:
+                # Run async search in sync context
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    search_results = loop.run_until_complete(
+                        self.knowledge_service.search_diseases(
+                            crop_type=crop_type,
+                            symptoms=symptoms,
+                            conditions=environmental_conditions
+                        )
+                    )
+                finally:
+                    loop.close()
+
+                # Process database results
+                if "error" not in search_results and search_results.get("total_results", 0) > 0:
+                    return self._format_database_results(search_results)
+                else:
+                    logger.info(f"No database results found, falling back to legacy method")
+
+            except Exception as e:
+                logger.warning(f"Database service failed: {e}, falling back to legacy method")
+
+            # Fallback to legacy hardcoded knowledge
+            return self._run_legacy_diagnosis(crop_type, symptoms, environmental_conditions)
+
         except Exception as e:
             logger.error(f"Diagnose disease error: {e}")
             return json.dumps({"error": f"Erreur lors du diagnostic: {str(e)}"})
-    
+
+    def _format_database_results(self, search_results: Dict[str, Any]) -> str:
+        """Format database search results for tool output."""
+        diseases = search_results.get("diseases", [])
+
+        # Convert to legacy format for compatibility
+        diagnoses = []
+        treatment_recommendations = []
+
+        for disease_result in diseases:
+            disease = disease_result["disease"]
+            confidence = disease_result["confidence_score"]
+
+            diagnosis = DiseaseDiagnosis(
+                disease_name=disease["name"],
+                confidence=confidence,
+                severity=disease["severity_level"],
+                symptoms_matched=disease_result.get("matching_symptoms", []),
+                treatment_recommendations=disease["treatment_options"],
+                prevention_measures=disease.get("prevention_methods", [])
+            )
+            diagnoses.append(diagnosis)
+
+            # Add treatments to recommendations
+            for treatment in disease["treatment_options"]:
+                if treatment not in treatment_recommendations:
+                    treatment_recommendations.append(treatment)
+
+        # Calculate overall confidence
+        diagnosis_confidence = sum(d.confidence for d in diagnoses) / len(diagnoses) if diagnoses else 0.0
+
+        result = {
+            "crop_type": search_results["crop_type"],
+            "symptoms_observed": search_results["search_symptoms"],
+            "environmental_conditions": search_results.get("search_conditions", {}),
+            "diagnoses": [asdict(diagnosis) for diagnosis in diagnoses],
+            "diagnosis_confidence": diagnosis_confidence,
+            "treatment_recommendations": treatment_recommendations,
+            "total_diagnoses": len(diagnoses),
+            "data_source": "database",
+            "search_metadata": search_results.get("search_metadata", {})
+        }
+
+        return json.dumps(result, ensure_ascii=False)
+
+    def _run_legacy_diagnosis(self, crop_type: str, symptoms: List[str], environmental_conditions: Dict[str, Any]) -> str:
+        """Run legacy diagnosis using hardcoded knowledge."""
+        # Get disease knowledge base
+        disease_knowledge = self._get_disease_knowledge_base(crop_type)
+
+        # Diagnose diseases
+        diagnoses = self._diagnose_diseases(symptoms, disease_knowledge, environmental_conditions)
+
+        # Calculate diagnosis confidence
+        diagnosis_confidence = self._calculate_diagnosis_confidence(diagnoses)
+
+        # Generate treatment recommendations
+        treatment_recommendations = self._generate_treatment_recommendations(diagnoses)
+
+        result = {
+            "crop_type": crop_type,
+            "symptoms_observed": symptoms,
+            "environmental_conditions": environmental_conditions or {},
+            "diagnoses": [asdict(diagnosis) for diagnosis in diagnoses],
+            "diagnosis_confidence": diagnosis_confidence,
+            "treatment_recommendations": treatment_recommendations,
+            "total_diagnoses": len(diagnoses),
+            "data_source": "legacy_hardcoded"
+        }
+
+        return json.dumps(result, ensure_ascii=False)
+
     def _get_disease_knowledge_base(self, crop_type: str) -> Dict[str, Any]:
         """Get disease knowledge base for specific crop."""
         disease_knowledge = {

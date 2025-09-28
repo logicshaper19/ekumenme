@@ -18,6 +18,7 @@ from typing import Dict, List, Any, Optional
 from langchain.tools import BaseTool
 import logging
 import json
+import os
 from dataclasses import dataclass, asdict
 
 logger = logging.getLogger(__name__)
@@ -43,7 +44,20 @@ class GeneratePlanningTasksTool(BaseTool):
     """
     
     name: str = "generate_planning_tasks_tool"
-    description: str = "Génère les tâches de planification pour les cultures spécifiées"
+    description: str = "Génère les tâches de planification pour les cultures spécifiées à partir de la configuration"
+
+    @property
+    def config(self):
+        """Load planning tasks configuration."""
+        if not hasattr(self, '_config'):
+            config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'planning_tasks_config.json')
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    self._config = json.load(f)
+            except Exception as e:
+                logger.error(f"Failed to load planning tasks config: {e}")
+                self._config = self._get_fallback_config()
+        return self._config
     
     def _run(
         self, 
@@ -83,45 +97,87 @@ class GeneratePlanningTasksTool(BaseTool):
             return json.dumps({"error": f"Erreur lors de la génération des tâches: {str(e)}"})
     
     def _get_standard_crop_tasks(self, crop: str, surface: float, objective: str) -> List[PlanningTask]:
-        """Get standard tasks for a specific crop."""
-        # Crop-specific task definitions with economic data
-        crop_task_templates = {
-            "blé": [
-                ("Préparation sol", 2.0, "tracteur_120cv", 1, [], 45.0, 0.05),
-                ("Semis", 3.0, "tracteur_120cv", 2, ["Préparation sol"], 85.0, 0.12),
-                ("Fertilisation", 1.5, "tracteur_80cv", 3, ["Semis"], 280.0, 0.15),
-                ("Protection phytosanitaire", 1.0, "tracteur_80cv", 4, ["Fertilisation"], 120.0, 0.08),
-                ("Récolte", 4.0, "moissonneuse", 5, ["Protection phytosanitaire"], 80.0, 0.0)
-            ],
-            "maïs": [
-                ("Préparation sol", 2.5, "tracteur_120cv", 1, [], 50.0, 0.05),
-                ("Semis", 2.0, "tracteur_120cv", 2, ["Préparation sol"], 220.0, 0.12),
-                ("Fertilisation", 1.0, "tracteur_80cv", 3, ["Semis"], 350.0, 0.20),
-                ("Désherbage", 1.5, "tracteur_80cv", 4, ["Fertilisation"], 150.0, 0.10),
-                ("Récolte", 5.0, "moissonneuse", 5, ["Désherbage"], 100.0, 0.0)
-            ],
-            "colza": [
-                ("Préparation sol", 2.0, "tracteur_120cv", 1, [], 45.0, 0.05),
-                ("Semis", 2.5, "tracteur_120cv", 2, ["Préparation sol"], 65.0, 0.15),
-                ("Fertilisation", 1.0, "tracteur_80cv", 3, ["Semis"], 320.0, 0.18),
-                ("Protection phytosanitaire", 1.5, "tracteur_80cv", 4, ["Fertilisation"], 180.0, 0.12),
-                ("Récolte", 3.5, "moissonneuse", 5, ["Protection phytosanitaire"], 90.0, 0.0)
-            ]
-        }
-        
+        """Get standard tasks for a specific crop from configuration."""
         tasks = []
-        task_templates = crop_task_templates.get(crop, crop_task_templates["blé"])
-        
-        for name, duration, equipment, priority, deps, cost, yield_impact in task_templates:
+
+        # Get task templates from configuration
+        task_templates = self.config.get("task_templates", {})
+        crop_config = task_templates.get(crop, task_templates.get("blé", {}))
+
+        if not crop_config:
+            logger.warning(f"No task templates found for crop: {crop}, using fallback")
+            return self._get_fallback_tasks(crop, surface, objective)
+
+        crop_tasks = crop_config.get("tasks", [])
+
+        for task_config in crop_tasks:
             task = PlanningTask(
-                name=f"{name} - {crop}",
-                duration_hours=duration,
-                equipment=equipment,
-                priority=priority,
-                dependencies=deps,
-                cost_per_hectare=cost,
-                yield_impact=yield_impact
+                name=f"{task_config['name']} - {crop}",
+                duration_hours=task_config["duration_hours"],
+                equipment=task_config["equipment"],
+                priority=task_config["priority"],
+                dependencies=task_config["dependencies"],
+                cost_per_hectare=task_config["cost_per_hectare"],
+                yield_impact=task_config["yield_impact"]
             )
             tasks.append(task)
-        
+
+        return tasks
+
+    def _get_fallback_config(self) -> Dict[str, Any]:
+        """Fallback configuration if config file cannot be loaded."""
+        return {
+            "task_templates": {
+                "blé": {
+                    "tasks": [
+                        {
+                            "name": "Préparation sol",
+                            "duration_hours": 2.0,
+                            "equipment": "tracteur_120cv",
+                            "priority": 1,
+                            "dependencies": [],
+                            "cost_per_hectare": 45.0,
+                            "yield_impact": 0.05
+                        },
+                        {
+                            "name": "Semis",
+                            "duration_hours": 3.0,
+                            "equipment": "tracteur_120cv",
+                            "priority": 2,
+                            "dependencies": ["Préparation sol"],
+                            "cost_per_hectare": 85.0,
+                            "yield_impact": 0.12
+                        },
+                        {
+                            "name": "Récolte",
+                            "duration_hours": 4.0,
+                            "equipment": "moissonneuse",
+                            "priority": 5,
+                            "dependencies": ["Semis"],
+                            "cost_per_hectare": 80.0,
+                            "yield_impact": 0.0
+                        }
+                    ]
+                }
+            }
+        }
+
+    def _get_fallback_tasks(self, crop: str, surface: float, objective: str) -> List[PlanningTask]:
+        """Get fallback tasks when configuration is not available."""
+        fallback_config = self._get_fallback_config()
+        crop_config = fallback_config["task_templates"]["blé"]
+
+        tasks = []
+        for task_config in crop_config["tasks"]:
+            task = PlanningTask(
+                name=f"{task_config['name']} - {crop}",
+                duration_hours=task_config["duration_hours"],
+                equipment=task_config["equipment"],
+                priority=task_config["priority"],
+                dependencies=task_config["dependencies"],
+                cost_per_hectare=task_config["cost_per_hectare"],
+                yield_impact=task_config["yield_impact"]
+            )
+            tasks.append(task)
+
         return tasks

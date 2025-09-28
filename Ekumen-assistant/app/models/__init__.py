@@ -5,6 +5,8 @@ from .organization import Organization, OrganizationMembership, OrganizationFarm
 from .conversation import Conversation, Message
 from .intervention import VoiceJournalEntry, ProductUsage
 from .product import Product, Usage, SubstanceActive, ProductSubstance
+from .disease import Disease
+from .pest import Pest
 
 __all__ = [
     "User", "UserSession", "UserActivity",
@@ -12,5 +14,6 @@ __all__ = [
     "Organization", "OrganizationMembership", "OrganizationFarmAccess", "KnowledgeBaseEntry",
     "Conversation", "Message",
     "VoiceJournalEntry", "ProductUsage",
-    "Product", "Usage", "SubstanceActive", "ProductSubstance"
+    "Product", "Usage", "SubstanceActive", "ProductSubstance",
+    "Disease", "Pest"
 ]

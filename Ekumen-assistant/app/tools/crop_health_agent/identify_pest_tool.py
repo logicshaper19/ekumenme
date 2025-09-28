@@ -18,7 +18,11 @@ from typing import Dict, List, Any, Optional
 from langchain.tools import BaseTool
 import logging
 import json
+import asyncio
+from datetime import datetime
 from dataclasses import dataclass, asdict
+
+from ...services.knowledge_base_service import KnowledgeBaseService
 
 logger = logging.getLogger(__name__)
 
@@ -34,15 +38,22 @@ class PestIdentification:
 
 class IdentifyPestTool(BaseTool):
     """
-    Tool: Identify crop pests from symptoms and damage patterns.
-    
-    Job: Take crop damage symptoms and pest indicators to identify pests.
+    Tool: Identify crop pests using database-backed knowledge and semantic search.
+
+    Job: Take crop damage symptoms and pest indicators to identify pests from database.
     Input: crop_type, damage_symptoms, pest_indicators
-    Output: JSON string with pest identification
+    Output: JSON string with pest identification from database knowledge
     """
-    
+
     name: str = "identify_pest_tool"
-    description: str = "Identifie les ravageurs des cultures à partir des symptômes de dégâts"
+    description: str = "Identifie les ravageurs des cultures à partir des symptômes de dégâts en utilisant la base de données"
+
+    @property
+    def knowledge_service(self):
+        """Get knowledge service instance."""
+        if not hasattr(self, '_knowledge_service'):
+            self._knowledge_service = KnowledgeBaseService()
+        return self._knowledge_service
     
     def _run(
         self,
@@ -60,33 +71,108 @@ class IdentifyPestTool(BaseTool):
             pest_indicators: List of pest indicators (eggs, larvae, adults)
         """
         try:
-            # Get pest knowledge base
-            pest_knowledge = self._get_pest_knowledge_base(crop_type)
-            
-            # Identify pests
-            pest_identifications = self._identify_pests(damage_symptoms, pest_indicators or [], pest_knowledge)
-            
-            # Calculate identification confidence
-            identification_confidence = self._calculate_identification_confidence(pest_identifications)
-            
-            # Generate treatment recommendations
-            treatment_recommendations = self._generate_treatment_recommendations(pest_identifications)
-            
-            result = {
-                "crop_type": crop_type,
-                "damage_symptoms": damage_symptoms,
-                "pest_indicators": pest_indicators or [],
-                "pest_identifications": [asdict(identification) for identification in pest_identifications],
-                "identification_confidence": identification_confidence,
-                "treatment_recommendations": treatment_recommendations,
-                "total_identifications": len(pest_identifications)
-            }
-            
-            return json.dumps(result, ensure_ascii=False)
-            
+            # Try database-backed identification first
+            try:
+                # Run async search in sync context
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    search_results = loop.run_until_complete(
+                        self.knowledge_service.search_pests(
+                            crop_type=crop_type,
+                            damage_patterns=damage_symptoms,
+                            pest_indicators=pest_indicators or []
+                        )
+                    )
+                finally:
+                    loop.close()
+
+                # Process database results
+                if "error" not in search_results and search_results.get("total_results", 0) > 0:
+                    return self._format_database_results(search_results)
+                else:
+                    logger.info(f"No database results found, falling back to legacy method")
+
+            except Exception as e:
+                logger.warning(f"Database service failed: {e}, falling back to legacy method")
+
+            # Fallback to legacy hardcoded knowledge
+            return self._run_legacy_identification(crop_type, damage_symptoms, pest_indicators or [])
+
         except Exception as e:
             logger.error(f"Identify pest error: {e}")
             return json.dumps({"error": f"Erreur lors de l'identification des ravageurs: {str(e)}"})
+
+    def _format_database_results(self, search_results: Dict[str, Any]) -> str:
+        """Format database search results for tool output."""
+        pests = search_results.get("pests", [])
+
+        # Convert to legacy format for compatibility
+        pest_identifications = []
+        treatment_recommendations = []
+
+        for pest_result in pests:
+            pest = pest_result["pest"]
+            confidence = pest_result["confidence_score"]
+
+            identification = PestIdentification(
+                pest_name=pest["name"],
+                confidence=confidence,
+                severity=pest["severity_level"],
+                damage_patterns=pest_result.get("matching_damage", []),
+                treatment_recommendations=pest["treatment_options"],
+                prevention_measures=pest.get("prevention_methods", [])
+            )
+            pest_identifications.append(identification)
+
+            # Add treatments to recommendations
+            for treatment in pest["treatment_options"]:
+                if treatment not in treatment_recommendations:
+                    treatment_recommendations.append(treatment)
+
+        # Calculate overall confidence
+        identification_confidence = sum(p.confidence for p in pest_identifications) / len(pest_identifications) if pest_identifications else 0.0
+
+        result = {
+            "crop_type": search_results["crop_type"],
+            "damage_symptoms": search_results["search_damage_patterns"],
+            "pest_indicators": search_results["search_pest_indicators"],
+            "pest_identifications": [asdict(identification) for identification in pest_identifications],
+            "identification_confidence": identification_confidence,
+            "treatment_recommendations": treatment_recommendations,
+            "total_identifications": len(pest_identifications),
+            "data_source": "database",
+            "search_metadata": search_results.get("search_metadata", {})
+        }
+
+        return json.dumps(result, ensure_ascii=False)
+
+    def _run_legacy_identification(self, crop_type: str, damage_symptoms: List[str], pest_indicators: List[str]) -> str:
+        """Run legacy identification using hardcoded knowledge."""
+        # Get pest knowledge base
+        pest_knowledge = self._get_pest_knowledge_base(crop_type)
+
+        # Identify pests
+        pest_identifications = self._identify_pests(damage_symptoms, pest_indicators, pest_knowledge)
+
+        # Calculate identification confidence
+        identification_confidence = self._calculate_identification_confidence(pest_identifications)
+
+        # Generate treatment recommendations
+        treatment_recommendations = self._generate_treatment_recommendations(pest_identifications)
+
+        result = {
+            "crop_type": crop_type,
+            "damage_symptoms": damage_symptoms,
+            "pest_indicators": pest_indicators,
+            "pest_identifications": [asdict(identification) for identification in pest_identifications],
+            "identification_confidence": identification_confidence,
+            "treatment_recommendations": treatment_recommendations,
+            "total_identifications": len(pest_identifications),
+            "data_source": "legacy_hardcoded"
+        }
+
+        return json.dumps(result, ensure_ascii=False)
     
     def _get_pest_knowledge_base(self, crop_type: str) -> Dict[str, Any]:
         """Get pest knowledge base for specific crop."""
