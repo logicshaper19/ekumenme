@@ -593,30 +593,55 @@ class CropHealthMonitorAgent(IntegratedAgriculturalAgent):
             return self.format_response(error_response, {"error": str(e)})
     
     def _determine_tools_needed(self, message: str) -> List[str]:
-        """Determine which tools to use based on message content."""
+        """Determine which tools to use based on message content using semantic selection."""
+        try:
+            # Try to use semantic tool selection if available
+            from ..services.semantic_tool_selector import semantic_tool_selector
+
+            available_tool_names = [tool.name for tool in self.tools]
+
+            # Use semantic selection
+            result = semantic_tool_selector.select_tools(
+                message=message,
+                available_tools=available_tool_names,
+                method="hybrid",
+                threshold=0.5,
+                max_tools=3
+            )
+
+            if result.selected_tools:
+                logger.info(f"Semantic tool selection: {result.selected_tools} (confidence: {result.confidence:.3f})")
+                return result.selected_tools
+
+        except ImportError:
+            logger.warning("Semantic tool selector not available, falling back to keyword-based selection")
+        except Exception as e:
+            logger.error(f"Error in semantic tool selection: {e}, falling back to keyword-based selection")
+
+        # Fallback to original keyword-based selection
         message_lower = message.lower()
         tools_needed = []
-        
+
         # Disease-related keywords
         disease_keywords = ["maladie", "champignon", "bactérie", "virus", "septoriose", "oïdium", "rouille", "sclérotinia", "taches", "pourriture"]
         if any(keyword in message_lower for keyword in disease_keywords):
             tools_needed.append("disease_diagnosis")
-        
+
         # Pest-related keywords
         pest_keywords = ["ravageur", "insecte", "puceron", "cécidomyie", "pyrale", "altise", "chenille", "trous", "galeries", "miellat"]
         if any(keyword in message_lower for keyword in pest_keywords):
             tools_needed.append("pest_identification")
-        
+
         # Deficiency-related keywords
         deficiency_keywords = ["carence", "déficience", "azote", "phosphore", "potassium", "magnésium", "fer", "jaunissement", "décoloration"]
         if any(keyword in message_lower for keyword in deficiency_keywords):
             tools_needed.append("nutrient_deficiency_analysis")
-        
+
         # Treatment-related keywords
         treatment_keywords = ["traitement", "produit", "dose", "pulvérisation", "fertilisation", "engrais", "amm", "efficacité"]
         if any(keyword in message_lower for keyword in treatment_keywords):
             tools_needed.append("treatment_recommendation")
-        
+
         return tools_needed
     
     def _execute_tool(self, tool_name: str, message: str, context: Dict[str, Any]) -> Optional[str]:
