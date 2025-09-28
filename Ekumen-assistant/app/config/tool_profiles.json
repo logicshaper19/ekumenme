@@ -1,0 +1,544 @@
+{
+  "version": "1.0",
+  "last_updated": "2024-01-15",
+  "default_language": "fr",
+  "supported_languages": ["fr", "en"],
+  "scoring_config": {
+    "semantic_weight": 0.4,
+    "keyword_weight": 0.35,
+    "intent_weight": 0.25,
+    "confidence_tiers": [
+      {"min_score": 0.8, "tier": "high", "description": "Highly confident selection"},
+      {"min_score": 0.6, "tier": "medium", "description": "Moderately confident selection"},
+      {"min_score": 0.4, "tier": "low", "description": "Low confidence selection"},
+      {"min_score": 0.0, "tier": "fallback", "description": "Fallback selection"}
+    ]
+  },
+  "tools": {
+    "diagnose_disease_tool": {
+      "id": "diagnose_disease_tool",
+      "name": {
+        "fr": "Outil de diagnostic des maladies",
+        "en": "Disease Diagnosis Tool"
+      },
+      "description": {
+        "fr": "Diagnostique les maladies des cultures à partir des symptômes observés et des conditions environnementales",
+        "en": "Diagnoses crop diseases based on observed symptoms and environmental conditions"
+      },
+      "domain": "crop_health",
+      "subdomain": "disease_management",
+      "complexity": "medium",
+      "priority": 1,
+      "keywords": {
+        "fr": {
+          "primary": ["maladie", "diagnostic", "symptôme", "pathologie"],
+          "secondary": ["champignon", "bactérie", "virus", "infection"],
+          "symptoms": ["taches", "jaunissement", "brunissement", "pourriture", "flétrissement", "décoloration", "nécrose", "chancre", "pustules", "moisissure"],
+          "diseases": ["septoriose", "oïdium", "rouille", "sclérotinia", "mildiou", "fusariose"]
+        },
+        "en": {
+          "primary": ["disease", "diagnosis", "symptom", "pathology"],
+          "secondary": ["fungus", "bacteria", "virus", "infection"],
+          "symptoms": ["spots", "yellowing", "browning", "rot", "wilting", "discoloration", "necrosis", "canker", "pustules", "mold"],
+          "diseases": ["septoria", "powdery_mildew", "rust", "sclerotinia", "downy_mildew", "fusarium"]
+        }
+      },
+      "intent_patterns": {
+        "fr": [
+          "diagnostic.*maladie",
+          "identifier.*maladie",
+          "symptômes.*culture",
+          "problème.*santé.*plante",
+          "taches.*feuilles",
+          "jaunissement.*culture"
+        ],
+        "en": [
+          "diagnose.*disease",
+          "identify.*disease", 
+          "symptoms.*crop",
+          "plant.*health.*problem",
+          "spots.*leaves",
+          "yellowing.*crop"
+        ]
+      },
+      "use_cases": {
+        "fr": [
+          "Identifier une maladie sur les cultures",
+          "Analyser des symptômes de maladie",
+          "Diagnostic phytosanitaire",
+          "Problèmes de santé des plantes"
+        ],
+        "en": [
+          "Identify crop diseases",
+          "Analyze disease symptoms",
+          "Phytosanitary diagnosis",
+          "Plant health problems"
+        ]
+      },
+      "input_parameters": [
+        {"name": "crop_type", "type": "string", "required": true},
+        {"name": "symptoms", "type": "array", "required": true},
+        {"name": "environmental_conditions", "type": "object", "required": false},
+        {"name": "location", "type": "string", "required": false}
+      ],
+      "output_types": ["disease_diagnosis", "treatment_recommendations", "confidence_score"],
+      "related_tools": ["identify_pest_tool", "generate_treatment_plan_tool"],
+      "exclusions": [],
+      "performance_metrics": {
+        "avg_execution_time_ms": 150,
+        "success_rate": 0.92,
+        "user_satisfaction": 0.87
+      }
+    },
+    "identify_pest_tool": {
+      "id": "identify_pest_tool",
+      "name": {
+        "fr": "Outil d'identification des ravageurs",
+        "en": "Pest Identification Tool"
+      },
+      "description": {
+        "fr": "Identifie les ravageurs des cultures à partir des dégâts observés et des indicateurs de présence",
+        "en": "Identifies crop pests based on observed damage and presence indicators"
+      },
+      "domain": "crop_health",
+      "subdomain": "pest_management",
+      "complexity": "medium",
+      "priority": 1,
+      "keywords": {
+        "fr": {
+          "primary": ["ravageur", "pest", "insecte", "nuisible"],
+          "secondary": ["dégât", "dommage", "attaque", "infestation"],
+          "damage_patterns": ["trous", "galeries", "morsures", "défoliation", "miellat", "excréments", "toiles", "perforations", "découpage"],
+          "pests": ["puceron", "cécidomyie", "pyrale", "altise", "chenille", "thrips", "acarien", "limace"]
+        },
+        "en": {
+          "primary": ["pest", "insect", "parasite", "harmful"],
+          "secondary": ["damage", "harm", "attack", "infestation"],
+          "damage_patterns": ["holes", "galleries", "bites", "defoliation", "honeydew", "excrement", "webs", "perforations", "cutting"],
+          "pests": ["aphid", "midge", "borer", "flea_beetle", "caterpillar", "thrips", "mite", "slug"]
+        }
+      },
+      "intent_patterns": {
+        "fr": [
+          "identifier.*ravageur",
+          "pest.*identification",
+          "dégâts.*insecte",
+          "trous.*feuilles",
+          "attaque.*ravageur",
+          "infestation.*culture"
+        ],
+        "en": [
+          "identify.*pest",
+          "pest.*identification",
+          "insect.*damage",
+          "holes.*leaves",
+          "pest.*attack",
+          "crop.*infestation"
+        ]
+      },
+      "use_cases": {
+        "fr": [
+          "Identifier des ravageurs sur les cultures",
+          "Analyser des dégâts d'insectes",
+          "Reconnaissance de nuisibles",
+          "Problèmes d'insectes"
+        ],
+        "en": [
+          "Identify crop pests",
+          "Analyze insect damage",
+          "Pest recognition",
+          "Insect problems"
+        ]
+      },
+      "input_parameters": [
+        {"name": "crop_type", "type": "string", "required": true},
+        {"name": "damage_patterns", "type": "array", "required": true},
+        {"name": "pest_indicators", "type": "array", "required": false},
+        {"name": "location", "type": "string", "required": false}
+      ],
+      "output_types": ["pest_identification", "control_methods", "confidence_score"],
+      "related_tools": ["diagnose_disease_tool", "generate_treatment_plan_tool"],
+      "exclusions": [],
+      "performance_metrics": {
+        "avg_execution_time_ms": 120,
+        "success_rate": 0.89,
+        "user_satisfaction": 0.84
+      }
+    },
+    "generate_planning_tasks_tool": {
+      "id": "generate_planning_tasks_tool",
+      "name": {
+        "fr": "Générateur de tâches de planification",
+        "en": "Planning Tasks Generator"
+      },
+      "description": {
+        "fr": "Génère des tâches de planification optimisées pour les opérations agricoles selon les objectifs et contraintes",
+        "en": "Generates optimized planning tasks for agricultural operations based on objectives and constraints"
+      },
+      "domain": "planning",
+      "subdomain": "operational_planning",
+      "complexity": "high",
+      "priority": 2,
+      "keywords": {
+        "fr": {
+          "primary": ["planification", "planning", "tâche", "organisation"],
+          "secondary": ["calendrier", "travaux", "opération", "programmation"],
+          "operations": ["semis", "fertilisation", "traitement", "récolte", "labour", "irrigation"],
+          "objectives": ["rendement", "coût", "rentabilité", "efficacité", "optimisation"]
+        },
+        "en": {
+          "primary": ["planning", "task", "organization", "schedule"],
+          "secondary": ["calendar", "work", "operation", "programming"],
+          "operations": ["seeding", "fertilization", "treatment", "harvest", "plowing", "irrigation"],
+          "objectives": ["yield", "cost", "profitability", "efficiency", "optimization"]
+        }
+      },
+      "intent_patterns": {
+        "fr": [
+          "planifier.*travaux",
+          "organiser.*tâches",
+          "calendrier.*cultural",
+          "programmation.*opération",
+          "optimiser.*planning",
+          "gérer.*exploitation"
+        ],
+        "en": [
+          "plan.*work",
+          "organize.*tasks",
+          "crop.*calendar",
+          "operation.*scheduling",
+          "optimize.*planning",
+          "manage.*farm"
+        ]
+      },
+      "use_cases": {
+        "fr": [
+          "Planifier les travaux agricoles",
+          "Organiser les tâches de la saison",
+          "Créer un calendrier cultural",
+          "Optimiser les opérations"
+        ],
+        "en": [
+          "Plan agricultural work",
+          "Organize seasonal tasks",
+          "Create crop calendar",
+          "Optimize operations"
+        ]
+      },
+      "input_parameters": [
+        {"name": "crops", "type": "array", "required": true},
+        {"name": "surface", "type": "number", "required": true},
+        {"name": "planning_objective", "type": "string", "required": true},
+        {"name": "constraints", "type": "object", "required": false}
+      ],
+      "output_types": ["planning_tasks", "task_schedule", "optimization_report"],
+      "related_tools": ["get_weather_data_tool", "check_regulatory_compliance_tool"],
+      "exclusions": [],
+      "performance_metrics": {
+        "avg_execution_time_ms": 300,
+        "success_rate": 0.94,
+        "user_satisfaction": 0.91
+      }
+    },
+    "check_regulatory_compliance_tool": {
+      "id": "check_regulatory_compliance_tool",
+      "name": {
+        "fr": "Vérificateur de conformité réglementaire",
+        "en": "Regulatory Compliance Checker"
+      },
+      "description": {
+        "fr": "Vérifie la conformité des pratiques agricoles avec la réglementation française et européenne",
+        "en": "Verifies agricultural practices compliance with French and European regulations"
+      },
+      "domain": "regulatory",
+      "subdomain": "compliance_verification",
+      "complexity": "high",
+      "priority": 1,
+      "keywords": {
+        "fr": {
+          "primary": ["conformité", "réglementation", "compliance", "légal"],
+          "secondary": ["autorisation", "règles", "norme", "validation"],
+          "regulations": ["pac", "directive", "arrêté", "décret", "loi"],
+          "practices": ["pulvérisation", "fertilisation", "irrigation", "stockage", "épandage"]
+        },
+        "en": {
+          "primary": ["compliance", "regulation", "legal", "authorization"],
+          "secondary": ["rules", "standard", "validation", "permit"],
+          "regulations": ["cap", "directive", "decree", "law", "regulation"],
+          "practices": ["spraying", "fertilization", "irrigation", "storage", "spreading"]
+        }
+      },
+      "intent_patterns": {
+        "fr": [
+          "vérifier.*conformité",
+          "contrôler.*réglementation",
+          "validation.*légale",
+          "respect.*règles",
+          "autorisation.*pratique",
+          "compliance.*agricole"
+        ],
+        "en": [
+          "check.*compliance",
+          "verify.*regulation",
+          "legal.*validation",
+          "rule.*compliance",
+          "practice.*authorization",
+          "agricultural.*compliance"
+        ]
+      },
+      "use_cases": {
+        "fr": [
+          "Vérifier la conformité réglementaire",
+          "Contrôler les autorisations",
+          "Respecter la législation",
+          "Validation légale"
+        ],
+        "en": [
+          "Check regulatory compliance",
+          "Control authorizations",
+          "Comply with legislation",
+          "Legal validation"
+        ]
+      },
+      "input_parameters": [
+        {"name": "practice_type", "type": "string", "required": true},
+        {"name": "products_used", "type": "array", "required": false},
+        {"name": "location", "type": "string", "required": true},
+        {"name": "timing", "type": "string", "required": false}
+      ],
+      "output_types": ["compliance_status", "violations", "recommendations"],
+      "related_tools": ["database_integrated_amm_lookup_tool"],
+      "exclusions": [],
+      "performance_metrics": {
+        "avg_execution_time_ms": 200,
+        "success_rate": 0.96,
+        "user_satisfaction": 0.93
+      }
+    },
+    "database_integrated_amm_lookup_tool": {
+      "id": "database_integrated_amm_lookup_tool",
+      "name": {
+        "fr": "Recherche AMM intégrée",
+        "en": "Integrated AMM Lookup"
+      },
+      "description": {
+        "fr": "Recherche d'autorisations de mise sur le marché dans la base de données EPHY officielle",
+        "en": "Searches for market authorizations in the official EPHY database"
+      },
+      "domain": "regulatory",
+      "subdomain": "product_authorization",
+      "complexity": "medium",
+      "priority": 1,
+      "keywords": {
+        "fr": {
+          "primary": ["amm", "autorisation", "ephy", "homologation"],
+          "secondary": ["produit", "phytosanitaire", "substance", "active"],
+          "products": ["herbicide", "fongicide", "insecticide", "régulateur", "adjuvant"],
+          "database": ["recherche", "consultation", "vérification", "validation"]
+        },
+        "en": {
+          "primary": ["amm", "authorization", "ephy", "approval"],
+          "secondary": ["product", "phytosanitary", "substance", "active"],
+          "products": ["herbicide", "fungicide", "insecticide", "regulator", "adjuvant"],
+          "database": ["search", "consultation", "verification", "validation"]
+        }
+      },
+      "intent_patterns": {
+        "fr": [
+          "recherche.*amm",
+          "vérifier.*autorisation",
+          "consulter.*ephy",
+          "produit.*autorisé",
+          "homologation.*substance",
+          "base.*données.*phyto"
+        ],
+        "en": [
+          "search.*amm",
+          "verify.*authorization",
+          "consult.*ephy",
+          "authorized.*product",
+          "substance.*approval",
+          "phyto.*database"
+        ]
+      },
+      "use_cases": {
+        "fr": [
+          "Vérifier l'autorisation d'un produit",
+          "Rechercher un numéro AMM",
+          "Contrôler l'homologation",
+          "Validation produit phytosanitaire"
+        ],
+        "en": [
+          "Verify product authorization",
+          "Search AMM number",
+          "Check approval",
+          "Phytosanitary product validation"
+        ]
+      },
+      "input_parameters": [
+        {"name": "product_name", "type": "string", "required": false},
+        {"name": "active_ingredient", "type": "string", "required": false},
+        {"name": "crop_type", "type": "string", "required": false},
+        {"name": "amm_number", "type": "string", "required": false}
+      ],
+      "output_types": ["amm_status", "product_details", "usage_conditions"],
+      "related_tools": ["check_regulatory_compliance_tool"],
+      "exclusions": [],
+      "performance_metrics": {
+        "avg_execution_time_ms": 100,
+        "success_rate": 0.98,
+        "user_satisfaction": 0.95
+      }
+    },
+    "get_weather_data_tool": {
+      "id": "get_weather_data_tool",
+      "name": {
+        "fr": "Récupérateur de données météo",
+        "en": "Weather Data Retriever"
+      },
+      "description": {
+        "fr": "Récupère les données météorologiques actuelles et prévisionnelles pour l'agriculture",
+        "en": "Retrieves current and forecast weather data for agriculture"
+      },
+      "domain": "weather",
+      "subdomain": "meteorological_data",
+      "complexity": "low",
+      "priority": 2,
+      "keywords": {
+        "fr": {
+          "primary": ["météo", "weather", "temps", "climat"],
+          "secondary": ["prévision", "forecast", "conditions", "atmosphérique"],
+          "parameters": ["température", "pluie", "vent", "humidité", "pression", "radiation"],
+          "timeframes": ["actuel", "demain", "semaine", "mois", "saison"]
+        },
+        "en": {
+          "primary": ["weather", "climate", "meteorology", "atmospheric"],
+          "secondary": ["forecast", "prediction", "conditions", "environment"],
+          "parameters": ["temperature", "rain", "wind", "humidity", "pressure", "radiation"],
+          "timeframes": ["current", "tomorrow", "week", "month", "season"]
+        }
+      },
+      "intent_patterns": {
+        "fr": [
+          "prévision.*météo",
+          "données.*climatique",
+          "conditions.*temps",
+          "température.*pluie",
+          "météo.*semaine",
+          "climat.*région"
+        ],
+        "en": [
+          "weather.*forecast",
+          "climate.*data",
+          "weather.*conditions",
+          "temperature.*rain",
+          "weekly.*weather",
+          "regional.*climate"
+        ]
+      },
+      "use_cases": {
+        "fr": [
+          "Obtenir les prévisions météo",
+          "Analyser les conditions climatiques",
+          "Planifier selon la météo",
+          "Risques météorologiques"
+        ],
+        "en": [
+          "Get weather forecasts",
+          "Analyze climate conditions",
+          "Plan according to weather",
+          "Weather risks"
+        ]
+      },
+      "input_parameters": [
+        {"name": "location", "type": "string", "required": true},
+        {"name": "date_range", "type": "string", "required": false},
+        {"name": "weather_type", "type": "string", "required": false},
+        {"name": "precision", "type": "string", "required": false}
+      ],
+      "output_types": ["weather_forecast", "climate_data", "weather_alerts"],
+      "related_tools": ["generate_planning_tasks_tool"],
+      "exclusions": [],
+      "performance_metrics": {
+        "avg_execution_time_ms": 80,
+        "success_rate": 0.97,
+        "user_satisfaction": 0.89
+      }
+    },
+    "get_farm_data_tool": {
+      "id": "get_farm_data_tool",
+      "name": {
+        "fr": "Récupérateur de données d'exploitation",
+        "en": "Farm Data Retriever"
+      },
+      "description": {
+        "fr": "Récupère et analyse les données de l'exploitation agricole et des parcelles",
+        "en": "Retrieves and analyzes farm and parcel data"
+      },
+      "domain": "farm_data",
+      "subdomain": "data_management",
+      "complexity": "low",
+      "priority": 2,
+      "keywords": {
+        "fr": {
+          "primary": ["exploitation", "farm", "parcelle", "données"],
+          "secondary": ["terrain", "surface", "information", "analyse"],
+          "data_types": ["rendement", "sol", "culture", "historique", "géolocalisation"],
+          "metrics": ["productivité", "performance", "statistique", "indicateur"]
+        },
+        "en": {
+          "primary": ["farm", "field", "parcel", "data"],
+          "secondary": ["land", "area", "information", "analysis"],
+          "data_types": ["yield", "soil", "crop", "historical", "geolocation"],
+          "metrics": ["productivity", "performance", "statistics", "indicator"]
+        }
+      },
+      "intent_patterns": {
+        "fr": [
+          "données.*exploitation",
+          "information.*parcelle",
+          "analyse.*terrain",
+          "rendement.*culture",
+          "historique.*production",
+          "statistique.*agricole"
+        ],
+        "en": [
+          "farm.*data",
+          "field.*information",
+          "land.*analysis",
+          "crop.*yield",
+          "production.*history",
+          "agricultural.*statistics"
+        ]
+      },
+      "use_cases": {
+        "fr": [
+          "Obtenir les données de l'exploitation",
+          "Analyser les parcelles",
+          "Informations terrain",
+          "Données agricoles"
+        ],
+        "en": [
+          "Get farm data",
+          "Analyze parcels",
+          "Land information",
+          "Agricultural data"
+        ]
+      },
+      "input_parameters": [
+        {"name": "farm_id", "type": "string", "required": false},
+        {"name": "parcel_id", "type": "string", "required": false},
+        {"name": "data_type", "type": "string", "required": true},
+        {"name": "time_period", "type": "string", "required": false}
+      ],
+      "output_types": ["farm_data", "parcel_info", "agricultural_metrics"],
+      "related_tools": ["generate_planning_tasks_tool"],
+      "exclusions": [],
+      "performance_metrics": {
+        "avg_execution_time_ms": 60,
+        "success_rate": 0.99,
+        "user_satisfaction": 0.92
+      }
+    }
+  }
+}
