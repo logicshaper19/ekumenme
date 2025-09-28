@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     
     # API Configuration
     API_V1_STR: str = "/api/v1"
-    PROJECT_NAME: str = "Assistant Agricole IA"
+    PROJECT_NAME: str = "Ekumen Assistant"
     VERSION: str = "1.0.0"
     DESCRIPTION: str = "Intelligent Agricultural Assistant with Voice Interface"
     
@@ -32,11 +32,11 @@ class Settings(BaseSettings):
     # Database Configuration
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL", 
-        "postgresql+asyncpg://user:password@localhost:5432/agricultural_chatbot"
+        "postgresql+asyncpg://postgres:postgres@localhost:5432/ekumen_assistant"
     )
     DATABASE_URL_SYNC: str = os.getenv(
         "DATABASE_URL_SYNC",
-        "postgresql://user:password@localhost:5432/agricultural_chatbot"
+        "postgresql://postgres:postgres@localhost:5432/ekumen_assistant"
     )
     
     # Redis Configuration

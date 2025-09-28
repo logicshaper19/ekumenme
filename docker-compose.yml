@@ -4,9 +4,9 @@ services:
   # PostgreSQL Database
   postgres:
     image: postgis/postgis:15-3.3
-    container_name: agricultural-chatbot-db
+    container_name: ekumen-db
     environment:
-      POSTGRES_DB: agricultural_chatbot
+      POSTGRES_DB: ekumen_assistant
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
@@ -20,7 +20,7 @@ services:
   # Redis Cache
   redis:
     image: redis:7-alpine
-    container_name: agricultural-chatbot-redis
+    container_name: ekumen-redis
     ports:
       - "6379:6379"
     volumes:
@@ -31,11 +31,11 @@ services:
   # FastAPI Backend
   backend:
     build:
-      context: ./agricultural-chatbot-backend
+      context: ./Ekumen-assistant
       dockerfile: Dockerfile
-    container_name: agricultural-chatbot-backend
+    container_name: ekumen-assistant-backend
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/agricultural_chatbot
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/ekumen_assistant
       - REDIS_URL=redis://redis:6379
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
@@ -46,7 +46,7 @@ services:
       - postgres
       - redis
     volumes:
-      - ./agricultural-chatbot-backend:/app
+      - ./Ekumen-assistant:/app
     networks:
       - agricultural-network
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
@@ -54,13 +54,13 @@ services:
   # React Frontend
   frontend:
     build:
-      context: ./agricultural-chatbot-frontend
+      context: ./Ekumen-frontend
       dockerfile: Dockerfile
-    container_name: agricultural-chatbot-frontend
+    container_name: ekumen-frontend
     ports:
       - "3000:3000"
     volumes:
-      - ./agricultural-chatbot-frontend:/app
+      - ./Ekumen-frontend:/app
       - /app/node_modules
     networks:
       - agricultural-network
