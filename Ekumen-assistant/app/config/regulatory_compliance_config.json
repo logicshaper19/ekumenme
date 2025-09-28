@@ -1,21 +1,163 @@
 {
   "metadata": {
-    "version": "1.0.0",
+    "version": "2.0.0",
     "last_updated": "2024-09-28",
-    "description": "Regulatory compliance configuration"
+    "description": "Configuration réglementaire pour la conformité agricole française"
   },
-  "require_practice_type": true,
-  "validate_products": true,
-  "validate_location": true,
-  "validate_timing": true,
-  "include_amm_check": true,
-  "include_znt_check": true,
-  "include_timing_check": true,
-  "include_equipment_check": true,
-  "min_compliance_score": 0.0,
-  "max_compliance_score": 100.0,
-  "require_critical_violations": true,
-  "require_major_violations": true,
-  "strict_validation": true,
-  "return_validation_errors": true
+
+  "validation_settings": {
+    "require_practice_type": true,
+    "validate_products": true,
+    "validate_location": true,
+    "validate_timing": true,
+    "include_amm_check": true,
+    "include_znt_check": true,
+    "include_timing_check": true,
+    "include_equipment_check": true,
+    "min_compliance_score": 0.0,
+    "max_compliance_score": 100.0,
+    "require_critical_violations": true,
+    "require_major_violations": true,
+    "strict_validation": true,
+    "return_validation_errors": true
+  },
+
+  "znt_requirements": {
+    "cours_eau": {
+      "minimum_meters": 5,
+      "high_risk_meters": 20,
+      "very_high_risk_meters": 50,
+      "description": "Zones Non Traitées le long des cours d'eau"
+    },
+    "zones_protegees": {
+      "minimum_meters": 50,
+      "natura_2000_meters": 100,
+      "description": "Zones écologiquement sensibles"
+    },
+    "habitations": {
+      "minimum_meters": 10,
+      "ecoles_meters": 100,
+      "description": "Distance minimale des habitations"
+    }
+  },
+
+  "application_limits": {
+    "glyphosate": {
+      "max_applications_per_year": 2,
+      "max_dose_per_ha": 3.0,
+      "unit": "L/ha",
+      "restrictions": ["interdiction_usage_public", "formation_obligatoire"]
+    },
+    "neonicotinoides": {
+      "banned_crops": ["tournesol", "colza", "lin"],
+      "exceptions": ["betterave_sucre_2024"],
+      "status": "interdiction_generale"
+    },
+    "cuivre": {
+      "max_kg_per_ha_per_year": 4.0,
+      "bio_limit_kg_per_ha": 6.0,
+      "unit": "kg/ha/an"
+    }
+  },
+
+  "safety_intervals": {
+    "default_pre_harvest_days": 14,
+    "crop_specific": {
+      "legumes_feuilles": 7,
+      "fruits_a_pepins": 21,
+      "fruits_a_noyaux": 14,
+      "cereales": 35,
+      "vignes": 28,
+      "legumineuses": 21
+    },
+    "re_entry_intervals": {
+      "default_hours": 6,
+      "high_toxicity_hours": 24,
+      "very_high_toxicity_hours": 48
+    }
+  },
+
+  "seasonal_adjustments": {
+    "printemps": {
+      "humidity_weight": 1.2,
+      "temperature_weight": 0.8,
+      "wind_sensitivity": 1.1,
+      "bee_protection_multiplier": 1.5
+    },
+    "ete": {
+      "humidity_weight": 0.9,
+      "temperature_weight": 1.3,
+      "wind_sensitivity": 1.3,
+      "bee_protection_multiplier": 2.0
+    },
+    "automne": {
+      "humidity_weight": 1.1,
+      "temperature_weight": 1.0,
+      "wind_sensitivity": 1.2,
+      "bee_protection_multiplier": 1.2
+    },
+    "hiver": {
+      "humidity_weight": 1.0,
+      "temperature_weight": 0.7,
+      "wind_sensitivity": 0.9,
+      "bee_protection_multiplier": 0.5
+    }
+  },
+
+  "regional_factors": {
+    "bretagne": {
+      "rainfall_multiplier": 1.4,
+      "humidity_baseline": 0.8,
+      "special_restrictions": ["algues_vertes_prevention"]
+    },
+    "provence": {
+      "drought_risk_multiplier": 1.6,
+      "fire_risk_multiplier": 1.8,
+      "special_restrictions": ["mistral_wind_restrictions"]
+    },
+    "champagne": {
+      "soil_sensitivity": 1.2,
+      "groundwater_protection": 1.3,
+      "special_restrictions": ["craie_soil_precautions"]
+    },
+    "normandie": {
+      "rainfall_multiplier": 1.3,
+      "bocage_protection": 1.2,
+      "special_restrictions": ["hedgerow_protection"]
+    }
+  },
+
+  "risk_assessment": {
+    "environmental_factors": {
+      "aquatic_toxicity": {"low": 1, "medium": 2, "high": 3, "very_high": 4},
+      "bee_toxicity": {"low": 1, "medium": 2, "high": 3, "very_high": 4},
+      "soil_persistence": {"low": 1, "medium": 2, "high": 3, "very_high": 4}
+    },
+    "weather_conditions": {
+      "wind_speed_max_kmh": 20,
+      "temperature_max_celsius": 30,
+      "humidity_min_percent": 60,
+      "rain_forecast_hours": 6
+    },
+    "application_timing": {
+      "bee_activity_hours": ["08:00", "18:00"],
+      "optimal_hours": ["06:00", "10:00", "18:00", "22:00"],
+      "forbidden_hours": ["12:00", "16:00"]
+    }
+  },
+
+  "compliance_scoring": {
+    "weights": {
+      "authorization_status": 0.3,
+      "dosage_compliance": 0.25,
+      "znt_compliance": 0.2,
+      "timing_compliance": 0.15,
+      "environmental_impact": 0.1
+    },
+    "thresholds": {
+      "compliant": 0.8,
+      "warning": 0.6,
+      "non_compliant": 0.4
+    }
+  }
 }

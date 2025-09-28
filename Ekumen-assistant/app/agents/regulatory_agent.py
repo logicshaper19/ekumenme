@@ -437,13 +437,15 @@ L'exploitant reste SEUL RESPONSABLE de la conformité réglementaire.
 
 class IntegratedRegulatoryAgent(IntegratedAgriculturalAgent):
     """Regulatory agent that maintains safety while leveraging system integration."""
-    
-    def __init__(self, llm_manager, knowledge_retriever: SemanticKnowledgeRetriever, 
+
+    def __init__(self, llm_manager, knowledge_retriever: SemanticKnowledgeRetriever,
                  database_config=None):
-        
-        # Initialize comprehensive safety-first tools with semantic enhancement
+
+        # Initialize database-integrated tools with real EPHY data
+        from ..tools.regulatory_agent.database_integrated_amm_tool import DatabaseIntegratedAMMLookupTool
+
         tools = [
-            SafeSemanticAMMLookupTool(database_config, knowledge_retriever)
+            DatabaseIntegratedAMMLookupTool()
         ]
         
         super().__init__(
