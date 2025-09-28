@@ -62,6 +62,32 @@ class SemanticKnowledgeRetriever:
     def retrieve_relevant_knowledge(self, query: str, top_k: int = 3) -> List[str]:
         return ["Connaissance agricole générale disponible"]
 
+class AgentState(BaseModel):
+    """State management for agricultural agents."""
+    
+    # Core state
+    current_message: str = ""
+    conversation_history: List[Dict[str, Any]] = Field(default_factory=list)
+    context: Dict[str, Any] = Field(default_factory=dict)
+    
+    # Agent metadata
+    agent_type: str = ""
+    session_id: str = ""
+    user_id: str = ""
+    
+    # Processing state
+    is_processing: bool = False
+    last_activity: Optional[str] = None
+    
+    # Results and outputs
+    current_response: str = ""
+    confidence_score: float = 0.0
+    recommendations: List[str] = Field(default_factory=list)
+    
+    # Error handling
+    errors: List[str] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+
 logger = logging.getLogger(__name__)
 
 # =============================================================================

@@ -13,7 +13,7 @@ from enum import Enum
 
 # Import from integrated system
 try:
-    from .base_agent import IntegratedAgriculturalAgent, AgentType, TaskComplexity
+    from .base_agent import IntegratedAgriculturalAgent, AgentType, TaskComplexity, AgentState
     from .base_agent import SemanticKnowledgeRetriever
 except ImportError:
     # Fallback imports
@@ -1065,3 +1065,47 @@ Fournissez des analyses précises, chiffrées et des recommandations actionnable
             "roi", "analyse financière", "réduction", "amélioration"
         ]
         return any(indicator in message.lower() for indicator in economic_indicators)
+
+
+class OperationalPlanningCoordinatorAgent(IntegratedPlanningEconomicAgent):
+    """Operational Planning Coordinator Agent for task coordination and resource management."""
+    
+    def __init__(self, llm_manager=None, knowledge_retriever=None, database_config=None):
+        # Use fallback components if not provided
+        if llm_manager is None:
+            llm_manager = CostOptimizedLLMManager()
+        if knowledge_retriever is None:
+            knowledge_retriever = SemanticKnowledgeRetriever()
+            
+        super().__init__(llm_manager, knowledge_retriever, database_config)
+        
+        # Override description for coordinator role
+        self.description = "Coordinateur de planification opérationnelle agricole"
+    
+    def process_message(self, message: str, state: AgentState, context: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Process operational planning coordination requests."""
+        try:
+            # Use parent class processing with coordinator-specific enhancements
+            result = super().process_message(message, state, context)
+            
+            # Add coordination-specific metadata
+            result["coordination_metadata"] = {
+                "agent_type": "operational_planning_coordinator",
+                "coordination_level": "operational",
+                "resource_management": True,
+                "task_optimization": True
+            }
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in operational planning coordination: {e}")
+            return {
+                "response": f"Erreur dans la coordination de planification: {str(e)}",
+                "confidence": 0.0,
+                "error": str(e),
+                "coordination_metadata": {
+                    "agent_type": "operational_planning_coordinator",
+                    "error": True
+                }
+            }
