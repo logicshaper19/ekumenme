@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Comprehensive test suite for Enhanced Semantic Tool Selector
+Comprehensive test suite for Semantic Tool Selector
 Tests production-ready features including configuration-based profiles, consistent scoring, and robust fallback mechanisms.
 """
 
@@ -13,12 +13,12 @@ from typing import List, Dict, Any
 # Add the app directory to the Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'app'))
 
-from services.enhanced_semantic_tool_selector import (
-    EnhancedSemanticToolSelector,
+from services.semantic_tool_selector import (
+    SemanticToolSelector,
     ToolSelectionResult,
     LanguageDetector,
     ScoringNormalizer,
-    select_tools_enhanced
+    semantic_tool_selector
 )
 
 def test_language_detection():
@@ -101,7 +101,7 @@ def test_configuration_loading():
     print("\n📁 Testing Configuration Loading...")
     
     try:
-        selector = EnhancedSemanticToolSelector()
+        selector = SemanticToolSelector()
         
         # Check configuration loaded
         assert selector.config is not None, "Configuration not loaded"
@@ -139,7 +139,7 @@ def test_tool_selection_methods():
     """Test different tool selection methods."""
     print("\n🎯 Testing Tool Selection Methods...")
     
-    selector = EnhancedSemanticToolSelector()
+    selector = SemanticToolSelector()
     
     # Test queries in French
     test_queries = [
@@ -233,7 +233,7 @@ def test_fallback_mechanisms():
     """Test fallback mechanisms for edge cases."""
     print("\n🔄 Testing Fallback Mechanisms...")
     
-    selector = EnhancedSemanticToolSelector()
+    selector = SemanticToolSelector()
     available_tools = list(selector.tool_profiles.keys())
     
     # Test with very high threshold (should trigger fallback)
@@ -283,7 +283,7 @@ def test_performance():
     """Test performance characteristics."""
     print("\n⚡ Testing Performance...")
     
-    selector = EnhancedSemanticToolSelector()
+    selector = SemanticToolSelector()
     available_tools = list(selector.tool_profiles.keys())
     
     # Test queries
@@ -326,7 +326,7 @@ def test_performance():
 
 def run_all_tests():
     """Run comprehensive test suite."""
-    print("🧪 Enhanced Semantic Tool Selector - Comprehensive Test Suite")
+    print("🧪 Semantic Tool Selector - Comprehensive Test Suite")
     print("=" * 70)
     
     tests = [
@@ -365,7 +365,7 @@ def run_all_tests():
     print(f"\n🎯 Overall Result: {passed}/{total} tests passed ({passed/total:.1%})")
     
     if passed == total:
-        print("🎉 All tests passed! Enhanced Semantic Tool Selector is ready for production.")
+        print("🎉 All tests passed! Semantic Tool Selector is ready for production.")
     else:
         print("⚠️  Some tests failed. Please review the implementation.")
     
