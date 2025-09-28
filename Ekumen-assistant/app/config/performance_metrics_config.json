@@ -1,0 +1,17 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Performance metrics configuration"
+  },
+  "require_records": true,
+  "validate_data_quality": true,
+  "include_yield_metrics": true,
+  "include_cost_metrics": true,
+  "include_quality_metrics": true,
+  "min_records": 1,
+  "max_records": 10000,
+  "require_benchmark_comparison": true,
+  "strict_validation": true,
+  "return_validation_errors": true
+}

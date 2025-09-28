@@ -1,0 +1,178 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Safety guidelines knowledge base for agricultural products and practices"
+  },
+  "safety_levels": {
+    "low": {
+      "description": "Risque faible - précautions de base",
+      "color": "green",
+      "icon": "🟢",
+      "equipment_required": ["gants", "vêtements de protection"]
+    },
+    "medium": {
+      "description": "Risque modéré - précautions renforcées",
+      "color": "yellow",
+      "icon": "🟡",
+      "equipment_required": ["gants", "vêtements de protection", "masque", "lunettes"]
+    },
+    "high": {
+      "description": "Risque élevé - précautions maximales",
+      "color": "orange",
+      "icon": "🟠",
+      "equipment_required": ["combinaison étanche", "masque complet", "gants étanches", "lunettes", "bottes"]
+    },
+    "critical": {
+      "description": "Risque critique - équipement spécialisé",
+      "color": "red",
+      "icon": "🔴",
+      "equipment_required": ["combinaison étanche", "masque à gaz", "gants étanches", "lunettes", "bottes", "appareil respiratoire"]
+    }
+  },
+  "product_safety_guidelines": {
+    "pesticides": {
+      "safety_level": "high",
+      "guidelines": [
+        "Ne jamais mélanger différents produits",
+        "Respecter les doses homologuées",
+        "Éviter le contact avec la peau",
+        "Ne pas inhaler les vapeurs",
+        "Stocker dans un endroit ventilé"
+      ],
+      "required_equipment": [
+        "combinaison étanche",
+        "gants étanches",
+        "masque complet",
+        "lunettes de protection",
+        "bottes étanches"
+      ],
+      "emergency_procedures": [
+        "En cas de contact: rincer immédiatement à l'eau",
+        "En cas d'ingestion: appeler le centre antipoison",
+        "En cas d'inhalation: sortir à l'air libre",
+        "Conserver l'étiquette du produit"
+      ]
+    },
+    "herbicides": {
+      "safety_level": "medium",
+      "guidelines": [
+        "Éviter le contact avec la peau",
+        "Ne pas traiter par vent fort",
+        "Respecter les délais avant récolte",
+        "Protéger les cultures non cibles"
+      ],
+      "required_equipment": [
+        "vêtements de protection",
+        "gants",
+        "masque",
+        "lunettes"
+      ],
+      "emergency_procedures": [
+        "En cas de contact: rincer à l'eau",
+        "En cas d'ingestion: appeler le centre antipoison",
+        "Éviter la contamination des eaux"
+      ]
+    },
+    "fungicides": {
+      "safety_level": "medium",
+      "guidelines": [
+        "Éviter le contact avec la peau",
+        "Respecter les conditions d'application",
+        "Ne pas traiter par temps humide",
+        "Alterner les modes d'action"
+      ],
+      "required_equipment": [
+        "vêtements de protection",
+        "gants",
+        "masque",
+        "lunettes"
+      ],
+      "emergency_procedures": [
+        "En cas de contact: rincer à l'eau",
+        "En cas d'ingestion: appeler le centre antipoison",
+        "Surveiller les signes d'intoxication"
+      ]
+    },
+    "fertilizers": {
+      "safety_level": "low",
+      "guidelines": [
+        "Éviter le contact avec la peau",
+        "Ne pas inhaler les poussières",
+        "Stocker dans un endroit sec",
+        "Respecter les doses recommandées"
+      ],
+      "required_equipment": [
+        "gants",
+        "vêtements de protection",
+        "masque anti-poussière"
+      ],
+      "emergency_procedures": [
+        "En cas de contact: rincer à l'eau",
+        "En cas d'ingestion: boire de l'eau",
+        "Éviter la contamination des eaux"
+      ]
+    }
+  },
+  "practice_safety_guidelines": {
+    "spraying": {
+      "safety_level": "high",
+      "guidelines": [
+        "Vérifier le matériel avant utilisation",
+        "Respecter les conditions météo",
+        "Éviter la dérive",
+        "Nettoyer le matériel après usage"
+      ],
+      "required_equipment": [
+        "pulvérisateur homologué",
+        "équipement de protection individuelle",
+        "masque complet",
+        "combinaison étanche"
+      ],
+      "emergency_procedures": [
+        "Arrêter immédiatement en cas de problème",
+        "Éviter la contamination de l'environnement",
+        "Signaler tout incident"
+      ]
+    },
+    "seed_treatment": {
+      "safety_level": "medium",
+      "guidelines": [
+        "Éviter le contact avec la peau",
+        "Respecter les doses de traitement",
+        "Stocker les semences traitées séparément",
+        "Étiqueter clairement"
+      ],
+      "required_equipment": [
+        "gants étanches",
+        "vêtements de protection",
+        "masque",
+        "lunettes"
+      ],
+      "emergency_procedures": [
+        "En cas de contact: rincer à l'eau",
+        "En cas d'ingestion: appeler le centre antipoison",
+        "Éviter la contamination des semences non traitées"
+      ]
+    },
+    "soil_treatment": {
+      "safety_level": "low",
+      "guidelines": [
+        "Éviter le contact avec la peau",
+        "Respecter les doses recommandées",
+        "Éviter la contamination des eaux",
+        "Travailler par temps sec"
+      ],
+      "required_equipment": [
+        "gants",
+        "vêtements de protection",
+        "masque anti-poussière"
+      ],
+      "emergency_procedures": [
+        "En cas de contact: rincer à l'eau",
+        "Éviter la contamination des eaux",
+        "Surveiller l'environnement"
+      ]
+    }
+  }
+}

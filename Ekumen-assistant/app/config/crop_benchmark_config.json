@@ -1,0 +1,18 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Crop benchmark configuration"
+  },
+  "require_crop_type": true,
+  "validate_yield_range": true,
+  "validate_quality_range": true,
+  "include_regional_adjustment": true,
+  "min_yield": 0.0,
+  "max_yield": 200.0,
+  "min_quality": 0.0,
+  "max_quality": 10.0,
+  "default_region": "france",
+  "strict_validation": true,
+  "return_validation_errors": true
+}

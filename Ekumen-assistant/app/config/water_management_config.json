@@ -1,0 +1,21 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Water management configuration"
+  },
+  "require_water_usage": true,
+  "validate_water_quality": true,
+  "include_irrigation_efficiency": true,
+  "include_water_quality": true,
+  "include_conservation_measures": true,
+  "include_runoff_control": true,
+  "min_water_efficiency": 0.0,
+  "max_water_efficiency": 100.0,
+  "min_ph": 4.0,
+  "max_ph": 12.0,
+  "min_salinity": 0.0,
+  "max_salinity": 10.0,
+  "strict_validation": true,
+  "return_validation_errors": true
+}

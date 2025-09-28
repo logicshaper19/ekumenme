@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Soil health configuration"
+  },
+  "require_soil_indicators": true,
+  "validate_indicator_values": true,
+  "include_organic_matter": true,
+  "include_ph_level": true,
+  "include_nutrient_content": true,
+  "include_water_capacity": true,
+  "include_soil_structure": true,
+  "include_biological_activity": true,
+  "min_organic_matter": 0.0,
+  "max_organic_matter": 20.0,
+  "min_ph": 3.0,
+  "max_ph": 10.0,
+  "min_nutrients": 0.0,
+  "max_nutrients": 1000.0,
+  "strict_validation": true,
+  "return_validation_errors": true
+}

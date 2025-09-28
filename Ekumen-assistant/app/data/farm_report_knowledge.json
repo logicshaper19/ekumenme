@@ -1,0 +1,104 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Farm report knowledge base for agricultural report generation"
+  },
+  "report_sections": {
+    "executive_summary": {
+      "title": "Résumé Exécutif",
+      "description": "Vue d'ensemble des performances de l'exploitation",
+      "priority": 1,
+      "required": true
+    },
+    "performance_analysis": {
+      "title": "Analyse des Performances",
+      "description": "Détail des métriques de performance",
+      "priority": 2,
+      "required": true
+    },
+    "benchmark_comparison": {
+      "title": "Comparaison aux Standards",
+      "description": "Comparaison aux benchmarks de l'industrie",
+      "priority": 3,
+      "required": false
+    },
+    "trend_analysis": {
+      "title": "Analyse des Tendance",
+      "description": "Évolution des performances dans le temps",
+      "priority": 4,
+      "required": false
+    },
+    "recommendations": {
+      "title": "Recommandations",
+      "description": "Suggestions d'amélioration",
+      "priority": 5,
+      "required": true
+    }
+  },
+  "report_templates": {
+    "executive_summary": {
+      "template": "L'exploitation présente {overall_performance} avec un score global de {overall_score}/100. Les points forts incluent {strengths} et les axes d'amélioration concernent {improvements}.",
+      "variables": ["overall_performance", "overall_score", "strengths", "improvements"]
+    },
+    "performance_analysis": {
+      "template": "Analyse détaillée: Rendement moyen {yield_avg} q/ha, Coût moyen {cost_avg} €/ha, Qualité moyenne {quality_avg}/10.",
+      "variables": ["yield_avg", "cost_avg", "quality_avg"]
+    },
+    "benchmark_comparison": {
+      "template": "Comparaison aux standards: {benchmark_summary}",
+      "variables": ["benchmark_summary"]
+    },
+    "trend_analysis": {
+      "template": "Tendances observées: {trend_summary}",
+      "variables": ["trend_summary"]
+    },
+    "recommendations": {
+      "template": "Recommandations prioritaires: {priority_recommendations}",
+      "variables": ["priority_recommendations"]
+    }
+  },
+  "performance_categories": {
+    "excellent": {
+      "score_range": [80, 100],
+      "description": "Performance excellente",
+      "color": "green",
+      "icon": "🏆"
+    },
+    "good": {
+      "score_range": [60, 79],
+      "description": "Bonne performance",
+      "color": "blue",
+      "icon": "👍"
+    },
+    "average": {
+      "score_range": [40, 59],
+      "description": "Performance moyenne",
+      "color": "yellow",
+      "icon": "⚖️"
+    },
+    "poor": {
+      "score_range": [0, 39],
+      "description": "Performance faible",
+      "color": "red",
+      "icon": "⚠️"
+    }
+  },
+  "recommendation_priorities": {
+    "high": {
+      "description": "Action immédiate requise",
+      "urgency": "urgent",
+      "impact": "high"
+    },
+    "medium": {
+      "description": "Action recommandée dans les 3 mois",
+      "urgency": "moderate",
+      "impact": "medium"
+    },
+    "low": {
+      "description": "Amélioration à long terme",
+      "urgency": "low",
+      "impact": "low"
+    }
+  }
+}

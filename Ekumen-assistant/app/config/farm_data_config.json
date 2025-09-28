@@ -1,0 +1,16 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Farm data configuration"
+  },
+  "require_filters": true,
+  "validate_time_period": true,
+  "validate_crop_types": true,
+  "validate_parcel_types": true,
+  "max_records_returned": 1000,
+  "default_time_period": "current_year",
+  "require_at_least_one_filter": true,
+  "strict_validation": true,
+  "return_validation_errors": true
+}

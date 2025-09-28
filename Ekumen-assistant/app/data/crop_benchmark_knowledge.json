@@ -1,0 +1,89 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Crop benchmark knowledge base for agricultural performance comparison"
+  },
+  "industry_benchmarks": {
+    "blé": {
+      "yield_benchmark": 70.0,
+      "quality_benchmark": 8.0,
+      "cost_benchmark": 450.0,
+      "description": "Blé tendre - France"
+    },
+    "maïs": {
+      "yield_benchmark": 90.0,
+      "quality_benchmark": 8.5,
+      "cost_benchmark": 520.0,
+      "description": "Maïs grain - France"
+    },
+    "tournesol": {
+      "yield_benchmark": 30.0,
+      "quality_benchmark": 7.5,
+      "cost_benchmark": 380.0,
+      "description": "Tournesol - France"
+    },
+    "colza": {
+      "yield_benchmark": 35.0,
+      "quality_benchmark": 8.2,
+      "cost_benchmark": 480.0,
+      "description": "Colza - France"
+    },
+    "orge": {
+      "yield_benchmark": 65.0,
+      "quality_benchmark": 7.8,
+      "cost_benchmark": 420.0,
+      "description": "Orge - France"
+    },
+    "avoine": {
+      "yield_benchmark": 55.0,
+      "quality_benchmark": 7.5,
+      "cost_benchmark": 400.0,
+      "description": "Avoine - France"
+    }
+  },
+  "performance_categories": {
+    "excellent": {
+      "yield_threshold": 1.2,
+      "quality_threshold": 1.15,
+      "description": "Top 10% des performances"
+    },
+    "good": {
+      "yield_threshold": 1.1,
+      "quality_threshold": 1.05,
+      "description": "Top 25% des performances"
+    },
+    "average": {
+      "yield_threshold": 1.0,
+      "quality_threshold": 1.0,
+      "description": "Performance moyenne"
+    },
+    "below_average": {
+      "yield_threshold": 0.9,
+      "quality_threshold": 0.95,
+      "description": "En dessous de la moyenne"
+    },
+    "poor": {
+      "yield_threshold": 0.8,
+      "quality_threshold": 0.85,
+      "description": "Performance faible"
+    }
+  },
+  "regional_factors": {
+    "france": {
+      "yield_multiplier": 1.0,
+      "quality_multiplier": 1.0,
+      "cost_multiplier": 1.0
+    },
+    "europe": {
+      "yield_multiplier": 1.05,
+      "quality_multiplier": 1.02,
+      "cost_multiplier": 1.1
+    },
+    "global": {
+      "yield_multiplier": 0.8,
+      "quality_multiplier": 0.9,
+      "cost_multiplier": 0.7
+    }
+  }
+}

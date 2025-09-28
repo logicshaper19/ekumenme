@@ -1,0 +1,48 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Trend analysis knowledge base for agricultural data analysis"
+  },
+  "trend_indicators": {
+    "yield_trends": {
+      "strong_positive": {"min_change": 10.0, "description": "Forte croissance du rendement"},
+      "positive": {"min_change": 5.0, "max_change": 9.9, "description": "Croissance du rendement"},
+      "stable": {"min_change": -2.0, "max_change": 4.9, "description": "Rendement stable"},
+      "negative": {"min_change": -10.0, "max_change": -2.1, "description": "Baisse du rendement"},
+      "strong_negative": {"max_change": -10.1, "description": "Forte baisse du rendement"}
+    },
+    "cost_trends": {
+      "cost_reduction": {"max_change": -5.0, "description": "Réduction des coûts"},
+      "cost_stable": {"min_change": -5.0, "max_change": 5.0, "description": "Coûts stables"},
+      "cost_increase": {"min_change": 5.1, "description": "Augmentation des coûts"}
+    },
+    "quality_trends": {
+      "quality_improvement": {"min_change": 0.5, "description": "Amélioration de la qualité"},
+      "quality_stable": {"min_change": -0.5, "max_change": 0.4, "description": "Qualité stable"},
+      "quality_decline": {"max_change": -0.6, "description": "Baisse de la qualité"}
+    }
+  },
+  "statistical_methods": {
+    "linear_regression": {
+      "description": "Régression linéaire pour tendance générale",
+      "min_data_points": 3,
+      "confidence_threshold": 0.7
+    },
+    "moving_average": {
+      "description": "Moyenne mobile pour lissage des données",
+      "window_size": 3,
+      "min_data_points": 5
+    },
+    "year_over_year": {
+      "description": "Comparaison année par année",
+      "min_data_points": 2,
+      "preferred_method": true
+    }
+  },
+  "trend_analysis_weights": {
+    "yield_weight": 0.4,
+    "cost_weight": 0.3,
+    "quality_weight": 0.3
+  }
+}

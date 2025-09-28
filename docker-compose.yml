@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgis/postgis:15-3.3
+    container_name: agricultural-chatbot-db
+    environment:
+      POSTGRES_DB: agricultural_chatbot
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - agricultural-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: agricultural-chatbot-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - agricultural-network
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./agricultural-chatbot-backend
+      dockerfile: Dockerfile
+    container_name: agricultural-chatbot-backend
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/agricultural_chatbot
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
+      - WEATHER_API_KEY=${WEATHER_API_KEY}
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./agricultural-chatbot-backend:/app
+    networks:
+      - agricultural-network
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./agricultural-chatbot-frontend
+      dockerfile: Dockerfile
+    container_name: agricultural-chatbot-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./agricultural-chatbot-frontend:/app
+      - /app/node_modules
+    networks:
+      - agricultural-network
+    command: npm run dev
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  agricultural-network:
+    driver: bridge

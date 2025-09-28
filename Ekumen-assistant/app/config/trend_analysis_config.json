@@ -1,0 +1,18 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Trend analysis configuration"
+  },
+  "require_records": true,
+  "validate_data_quality": true,
+  "include_yield_trends": true,
+  "include_cost_trends": true,
+  "include_quality_trends": true,
+  "min_records": 2,
+  "max_records": 10000,
+  "min_years_for_trend": 2,
+  "require_time_series": true,
+  "strict_validation": true,
+  "return_validation_errors": true
+}

@@ -1,0 +1,560 @@
+/* Agricultural Chatbot Design System - Component Styles */
+/* Adapted from Sema design system for agricultural context */
+
+@layer components {
+  /* Agricultural Card Styles */
+  .agricultural-card {
+    @apply bg-white rounded-xl shadow-card border border-gray-200 transition-all duration-200;
+  }
+  
+  .agricultural-card-interactive {
+    @apply cursor-pointer hover:shadow-lg hover:border-gray-300;
+  }
+  
+  .agricultural-card-loading {
+    @apply opacity-75 pointer-events-none;
+  }
+  
+  .agricultural-card-accent {
+    @apply border-l-4;
+  }
+  
+  /* Card Type Variants */
+  .agricultural-card-farm-data {
+    @apply border-l-primary-500;
+  }
+  
+  .agricultural-card-weather {
+    @apply border-l-info-500;
+  }
+  
+  .agricultural-card-regulatory {
+    @apply border-l-warning-500;
+  }
+  
+  .agricultural-card-crop-health {
+    @apply border-l-success-500;
+  }
+  
+  .agricultural-card-planning {
+    @apply border-l-primary-600;
+  }
+  
+  .agricultural-card-sustainability {
+    @apply border-l-earth-600;
+  }
+  
+  .agricultural-card-voice-journal {
+    @apply border-l-info-600;
+  }
+  
+  /* Card Status Variants */
+  .agricultural-card-healthy {
+    @apply bg-success-50 border-success-200;
+  }
+  
+  .agricultural-card-warning {
+    @apply bg-warning-50 border-warning-200;
+  }
+  
+  .agricultural-card-critical {
+    @apply bg-error-50 border-error-200;
+  }
+  
+  .agricultural-card-info {
+    @apply bg-info-50 border-info-200;
+  }
+  
+  /* Card Header */
+  .agricultural-card-header {
+    @apply px-6 py-4 border-b border-gray-200 flex items-center justify-between;
+  }
+  
+  .agricultural-card-header-content {
+    @apply flex items-center space-x-3;
+  }
+  
+  .agricultural-card-icon {
+    @apply flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg;
+  }
+  
+  .agricultural-card-title-section {
+    @apply flex-1 min-w-0;
+  }
+  
+  .agricultural-card-title {
+    @apply text-lg font-semibold text-gray-900 truncate;
+  }
+  
+  .agricultural-card-subtitle {
+    @apply text-sm text-gray-600 mt-1;
+  }
+  
+  .agricultural-card-loading-spinner {
+    @apply flex-shrink-0;
+  }
+  
+  /* Card Body */
+  .agricultural-card-body {
+    @apply px-6 py-4;
+  }
+  
+  /* Card Footer */
+  .agricultural-card-footer {
+    @apply px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl;
+  }
+  
+  /* Voice Interface Styles */
+  .voice-interface {
+    @apply flex flex-col items-center space-y-4 p-6 bg-white rounded-xl shadow-card border border-gray-200;
+  }
+  
+  .voice-interface-active {
+    @apply border-primary-300 bg-primary-50;
+  }
+  
+  .voice-interface-recording {
+    @apply border-warning-300 bg-warning-50;
+  }
+  
+  /* Voice Interface Sizes */
+  .voice-interface-sm {
+    @apply p-4;
+  }
+  
+  .voice-interface-md {
+    @apply p-6;
+  }
+  
+  .voice-interface-lg {
+    @apply p-8;
+  }
+  
+  /* Voice Interface States */
+  .voice-interface-idle {
+    @apply border-gray-200 bg-gray-50;
+  }
+  
+  .voice-interface-listening {
+    @apply border-primary-400 bg-primary-100;
+  }
+  
+  .voice-interface-processing {
+    @apply border-warning-400 bg-warning-100;
+  }
+  
+  .voice-interface-speaking {
+    @apply border-success-400 bg-success-100;
+  }
+  
+  .voice-interface-error {
+    @apply border-error-400 bg-error-100;
+  }
+  
+  /* Voice Button */
+  .voice-button {
+    @apply relative w-16 h-16 rounded-full flex items-center justify-center transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-offset-2;
+  }
+  
+  .voice-interface-idle .voice-button {
+    @apply bg-gray-200 text-gray-600 hover:bg-gray-300 focus:ring-gray-500;
+  }
+  
+  .voice-interface-listening .voice-button {
+    @apply bg-primary-500 text-white hover:bg-primary-600 focus:ring-primary-500;
+  }
+  
+  .voice-interface-processing .voice-button {
+    @apply bg-warning-500 text-white hover:bg-warning-600 focus:ring-warning-500;
+  }
+  
+  .voice-interface-speaking .voice-button {
+    @apply bg-success-500 text-white hover:bg-success-600 focus:ring-success-500;
+  }
+  
+  .voice-interface-error .voice-button {
+    @apply bg-error-500 text-white hover:bg-error-600 focus:ring-error-500;
+  }
+  
+  .voice-button-icon {
+    @apply w-8 h-8 flex items-center justify-center;
+  }
+  
+  .voice-icon {
+    @apply w-6 h-6 transition-all duration-200;
+  }
+  
+  .voice-icon-listening {
+    @apply animate-pulse;
+  }
+  
+  .voice-icon-processing {
+    @apply animate-spin;
+  }
+  
+  .voice-icon-speaking {
+    @apply animate-bounce;
+  }
+  
+  /* Voice Pulse Ring */
+  .voice-pulse-ring {
+    @apply absolute inset-0 rounded-full border-2 border-primary-400 animate-ping;
+  }
+  
+  /* Voice Status */
+  .voice-status {
+    @apply text-center;
+  }
+  
+  .voice-status-text {
+    @apply text-sm font-medium text-gray-700;
+  }
+  
+  .voice-interface-listening .voice-status-text {
+    @apply text-primary-700;
+  }
+  
+  .voice-interface-processing .voice-status-text {
+    @apply text-warning-700;
+  }
+  
+  .voice-interface-speaking .voice-status-text {
+    @apply text-success-700;
+  }
+  
+  .voice-interface-error .voice-status-text {
+    @apply text-error-700;
+  }
+  
+  /* Voice Transcript */
+  .voice-transcript {
+    @apply w-full max-w-md;
+  }
+  
+  .voice-transcript-label {
+    @apply text-xs font-medium text-gray-500 mb-2;
+  }
+  
+  .voice-transcript-text {
+    @apply text-sm text-gray-800 bg-gray-100 rounded-lg p-3 border border-gray-200;
+  }
+  
+  /* Agricultural Button Styles */
+  .btn-agricultural {
+    @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  .btn-agricultural-primary {
+    @apply btn-agricultural bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
+  }
+  
+  .btn-agricultural-success {
+    @apply btn-agricultural bg-success-600 text-white hover:bg-success-700 focus:ring-success-500;
+  }
+  
+  .btn-agricultural-warning {
+    @apply btn-agricultural bg-warning-600 text-white hover:bg-warning-700 focus:ring-warning-500;
+  }
+  
+  .btn-agricultural-error {
+    @apply btn-agricultural bg-error-600 text-white hover:bg-error-700 focus:ring-error-500;
+  }
+  
+  .btn-agricultural-outline {
+    @apply btn-agricultural border border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-gray-500;
+  }
+  
+  .btn-agricultural-ghost {
+    @apply btn-agricultural text-gray-700 hover:bg-gray-100 focus:ring-gray-500;
+  }
+  
+  /* Agricultural Badge Styles */
+  .badge-agricultural {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  
+  .badge-agricultural-primary {
+    @apply badge-agricultural bg-primary-100 text-primary-800;
+  }
+  
+  .badge-agricultural-success {
+    @apply badge-agricultural bg-success-100 text-success-800;
+  }
+  
+  .badge-agricultural-warning {
+    @apply badge-agricultural bg-warning-100 text-warning-800;
+  }
+  
+  .badge-agricultural-error {
+    @apply badge-agricultural bg-error-100 text-error-800;
+  }
+  
+  .badge-agricultural-info {
+    @apply badge-agricultural bg-info-100 text-info-800;
+  }
+  
+  .badge-agricultural-earth {
+    @apply badge-agricultural bg-earth-100 text-earth-800;
+  }
+  
+  /* Weather Status Badges */
+  .badge-weather-optimal {
+    @apply badge-agricultural bg-success-100 text-success-800;
+  }
+  
+  .badge-weather-caution {
+    @apply badge-agricultural bg-warning-100 text-warning-800;
+  }
+  
+  .badge-weather-dangerous {
+    @apply badge-agricultural bg-error-100 text-error-800;
+  }
+  
+  /* Crop Health Badges */
+  .badge-crop-excellent {
+    @apply badge-agricultural bg-success-200 text-success-900;
+  }
+  
+  .badge-crop-good {
+    @apply badge-agricultural bg-success-100 text-success-800;
+  }
+  
+  .badge-crop-fair {
+    @apply badge-agricultural bg-warning-100 text-warning-800;
+  }
+  
+  .badge-crop-poor {
+    @apply badge-agricultural bg-error-100 text-error-800;
+  }
+  
+  /* Regulatory Status Badges */
+  .badge-regulatory-approved {
+    @apply badge-agricultural bg-success-100 text-success-800;
+  }
+  
+  .badge-regulatory-pending {
+    @apply badge-agricultural bg-warning-100 text-warning-800;
+  }
+  
+  .badge-regulatory-rejected {
+    @apply badge-agricultural bg-error-100 text-error-800;
+  }
+  
+  .badge-regulatory-restricted {
+    @apply badge-agricultural bg-error-200 text-error-900;
+  }
+  
+  /* Agent Status Indicators */
+  .agent-status {
+    @apply inline-flex items-center px-2 py-1 rounded-full text-xs font-medium;
+  }
+  
+  .agent-status-active {
+    @apply agent-status bg-success-100 text-success-800;
+  }
+  
+  .agent-status-processing {
+    @apply agent-status bg-warning-100 text-warning-800;
+  }
+  
+  .agent-status-error {
+    @apply agent-status bg-error-100 text-error-800;
+  }
+  
+  .agent-status-idle {
+    @apply agent-status bg-gray-100 text-gray-800;
+  }
+  
+  /* Data Display Components */
+  .data-display {
+    @apply bg-white rounded-lg border border-gray-200 p-4;
+  }
+  
+  .data-display-label {
+    @apply text-sm font-medium text-gray-600 mb-1;
+  }
+  
+  .data-display-value {
+    @apply text-2xl font-bold text-gray-900;
+  }
+  
+  .data-display-unit {
+    @apply text-sm text-gray-500 ml-1;
+  }
+  
+  .data-display-change {
+    @apply text-sm font-medium mt-1;
+  }
+  
+  .data-display-change-positive {
+    @apply data-display-change text-success-600;
+  }
+  
+  .data-display-change-negative {
+    @apply data-display-change text-error-600;
+  }
+  
+  .data-display-change-neutral {
+    @apply data-display-change text-gray-600;
+  }
+  
+  /* Weather Display */
+  .weather-display {
+    @apply data-display;
+  }
+  
+  .weather-temp {
+    @apply text-4xl font-bold text-gray-900;
+  }
+  
+  .weather-condition {
+    @apply text-lg font-medium text-gray-700;
+  }
+  
+  .weather-details {
+    @apply text-sm text-gray-600 space-y-1;
+  }
+  
+  /* Chat Message Styles */
+  .chat-message {
+    @apply p-4 rounded-lg max-w-3xl;
+  }
+  
+  .chat-message-user {
+    @apply chat-message bg-primary-100 text-primary-900 ml-auto;
+  }
+  
+  .chat-message-agent {
+    @apply chat-message bg-gray-100 text-gray-900 mr-auto;
+  }
+  
+  .chat-message-system {
+    @apply chat-message bg-info-100 text-info-900 mx-auto text-center;
+  }
+  
+  .chat-message-timestamp {
+    @apply text-xs text-gray-500 mt-2;
+  }
+  
+  .chat-message-agent-name {
+    @apply text-sm font-semibold text-gray-700 mb-1;
+  }
+  
+  /* Journal Entry Styles */
+  .journal-entry {
+    @apply bg-white rounded-lg border border-gray-200 p-4 space-y-3;
+  }
+  
+  .journal-entry-header {
+    @apply flex items-center justify-between;
+  }
+  
+  .journal-entry-time {
+    @apply text-sm text-gray-500;
+  }
+  
+  .journal-entry-location {
+    @apply text-sm text-gray-600;
+  }
+  
+  .journal-entry-content {
+    @apply text-gray-800;
+  }
+  
+  .journal-entry-validation {
+    @apply flex items-center space-x-2 text-sm;
+  }
+  
+  .journal-entry-validation-success {
+    @apply journal-entry-validation text-success-600;
+  }
+  
+  .journal-entry-validation-warning {
+    @apply journal-entry-validation text-warning-600;
+  }
+  
+  .journal-entry-validation-error {
+    @apply journal-entry-validation text-error-600;
+  }
+
+  /* Logo Styles */
+  .logo {
+    @apply flex items-center space-x-3;
+  }
+
+  .logo-clickable {
+    @apply cursor-pointer transition-all duration-200 hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 rounded-lg p-1;
+  }
+
+  .logo-icon {
+    @apply flex-shrink-0;
+  }
+
+  .logo-shape {
+    @apply transition-all duration-200;
+  }
+
+  .logo-clickable:hover .logo-shape {
+    @apply transform scale-105;
+  }
+
+  .logo-text {
+    @apply font-semibold text-gray-900 whitespace-nowrap;
+  }
+
+  /* Logo Sizes */
+  .logo-sm {
+    @apply space-x-2;
+  }
+
+  .logo-md {
+    @apply space-x-3;
+  }
+
+  .logo-lg {
+    @apply space-x-4;
+  }
+
+  .logo-xl {
+    @apply space-x-5;
+  }
+
+  /* Navigation Header with Logo */
+  .nav-header {
+    @apply flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200;
+  }
+
+  .nav-header-left {
+    @apply flex items-center space-x-4;
+  }
+
+  .nav-header-right {
+    @apply flex items-center space-x-4;
+  }
+
+  /* Dashboard Header */
+  .dashboard-header {
+    @apply flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200 shadow-sm;
+  }
+
+  .dashboard-header-left {
+    @apply flex items-center space-x-6;
+  }
+
+  .dashboard-header-right {
+    @apply flex items-center space-x-4;
+  }
+
+  /* Landing Page Header */
+  .landing-header {
+    @apply flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200;
+  }
+
+  .landing-header-left {
+    @apply flex items-center space-x-4;
+  }
+
+  .landing-header-right {
+    @apply flex items-center space-x-4;
+  }
+}

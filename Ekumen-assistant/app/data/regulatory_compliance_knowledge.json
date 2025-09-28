@@ -1,0 +1,108 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Regulatory compliance knowledge base for agricultural practices"
+  },
+  "regulations": {
+    "amm_compliance": {
+      "description": "Autorisation de Mise sur le Marché",
+      "requirements": [
+        "Produit doit avoir un numéro AMM valide",
+        "Respect des usages autorisés",
+        "Respect des doses homologuées",
+        "Respect des délais avant récolte"
+      ],
+      "penalties": [
+        "Amende jusqu'à 75 000€",
+        "Suspension d'activité",
+        "Retrait de certification"
+      ]
+    },
+    "znt_compliance": {
+      "description": "Zones de Non Traitement",
+      "requirements": [
+        "Respect des distances minimales",
+        "Protection des cours d'eau",
+        "Protection des habitations",
+        "Protection des zones sensibles"
+      ],
+      "penalties": [
+        "Amende jusqu'à 150 000€",
+        "Contamination environnementale",
+        "Responsabilité civile"
+      ]
+    },
+    "timing_compliance": {
+      "description": "Respect des délais et périodes",
+      "requirements": [
+        "Délais avant récolte respectés",
+        "Périodes d'application autorisées",
+        "Conditions météo respectées",
+        "Stades de culture appropriés"
+      ],
+      "penalties": [
+        "Amende jusqu'à 50 000€",
+        "Destruction de récolte",
+        "Perte de certification"
+      ]
+    },
+    "equipment_compliance": {
+      "description": "Équipements de protection et application",
+      "requirements": [
+        "Équipements de protection individuelle",
+        "Matériel d'application homologué",
+        "Contrôle technique régulier",
+        "Formation des applicateurs"
+      ],
+      "penalties": [
+        "Amende jusqu'à 30 000€",
+        "Interdiction d'utilisation",
+        "Formation obligatoire"
+      ]
+    }
+  },
+  "compliance_levels": {
+    "fully_compliant": {
+      "score_range": [90, 100],
+      "description": "Conformité totale",
+      "color": "green",
+      "icon": "✅"
+    },
+    "mostly_compliant": {
+      "score_range": [70, 89],
+      "description": "Conformité majoritaire",
+      "color": "yellow",
+      "icon": "⚠️"
+    },
+    "partially_compliant": {
+      "score_range": [50, 69],
+      "description": "Conformité partielle",
+      "color": "orange",
+      "icon": "🔶"
+    },
+    "non_compliant": {
+      "score_range": [0, 49],
+      "description": "Non-conformité",
+      "color": "red",
+      "icon": "❌"
+    }
+  },
+  "violation_categories": {
+    "critical": {
+      "description": "Violation critique - action immédiate requise",
+      "severity": "high",
+      "action_required": "immediate"
+    },
+    "major": {
+      "description": "Violation majeure - correction rapide nécessaire",
+      "severity": "medium",
+      "action_required": "urgent"
+    },
+    "minor": {
+      "description": "Violation mineure - correction recommandée",
+      "severity": "low",
+      "action_required": "recommended"
+    }
+  }
+}

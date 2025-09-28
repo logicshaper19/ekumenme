@@ -1,0 +1,17 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Safety guidelines configuration"
+  },
+  "require_product_or_practice": true,
+  "validate_safety_level": true,
+  "include_equipment_requirements": true,
+  "include_emergency_procedures": true,
+  "include_general_guidelines": true,
+  "default_safety_level": "medium",
+  "require_emergency_info": true,
+  "require_equipment_info": true,
+  "strict_validation": true,
+  "return_validation_errors": true
+}

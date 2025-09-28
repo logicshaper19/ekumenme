@@ -1,0 +1,49 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Performance metrics knowledge base for agricultural analysis"
+  },
+  "performance_indicators": {
+    "yield_metrics": {
+      "average_yield": {"description": "Rendement moyen pondéré par surface", "unit": "q/ha"},
+      "yield_variance": {"description": "Variance du rendement", "unit": "q²/ha²"},
+      "yield_efficiency": {"description": "Efficacité du rendement par rapport à la surface", "unit": "q/ha"}
+    },
+    "cost_metrics": {
+      "average_cost": {"description": "Coût moyen par hectare", "unit": "€/ha"},
+      "cost_per_yield": {"description": "Coût par quintal produit", "unit": "€/q"},
+      "cost_efficiency": {"description": "Efficacité des coûts", "unit": "€/ha"}
+    },
+    "quality_metrics": {
+      "average_quality": {"description": "Score de qualité moyen", "unit": "score/10"},
+      "quality_consistency": {"description": "Cohérence de la qualité", "unit": "score/10"},
+      "quality_trend": {"description": "Tendance de la qualité", "unit": "score/an"}
+    }
+  },
+  "benchmark_thresholds": {
+    "yield_performance": {
+      "excellent": {"min": 80.0, "description": "Rendement excellent"},
+      "good": {"min": 65.0, "max": 79.9, "description": "Rendement bon"},
+      "average": {"min": 50.0, "max": 64.9, "description": "Rendement moyen"},
+      "poor": {"max": 49.9, "description": "Rendement faible"}
+    },
+    "cost_efficiency": {
+      "excellent": {"max": 400.0, "description": "Coût excellent"},
+      "good": {"min": 400.1, "max": 550.0, "description": "Coût bon"},
+      "average": {"min": 550.1, "max": 700.0, "description": "Coût moyen"},
+      "poor": {"min": 700.1, "description": "Coût élevé"}
+    },
+    "quality_performance": {
+      "excellent": {"min": 8.5, "description": "Qualité excellente"},
+      "good": {"min": 7.0, "max": 8.4, "description": "Qualité bonne"},
+      "average": {"min": 5.5, "max": 6.9, "description": "Qualité moyenne"},
+      "poor": {"max": 5.4, "description": "Qualité faible"}
+    }
+  },
+  "calculation_weights": {
+    "yield_weight": 0.4,
+    "cost_weight": 0.3,
+    "quality_weight": 0.3
+  }
+}

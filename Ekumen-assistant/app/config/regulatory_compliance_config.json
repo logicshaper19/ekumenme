@@ -1,0 +1,21 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Regulatory compliance configuration"
+  },
+  "require_practice_type": true,
+  "validate_products": true,
+  "validate_location": true,
+  "validate_timing": true,
+  "include_amm_check": true,
+  "include_znt_check": true,
+  "include_timing_check": true,
+  "include_equipment_check": true,
+  "min_compliance_score": 0.0,
+  "max_compliance_score": 100.0,
+  "require_critical_violations": true,
+  "require_major_violations": true,
+  "strict_validation": true,
+  "return_validation_errors": true
+}

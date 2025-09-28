@@ -1,0 +1,317 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Agricultural Chatbot Global Styles */
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  }
+  
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+}
+
+@layer components {
+  /* Agricultural design system components - copied for better compatibility */
+  
+  /* Agricultural Card Styles */
+  .agricultural-card {
+    @apply bg-white rounded-xl shadow-card border border-gray-200 transition-all duration-200;
+  }
+  
+  .agricultural-card-interactive {
+    @apply cursor-pointer hover:shadow-lg hover:border-gray-300;
+  }
+  
+  .agricultural-card-loading {
+    @apply opacity-75 pointer-events-none;
+  }
+  
+  .agricultural-card-accent {
+    @apply border-l-4;
+  }
+  
+  /* Card Type Variants */
+  .agricultural-card-farm-data {
+    @apply border-l-primary-500;
+  }
+  
+  .agricultural-card-weather {
+    @apply border-l-info-500;
+  }
+  
+  .agricultural-card-regulatory {
+    @apply border-l-warning-500;
+  }
+  
+  .agricultural-card-crop-health {
+    @apply border-l-success-500;
+  }
+  
+  .agricultural-card-planning {
+    @apply border-l-primary-600;
+  }
+  
+  .agricultural-card-sustainability {
+    @apply border-l-earth-600;
+  }
+  
+  .agricultural-card-voice-journal {
+    @apply border-l-info-600;
+  }
+  
+  /* Card Status Variants */
+  .agricultural-card-healthy {
+    @apply bg-success-50 border-success-200;
+  }
+  
+  .agricultural-card-warning {
+    @apply bg-warning-50 border-warning-200;
+  }
+  
+  .agricultural-card-critical {
+    @apply bg-error-50 border-error-200;
+  }
+  
+  .agricultural-card-info {
+    @apply bg-info-50 border-info-200;
+  }
+  
+  /* Card Header */
+  .agricultural-card-header {
+    @apply px-6 py-4 border-b border-gray-200 flex items-center justify-between;
+  }
+  
+  .agricultural-card-header-content {
+    @apply flex items-center space-x-3;
+  }
+  
+  .agricultural-card-icon {
+    @apply flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg;
+  }
+  
+  .agricultural-card-title-section {
+    @apply flex-1 min-w-0;
+  }
+  
+  .agricultural-card-title {
+    @apply text-lg font-semibold text-gray-900 truncate;
+  }
+  
+  .agricultural-card-subtitle {
+    @apply text-sm text-gray-600 mt-1;
+  }
+  
+  .agricultural-card-loading-spinner {
+    @apply flex-shrink-0;
+  }
+  
+  /* Card Body */
+  .agricultural-card-body {
+    @apply px-6 py-4;
+  }
+  
+  /* Card Footer */
+  .agricultural-card-footer {
+    @apply px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl;
+  }
+  
+  /* Voice Interface Styles */
+  .voice-interface {
+    @apply flex flex-col items-center space-y-4 p-6 bg-white rounded-xl shadow-card border border-gray-200;
+  }
+  
+  .voice-interface-active {
+    @apply border-primary-300 bg-primary-50;
+  }
+  
+  .voice-interface-recording {
+    @apply border-warning-300 bg-warning-50;
+  }
+  
+  /* Voice Interface Sizes */
+  .voice-interface-sm {
+    @apply p-4;
+  }
+  
+  .voice-interface-md {
+    @apply p-6;
+  }
+  
+  .voice-interface-lg {
+    @apply p-8;
+  }
+  
+  /* Voice Interface States */
+  .voice-interface-idle {
+    @apply border-gray-200 bg-gray-50;
+  }
+  
+  .voice-interface-listening {
+    @apply border-primary-400 bg-primary-100;
+  }
+  
+  .voice-interface-processing {
+    @apply border-warning-400 bg-warning-100;
+  }
+  
+  .voice-interface-speaking {
+    @apply border-success-400 bg-success-100;
+  }
+  
+  .voice-interface-error {
+    @apply border-error-400 bg-error-100;
+  }
+  
+  /* Voice Button */
+  .voice-button {
+    @apply relative w-16 h-16 rounded-full flex items-center justify-center transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-offset-2;
+  }
+  
+  .voice-interface-idle .voice-button {
+    @apply bg-gray-200 text-gray-600 hover:bg-gray-300 focus:ring-gray-500;
+  }
+  
+  .voice-interface-listening .voice-button {
+    @apply bg-primary-500 text-white hover:bg-primary-600 focus:ring-primary-500;
+  }
+  
+  .voice-interface-processing .voice-button {
+    @apply bg-warning-500 text-white hover:bg-warning-600 focus:ring-warning-500;
+  }
+  
+  .voice-interface-speaking .voice-button {
+    @apply bg-success-500 text-white hover:bg-success-600 focus:ring-success-500;
+  }
+  
+  .voice-interface-error .voice-button {
+    @apply bg-error-500 text-white hover:bg-error-600 focus:ring-error-500;
+  }
+  
+  .voice-button-icon {
+    @apply w-8 h-8 flex items-center justify-center;
+  }
+  
+  .voice-icon {
+    @apply w-6 h-6 transition-all duration-200;
+  }
+  
+  .voice-icon-listening {
+    @apply animate-pulse;
+  }
+  
+  .voice-icon-processing {
+    @apply animate-spin;
+  }
+  
+  .voice-icon-speaking {
+    @apply animate-bounce;
+  }
+  
+  /* Voice Pulse Ring */
+  .voice-pulse-ring {
+    @apply absolute inset-0 rounded-full border-2 border-primary-400 animate-ping;
+  }
+  
+  /* Voice Status */
+  .voice-status {
+    @apply text-center;
+  }
+  
+  .voice-status-text {
+    @apply text-sm font-medium text-gray-700;
+  }
+  
+  .voice-interface-listening .voice-status-text {
+    @apply text-primary-700;
+  }
+  
+  .voice-interface-processing .voice-status-text {
+    @apply text-warning-700;
+  }
+  
+  .voice-interface-speaking .voice-status-text {
+    @apply text-success-700;
+  }
+  
+  .voice-interface-error .voice-status-text {
+    @apply text-error-700;
+  }
+  
+  /* Voice Transcript */
+  .voice-transcript {
+    @apply w-full max-w-md;
+  }
+  
+  .voice-transcript-label {
+    @apply text-xs font-medium text-gray-500 mb-2;
+  }
+  
+  .voice-transcript-text {
+    @apply text-sm text-gray-800 bg-gray-100 rounded-lg p-3 border border-gray-200;
+  }
+  
+  /* Additional frontend-specific styles */
+  .btn-agricultural {
+    @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  .btn-agricultural-primary {
+    @apply btn-agricultural bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
+  }
+  
+  .btn-agricultural-success {
+    @apply btn-agricultural bg-success-600 text-white hover:bg-success-700 focus:ring-success-500;
+  }
+  
+  .btn-agricultural-warning {
+    @apply btn-agricultural bg-warning-600 text-white hover:bg-warning-700 focus:ring-warning-500;
+  }
+  
+  .btn-agricultural-error {
+    @apply btn-agricultural bg-error-600 text-white hover:bg-error-700 focus:ring-error-500;
+  }
+  
+  .btn-agricultural-outline {
+    @apply btn-agricultural border border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-gray-500;
+  }
+  
+  .btn-agricultural-ghost {
+    @apply btn-agricultural text-gray-700 hover:bg-gray-100 focus:ring-gray-500;
+  }
+  
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+  
+  .btn-lg {
+    @apply px-6 py-3 text-base;
+  }
+  
+  .badge-agricultural-success {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-100 text-success-800;
+  }
+  
+  .badge-agricultural-warning {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning-100 text-warning-800;
+  }
+}
+
+@layer utilities {
+  /* Custom utilities for agricultural chatbot */
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
