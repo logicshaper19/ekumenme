@@ -9,6 +9,19 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 import time
 import logging
+import uuid
+from datetime import datetime
+
+# Rate limiting imports (optional - only if slowapi is installed)
+try:
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+    from slowapi.util import get_remote_address
+    from slowapi.errors import RateLimitExceeded
+    RATE_LIMITING_AVAILABLE = True
+except ImportError:
+    RATE_LIMITING_AVAILABLE = False
+    logger = logging.getLogger(__name__)
+    logger.warning("slowapi not installed - rate limiting disabled")
 
 from app.core.config import settings
 from app.core.database import init_db, close_db
@@ -27,13 +40,19 @@ app = FastAPI(
     redoc_url="/redoc" if settings.DEBUG else None,
 )
 
+# Initialize rate limiter if available
+if RATE_LIMITING_AVAILABLE:
+    limiter = Limiter(key_func=get_remote_address)
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "Accept", "X-Process-Time"],
 )
 
 # Add trusted host middleware
@@ -100,14 +119,31 @@ async def shutdown_event():
 # Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """Global exception handler"""
-    logger.error(f"Global exception: {exc}", exc_info=True)
+    """Global exception handler with comprehensive logging"""
+    # Generate request ID for tracking
+    request_id = str(uuid.uuid4())[:8]
+
+    # Log comprehensive error details
+    logger.error(
+        f"Global exception [ID: {request_id}]: {exc}",
+        extra={
+            "request_id": request_id,
+            "method": request.method,
+            "url": str(request.url),
+            "client_ip": request.client.host if request.client else "unknown",
+            "user_agent": request.headers.get("user-agent", "unknown"),
+            "exception_type": type(exc).__name__,
+        },
+        exc_info=True
+    )
+
     return JSONResponse(
         status_code=500,
         content={
             "error": "Internal server error",
-            "message": "An unexpected error occurred. Please try again later.",
-            "request_id": getattr(request.state, "request_id", None)
+            "message": "An unexpected error occurred. Please contact support with this ID.",
+            "request_id": request_id,
+            "timestamp": datetime.utcnow().isoformat()
         }
     )
 

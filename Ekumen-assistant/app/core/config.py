@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     
     # Security
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-here")
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -100,7 +100,7 @@ class Settings(BaseSettings):
     
     # Agricultural API Configuration
     WEATHER_API_KEY: str = os.getenv("WEATHER_API_KEY", "")
-    WEATHER_BASE_URL: str = "https://api.openweathermap.org/data/2.5"
+    WEATHER_BASE_URL: str = "http://api.weatherapi.com/v1"
     METEO_FRANCE_API_KEY: str = os.getenv("METEO_FRANCE_API_KEY", "")
     
     # Regulatory API Configuration
@@ -165,6 +165,11 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+
+    def __post_init__(self):
+        """Validate critical settings after initialization"""
+        if not self.SECRET_KEY or self.SECRET_KEY == "your_secret_key_here_generate_a_strong_random_string":
+            raise ValueError("SECRET_KEY environment variable is required and must be set to a secure value")
 
 
 # Global settings instance

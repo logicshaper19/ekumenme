@@ -5,7 +5,7 @@ Handles voice journal entries and agricultural interventions
 
 from sqlalchemy import Column, String, Boolean, DateTime, Text, ForeignKey, Enum as SQLEnum, Numeric, Integer
 from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, validates
 from sqlalchemy.sql import func
 import uuid
 import enum
@@ -150,6 +150,20 @@ class ProductUsage(Base):
     
     def __repr__(self):
         return f"<ProductUsage(id={self.id}, product={self.product_name}, quantity={self.quantity_used}{self.unit})>"
+
+    @validates('quantity_used')
+    def validate_quantity(self, key, value):
+        """Validate quantity is positive"""
+        if value is not None and value <= 0:
+            raise ValueError("Product quantity must be positive")
+        return value
+
+    @validates('dosage_per_ha')
+    def validate_dosage(self, key, value):
+        """Validate dosage is positive"""
+        if value is not None and value <= 0:
+            raise ValueError("Dosage per hectare must be positive")
+        return value
 
 
 class InterventionHistory(Base):

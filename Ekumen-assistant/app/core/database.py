@@ -9,10 +9,20 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from typing import AsyncGenerator
 import logging
+import os
 
 from .config import settings
 
+
+class DatabaseError(Exception):
+    """Custom database error for better error handling"""
+    pass
+
 logger = logging.getLogger(__name__)
+
+# Database pool configuration
+pool_size = int(os.getenv("DB_POOL_SIZE", "20"))
+max_overflow = int(os.getenv("DB_MAX_OVERFLOW", "40"))
 
 # Create async engine for PostgreSQL with PostGIS support
 async_engine = create_async_engine(
@@ -20,8 +30,10 @@ async_engine = create_async_engine(
     echo=settings.DEBUG,
     pool_pre_ping=True,
     pool_recycle=300,
-    pool_size=10,
-    max_overflow=20,
+    pool_size=pool_size,
+    max_overflow=max_overflow,
+    pool_timeout=30,  # Add timeout
+    pool_reset_on_return='commit'  # Reset connections
 )
 
 # Create sync engine for migrations and admin tasks
@@ -62,9 +74,21 @@ async def get_async_db() -> AsyncGenerator[AsyncSession, None]:
         try:
             yield session
         except Exception as e:
-            logger.error(f"Database session error: {e}")
-            await session.rollback()
-            raise
+            error_context = {
+                "session_id": id(session),
+                "transaction_active": session.in_transaction(),
+                "error_type": type(e).__name__,
+                "error_message": str(e)
+            }
+            logger.error(f"Database session error: {error_context}", exc_info=True)
+
+            try:
+                await session.rollback()
+                logger.info(f"Session {id(session)} rolled back successfully")
+            except Exception as rollback_error:
+                logger.error(f"Rollback failed for session {id(session)}: {rollback_error}")
+
+            raise DatabaseError(f"Database operation failed: {str(e)}") from e
         finally:
             await session.close()
 
@@ -77,9 +101,20 @@ def get_sync_db():
     try:
         yield db
     except Exception as e:
-        logger.error(f"Sync database session error: {e}")
-        db.rollback()
-        raise
+        error_context = {
+            "session_id": id(db),
+            "error_type": type(e).__name__,
+            "error_message": str(e)
+        }
+        logger.error(f"Sync database session error: {error_context}", exc_info=True)
+
+        try:
+            db.rollback()
+            logger.info(f"Sync session {id(db)} rolled back successfully")
+        except Exception as rollback_error:
+            logger.error(f"Sync rollback failed for session {id(db)}: {rollback_error}")
+
+        raise DatabaseError(f"Sync database operation failed: {str(e)}") from e
     finally:
         db.close()
 

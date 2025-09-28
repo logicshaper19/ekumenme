@@ -191,15 +191,39 @@ class AgriculturalOrchestrator:
                 return False
         return True
     
-    def _execute_step(self, step: WorkflowStep, input_data: Dict[str, Any], results: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute a workflow step."""
-        # Simplified step execution - in real implementation would call actual agents
-        return {
-            "step_id": step.step_id,
-            "agent_type": step.agent_type,
-            "output": f"Mock output from {step.agent_type} agent",
-            "executed_at": datetime.now().isoformat()
-        }
+    async def _execute_step(self, step: WorkflowStep, input_data: Dict[str, Any], results: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute a workflow step with real agent."""
+        try:
+            # Get the actual agent instance
+            agent = await self._get_agent_instance(step.agent_type)
+
+            # Prepare input data with context from previous steps
+            step_input = {**input_data, **step.input_data}
+            if step.dependencies:
+                for dep_id in step.dependencies:
+                    if dep_id in results:
+                        step_input[f"dependency_{dep_id}"] = results[dep_id]
+
+            # Execute the agent
+            result = await agent.execute(step_input)
+
+            return {
+                "step_id": step.step_id,
+                "agent_type": step.agent_type,
+                "output": result,
+                "executed_at": datetime.now().isoformat(),
+                "success": True
+            }
+        except Exception as e:
+            logger.error(f"Step execution failed for {step.agent_type}: {e}", exc_info=True)
+            return {
+                "step_id": step.step_id,
+                "agent_type": step.agent_type,
+                "output": None,
+                "error": str(e),
+                "executed_at": datetime.now().isoformat(),
+                "success": False
+            }
     
     def get_workflow_status(self, workflow_id: str) -> Dict[str, Any]:
         """Get workflow status."""
@@ -225,3 +249,28 @@ class AgriculturalOrchestrator:
             }
             for workflow_id, workflow in self.workflows.items()
         ]
+
+    async def _get_agent_instance(self, agent_type: str):
+        """Get agent instance by type."""
+        from app.agents.weather_agent import WeatherAgent
+        from app.agents.crop_health_agent import CropHealthAgent
+        from app.agents.farm_data_agent import FarmDataAgent
+        from app.agents.planning_agent import PlanningAgent
+        from app.agents.regulatory_agent import RegulatoryAgent
+        from app.agents.sustainability_agent import SustainabilityAgent
+
+        agent_map = {
+            "weather": WeatherAgent,
+            "crop_health": CropHealthAgent,
+            "farm_data": FarmDataAgent,
+            "planning": PlanningAgent,
+            "regulatory": RegulatoryAgent,
+            "sustainability": SustainabilityAgent
+        }
+
+        if agent_type not in agent_map:
+            raise ValueError(f"Unknown agent type: {agent_type}")
+
+        # Initialize agent with configuration
+        agent_class = agent_map[agent_type]
+        return agent_class()

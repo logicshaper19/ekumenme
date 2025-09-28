@@ -3,7 +3,7 @@ User models for agricultural chatbot
 Supports farmers, advisors, inspectors, and administrators
 """
 
-from sqlalchemy import Column, String, Boolean, DateTime, Text, Enum as SQLEnum
+from sqlalchemy import Column, String, Boolean, DateTime, Text, Enum as SQLEnum, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -78,7 +78,12 @@ class User(Base):
     farms = relationship("Farm", back_populates="owner", cascade="all, delete-orphan", lazy="select")
     conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan", lazy="select")
     interventions = relationship("VoiceJournalEntry", back_populates="user", cascade="all, delete-orphan", lazy="select")
-    # organization_memberships = relationship("OrganizationMembership", back_populates="user", cascade="all, delete-orphan", lazy="select")
+    organization_memberships = relationship("OrganizationMembership", back_populates="user", cascade="all, delete-orphan", lazy="select")
+    
+
+    # Additional relationships for user management
+    user_sessions = relationship("UserSession", foreign_keys="UserSession.user_id", cascade="all, delete-orphan", lazy="select")
+    user_activities = relationship("UserActivity", foreign_keys="UserActivity.user_id", cascade="all, delete-orphan", lazy="select")
     
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email}, role={self.role})>"
@@ -118,7 +123,7 @@ class UserSession(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     
     # Foreign keys
-    user_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
     
     # Session information
     session_token = Column(String(500), unique=True, nullable=False, index=True)
@@ -138,7 +143,7 @@ class UserSession(Base):
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=False)
-    
+
     def __repr__(self):
         return f"<UserSession(id={self.id}, user_id={self.user_id}, active={self.is_active})>"
 
@@ -152,7 +157,7 @@ class UserActivity(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     
     # Foreign keys
-    user_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
     session_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     
     # Activity information
@@ -168,6 +173,6 @@ class UserActivity(Base):
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    
+
     def __repr__(self):
         return f"<UserActivity(id={self.id}, user_id={self.user_id}, type={self.activity_type})>"

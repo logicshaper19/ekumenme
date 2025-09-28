@@ -168,7 +168,7 @@ class OrganizationFarmAccess(Base):
     
     # Relationships
     organization = relationship("Organization", back_populates="farm_access", lazy="select")
-    farm = relationship("Farm", back_populates="organization_memberships", lazy="select")
+    farm = relationship("Farm", back_populates="organization_access", lazy="select")
     granted_by_user = relationship("User", foreign_keys=[granted_by], lazy="select")
     
     def __repr__(self):

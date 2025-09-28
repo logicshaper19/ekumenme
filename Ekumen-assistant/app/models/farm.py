@@ -5,7 +5,7 @@ Supports French agricultural data structure with SIRET, parcels, and interventio
 
 from sqlalchemy import Column, String, Boolean, DateTime, Text, Numeric, Enum as SQLEnum, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID, ARRAY, JSONB
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, validates
 from sqlalchemy.sql import func
 from geoalchemy2 import Geography
 import uuid
@@ -91,10 +91,24 @@ class Farm(Base):
     parcels = relationship("Parcel", back_populates="farm", cascade="all, delete-orphan", lazy="select")
     conversations = relationship("Conversation", back_populates="farm", cascade="all, delete-orphan", lazy="select")
     interventions = relationship("VoiceJournalEntry", back_populates="farm", cascade="all, delete-orphan", lazy="select")
-    # organization_memberships = relationship("OrganizationFarmAccess", back_populates="farm", cascade="all, delete-orphan", lazy="select")
+    organization_access = relationship("OrganizationFarmAccess", back_populates="farm", cascade="all, delete-orphan", lazy="select")
     
     def __repr__(self):
         return f"<Farm(siret={self.siret}, name={self.farm_name}, type={self.farm_type})>"
+
+    @validates('siret')
+    def validate_siret(self, key, value):
+        """Validate SIRET format (14 digits)"""
+        if value and (len(value) != 14 or not value.isdigit()):
+            raise ValueError("SIRET must be exactly 14 digits")
+        return value
+
+    @validates('total_area_ha')
+    def validate_area(self, key, value):
+        """Validate farm area is positive"""
+        if value is not None and value <= 0:
+            raise ValueError("Farm area must be positive")
+        return value
     
     @property
     def is_organic(self) -> bool:
@@ -159,6 +173,13 @@ class Parcel(Base):
     
     def __repr__(self):
         return f"<Parcel(id={self.id}, number={self.parcel_number}, area={self.area_ha}ha)>"
+
+    @validates('area_ha')
+    def validate_area(self, key, value):
+        """Validate parcel area is positive"""
+        if value is not None and value <= 0:
+            raise ValueError("Parcel area must be positive")
+        return value
     
     @property
     def display_name(self) -> str:
