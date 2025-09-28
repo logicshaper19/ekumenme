@@ -1,0 +1,16 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Planning report configuration"
+  },
+  "require_tasks": true,
+  "validate_report_sections": true,
+  "include_executive_summary": true,
+  "include_recommendations": true,
+  "min_report_sections": 2,
+  "max_report_sections": 10,
+  "require_report_format": true,
+  "strict_validation": true,
+  "return_validation_errors": true
+}

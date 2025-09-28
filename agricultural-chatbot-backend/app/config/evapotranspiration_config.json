@@ -1,0 +1,17 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Evapotranspiration configuration"
+  },
+  "default_calculation_method": "penman_monteith",
+  "require_weather_data": true,
+  "validate_crop_type": true,
+  "validate_soil_type": true,
+  "min_temperature": -20.0,
+  "max_temperature": 50.0,
+  "min_humidity": 0.0,
+  "max_humidity": 100.0,
+  "strict_validation": true,
+  "return_validation_errors": true
+}

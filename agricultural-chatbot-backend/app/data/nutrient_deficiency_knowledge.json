@@ -1,0 +1,368 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Nutrient deficiency knowledge base for French agricultural crops",
+    "total_crops": 3,
+    "total_nutrients": 8
+  },
+  "analysis_config": {
+    "confidence_thresholds": {
+      "minimum_confidence": 0.3,
+      "high_confidence": 0.8,
+      "moderate_confidence": 0.6
+    },
+    "weighting": {
+      "symptom_weight": 0.7,
+      "soil_weight": 0.3
+    },
+    "scoring": {
+      "symptom_match_bonus": 0.1,
+      "soil_match_bonus": 0.05
+    }
+  },
+  "crops": {
+    "blé": {
+      "name": "Blé tendre",
+      "scientific_name": "Triticum aestivum",
+      "nutrients": {
+        "azote": {
+          "name": "Azote",
+          "symbol": "N",
+          "symptoms": [
+            "feuilles_jaunes",
+            "croissance_ralentie", 
+            "épis_petits",
+            "feuilles_vert_clair",
+            "tallage_faible"
+          ],
+          "soil_indicators": [
+            "azote_faible",
+            "matière_organique_faible",
+            "drainage_excessif",
+            "ph_acide"
+          ],
+          "deficiency_level": "moderate",
+          "critical_stages": ["tallage", "montaison"],
+          "treatment": [
+            "engrais_azoté_urée",
+            "engrais_azoté_ammonitrate", 
+            "compost_mature",
+            "engrais_vert_légumineuses"
+          ],
+          "prevention": [
+            "rotation_légumineuses",
+            "apport_organique_régulier",
+            "couverture_sol_hiver",
+            "gestion_residus"
+          ],
+          "dosage_guidelines": {
+            "moderate": "80-120 kg N/ha",
+            "severe": "120-160 kg N/ha"
+          }
+        },
+        "phosphore": {
+          "name": "Phosphore",
+          "symbol": "P",
+          "symptoms": [
+            "feuilles_violettes",
+            "racines_faibles",
+            "croissance_ralentie",
+            "épis_petits",
+            "maturation_retardée"
+          ],
+          "soil_indicators": [
+            "phosphore_faible",
+            "ph_acide",
+            "argile_forte",
+            "calcaire_actif"
+          ],
+          "deficiency_level": "moderate",
+          "critical_stages": ["levée", "tallage"],
+          "treatment": [
+            "engrais_phosphoré_superphosphate",
+            "engrais_phosphoré_phosphate_diammonique",
+            "chaulage_correctif"
+          ],
+          "prevention": [
+            "apport_phosphore_automne",
+            "correction_ph_sol",
+            "rotation_cultures"
+          ],
+          "dosage_guidelines": {
+            "moderate": "40-60 kg P2O5/ha",
+            "severe": "60-80 kg P2O5/ha"
+          }
+        },
+        "potassium": {
+          "name": "Potassium",
+          "symbol": "K",
+          "symptoms": [
+            "feuilles_brunies",
+            "bords_brûlés",
+            "résistance_faible",
+            "épis_petits",
+            "sensibilité_maladies"
+          ],
+          "soil_indicators": [
+            "potassium_faible",
+            "drainage_excessif",
+            "sable_dominant",
+            "lessivage_intense"
+          ],
+          "deficiency_level": "moderate",
+          "critical_stages": ["montaison", "épiaison"],
+          "treatment": [
+            "engrais_potassique_chlorure",
+            "engrais_potassique_sulfate",
+            "compost_potassique"
+          ],
+          "prevention": [
+            "apport_potassium_automne",
+            "amélioration_structure_sol",
+            "couverture_sol"
+          ],
+          "dosage_guidelines": {
+            "moderate": "80-120 kg K2O/ha",
+            "severe": "120-160 kg K2O/ha"
+          }
+        },
+        "magnésium": {
+          "name": "Magnésium",
+          "symbol": "Mg",
+          "symptoms": [
+            "feuilles_jaunes_veines_vertes",
+            "croissance_ralentie",
+            "photosynthèse_faible",
+            "sensibilité_stress"
+          ],
+          "soil_indicators": [
+            "magnésium_faible",
+            "ph_acide",
+            "calcaire_actif_faible",
+            "lessivage_intense"
+          ],
+          "deficiency_level": "moderate",
+          "critical_stages": ["tallage", "montaison"],
+          "treatment": [
+            "engrais_magnésien_sulfate",
+            "chaulage_magnésien",
+            "compost_magnésien"
+          ],
+          "prevention": [
+            "apport_magnésium_régulier",
+            "correction_ph_sol",
+            "rotation_cultures"
+          ],
+          "dosage_guidelines": {
+            "moderate": "30-50 kg MgO/ha",
+            "severe": "50-80 kg MgO/ha"
+          }
+        }
+      }
+    },
+    "maïs": {
+      "name": "Maïs grain",
+      "scientific_name": "Zea mays",
+      "nutrients": {
+        "azote": {
+          "name": "Azote",
+          "symbol": "N",
+          "symptoms": [
+            "feuilles_jaunes",
+            "croissance_ralentie",
+            "épis_petits",
+            "feuilles_vert_clair",
+            "tige_fine"
+          ],
+          "soil_indicators": [
+            "azote_faible",
+            "matière_organique_faible",
+            "drainage_excessif"
+          ],
+          "deficiency_level": "high",
+          "critical_stages": ["levée", "floraison"],
+          "treatment": [
+            "engrais_azoté_urée",
+            "engrais_azoté_ammonitrate",
+            "compost_mature"
+          ],
+          "prevention": [
+            "rotation_légumineuses",
+            "apport_organique",
+            "couverture_sol"
+          ],
+          "dosage_guidelines": {
+            "moderate": "120-160 kg N/ha",
+            "severe": "160-200 kg N/ha"
+          }
+        },
+        "phosphore": {
+          "name": "Phosphore",
+          "symbol": "P",
+          "symptoms": [
+            "feuilles_violettes",
+            "racines_faibles",
+            "croissance_ralentie",
+            "épis_petits"
+          ],
+          "soil_indicators": [
+            "phosphore_faible",
+            "ph_acide",
+            "température_sol_froide"
+          ],
+          "deficiency_level": "moderate",
+          "critical_stages": ["levée", "floraison"],
+          "treatment": [
+            "engrais_phosphoré_superphosphate",
+            "engrais_phosphoré_phosphate_diammonique"
+          ],
+          "prevention": [
+            "apport_phosphore_automne",
+            "correction_ph_sol"
+          ],
+          "dosage_guidelines": {
+            "moderate": "60-80 kg P2O5/ha",
+            "severe": "80-100 kg P2O5/ha"
+          }
+        },
+        "zinc": {
+          "name": "Zinc",
+          "symbol": "Zn",
+          "symptoms": [
+            "feuilles_blanches",
+            "croissance_ralentie",
+            "épis_petits",
+            "entre-nœuds_courts"
+          ],
+          "soil_indicators": [
+            "zinc_faible",
+            "ph_alcalin",
+            "calcaire_actif",
+            "phosphore_excessif"
+          ],
+          "deficiency_level": "moderate",
+          "critical_stages": ["levée", "floraison"],
+          "treatment": [
+            "engrais_zinc_sulfate",
+            "engrais_zinc_chélaté",
+            "correction_ph_sol"
+          ],
+          "prevention": [
+            "apport_zinc_régulier",
+            "correction_ph_sol",
+            "équilibre_phosphore"
+          ],
+          "dosage_guidelines": {
+            "moderate": "2-5 kg Zn/ha",
+            "severe": "5-10 kg Zn/ha"
+          }
+        }
+      }
+    },
+    "colza": {
+      "name": "Colza d'hiver",
+      "scientific_name": "Brassica napus",
+      "nutrients": {
+        "azote": {
+          "name": "Azote",
+          "symbol": "N",
+          "symptoms": [
+            "feuilles_jaunes",
+            "croissance_ralentie",
+            "fleurs_petites",
+            "feuilles_vert_clair",
+            "tige_fine"
+          ],
+          "soil_indicators": [
+            "azote_faible",
+            "matière_organique_faible",
+            "drainage_excessif"
+          ],
+          "deficiency_level": "moderate",
+          "critical_stages": ["reprise", "floraison"],
+          "treatment": [
+            "engrais_azoté_urée",
+            "engrais_azoté_ammonitrate",
+            "compost_mature"
+          ],
+          "prevention": [
+            "rotation_légumineuses",
+            "apport_organique",
+            "couverture_sol"
+          ],
+          "dosage_guidelines": {
+            "moderate": "100-140 kg N/ha",
+            "severe": "140-180 kg N/ha"
+          }
+        },
+        "soufre": {
+          "name": "Soufre",
+          "symbol": "S",
+          "symptoms": [
+            "feuilles_jaunes",
+            "croissance_ralentie",
+            "fleurs_petites",
+            "tige_fine",
+            "sensibilité_maladies"
+          ],
+          "soil_indicators": [
+            "soufre_faible",
+            "drainage_excessif",
+            "lessivage_intense",
+            "sable_dominant"
+          ],
+          "deficiency_level": "moderate",
+          "critical_stages": ["reprise", "floraison"],
+          "treatment": [
+            "engrais_soufré_sulfate",
+            "engrais_soufré_ammonitrate",
+            "compost_soufré"
+          ],
+          "prevention": [
+            "apport_soufre_régulier",
+            "amélioration_sol",
+            "couverture_sol"
+          ],
+          "dosage_guidelines": {
+            "moderate": "30-50 kg SO3/ha",
+            "severe": "50-80 kg SO3/ha"
+          }
+        },
+        "bore": {
+          "name": "Bore",
+          "symbol": "B",
+          "symptoms": [
+            "feuilles_épaisses",
+            "croissance_anormale",
+            "fleurs_abîmées",
+            "tige_creuse",
+            "sensibilité_stress"
+          ],
+          "soil_indicators": [
+            "bore_faible",
+            "ph_alcalin",
+            "calcaire_actif",
+            "sécheresse"
+          ],
+          "deficiency_level": "moderate",
+          "critical_stages": ["floraison", "formation_siliques"],
+          "treatment": [
+            "engrais_boré_borax",
+            "engrais_boré_acide_borique",
+            "correction_ph_sol"
+          ],
+          "prevention": [
+            "apport_bore_régulier",
+            "correction_ph_sol",
+            "gestion_hydrique"
+          ],
+          "dosage_guidelines": {
+            "moderate": "1-2 kg B/ha",
+            "severe": "2-4 kg B/ha"
+          }
+        }
+      }
+    }
+  }
+}

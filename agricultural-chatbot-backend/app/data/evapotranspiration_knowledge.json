@@ -1,0 +1,71 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Evapotranspiration knowledge base for agricultural water management"
+  },
+  "crop_coefficients": {
+    "blé": {
+      "initial_stage": 0.3,
+      "development_stage": 0.7,
+      "mid_stage": 1.15,
+      "late_stage": 0.4,
+      "growth_period_days": 120
+    },
+    "maïs": {
+      "initial_stage": 0.3,
+      "development_stage": 0.7,
+      "mid_stage": 1.2,
+      "late_stage": 0.6,
+      "growth_period_days": 140
+    },
+    "tournesol": {
+      "initial_stage": 0.3,
+      "development_stage": 0.7,
+      "mid_stage": 1.1,
+      "late_stage": 0.5,
+      "growth_period_days": 100
+    }
+  },
+  "soil_characteristics": {
+    "clay": {
+      "water_holding_capacity": 0.4,
+      "drainage_rate": 0.1,
+      "root_zone_depth": 0.6
+    },
+    "loam": {
+      "water_holding_capacity": 0.3,
+      "drainage_rate": 0.2,
+      "root_zone_depth": 0.8
+    },
+    "sandy": {
+      "water_holding_capacity": 0.15,
+      "drainage_rate": 0.4,
+      "root_zone_depth": 1.0
+    }
+  },
+  "calculation_parameters": {
+    "penman_monteith": {
+      "solar_constant": 1367.0,
+      "albedo": 0.23,
+      "psychrometric_constant": 0.0665,
+      "latent_heat_vaporization": 2.45
+    },
+    "blaney_criddle": {
+      "base_temperature": 0.0,
+      "temperature_factor": 0.8
+    }
+  },
+  "irrigation_recommendations": {
+    "deficit_thresholds": {
+      "mild_stress": 0.8,
+      "moderate_stress": 0.6,
+      "severe_stress": 0.4
+    },
+    "irrigation_efficiency": {
+      "sprinkler": 0.75,
+      "drip": 0.9,
+      "flood": 0.6
+    }
+  }
+}

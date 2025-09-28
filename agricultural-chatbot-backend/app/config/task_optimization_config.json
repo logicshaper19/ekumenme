@@ -1,0 +1,16 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Task optimization configuration"
+  },
+  "default_algorithm": "greedy",
+  "require_tasks": true,
+  "validate_optimization_objective": true,
+  "max_optimization_time_seconds": 30,
+  "min_tasks": 1,
+  "max_tasks": 100,
+  "require_optimization_objective": true,
+  "strict_validation": true,
+  "return_validation_errors": true
+}

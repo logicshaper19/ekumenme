@@ -1,0 +1,16 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Resource requirements configuration"
+  },
+  "require_tasks": true,
+  "validate_equipment_requirements": true,
+  "validate_labor_requirements": true,
+  "validate_material_requirements": true,
+  "min_tasks": 1,
+  "max_tasks": 100,
+  "require_analysis_type": true,
+  "strict_validation": true,
+  "return_validation_errors": true
+}

@@ -1,0 +1,556 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Treatment plan generation knowledge base for agricultural crop health",
+    "total_treatments": 25,
+    "total_crops": 5
+  },
+  "analysis_config": {
+    "confidence_thresholds": {
+      "minimum_confidence": 0.6,
+      "high_confidence": 0.8,
+      "moderate_confidence": 0.7
+    },
+    "priority_weights": {
+      "disease_weight": 0.4,
+      "pest_weight": 0.3,
+      "nutrient_weight": 0.3
+    },
+    "cost_estimation": {
+      "default_cost": 25.0,
+      "cost_multiplier": 1.0
+    }
+  },
+  "treatments": {
+    "disease_treatments": {
+      "fongicide_systémique": {
+        "name": "Fongicide systémique",
+        "category": "disease_control",
+        "cost_per_hectare": 45.0,
+        "effectiveness": "high",
+        "application_method": "pulvérisation",
+        "timing": "préventif_curatif",
+        "safety_class": "moderate",
+        "environmental_impact": "moderate",
+        "target_diseases": [
+          "rouille_jaune",
+          "rouille_brune",
+          "septoriose",
+          "oïdium"
+        ],
+        "target_crops": [
+          "blé",
+          "orge",
+          "triticale",
+          "avoine"
+        ],
+        "application_conditions": {
+          "temperature_min": 5,
+          "temperature_max": 30,
+          "humidity_max": 80,
+          "wind_max": 20
+        },
+        "dose_range": {
+          "min": "0.5L/ha",
+          "max": "1.5L/ha",
+          "recommended": "1L/ha"
+        },
+        "waiting_period": "21 jours",
+        "compatibility": [
+          "insecticides",
+          "engrais_foliaires"
+        ]
+      },
+      "fongicide_contact": {
+        "name": "Fongicide de contact",
+        "category": "disease_control",
+        "cost_per_hectare": 35.0,
+        "effectiveness": "moderate",
+        "application_method": "pulvérisation",
+        "timing": "préventif",
+        "safety_class": "low",
+        "environmental_impact": "low",
+        "target_diseases": [
+          "oïdium",
+          "taches_foliaires"
+        ],
+        "target_crops": [
+          "blé",
+          "maïs",
+          "colza"
+        ],
+        "application_conditions": {
+          "temperature_min": 10,
+          "temperature_max": 25,
+          "humidity_max": 70,
+          "wind_max": 15
+        },
+        "dose_range": {
+          "min": "1L/ha",
+          "max": "2L/ha",
+          "recommended": "1.5L/ha"
+        },
+        "waiting_period": "14 jours",
+        "compatibility": [
+          "insecticides",
+          "engrais_foliaires"
+        ]
+      },
+      "fongicide_soufre": {
+        "name": "Fongicide soufre",
+        "category": "disease_control",
+        "cost_per_hectare": 25.0,
+        "effectiveness": "moderate",
+        "application_method": "pulvérisation",
+        "timing": "préventif",
+        "safety_class": "low",
+        "environmental_impact": "low",
+        "target_diseases": [
+          "oïdium",
+          "taches_foliaires"
+        ],
+        "target_crops": [
+          "blé",
+          "vigne",
+          "arbres_fruitiers"
+        ],
+        "application_conditions": {
+          "temperature_min": 15,
+          "temperature_max": 30,
+          "humidity_max": 60,
+          "wind_max": 10
+        },
+        "dose_range": {
+          "min": "2kg/ha",
+          "max": "4kg/ha",
+          "recommended": "3kg/ha"
+        },
+        "waiting_period": "7 jours",
+        "compatibility": [
+          "insecticides",
+          "engrais_foliaires"
+        ]
+      }
+    },
+    "pest_treatments": {
+      "insecticide_systémique": {
+        "name": "Insecticide systémique",
+        "category": "pest_control",
+        "cost_per_hectare": 40.0,
+        "effectiveness": "high",
+        "application_method": "pulvérisation",
+        "timing": "curatif",
+        "safety_class": "high",
+        "environmental_impact": "high",
+        "target_pests": [
+          "pucerons",
+          "thrips",
+          "cicadelles"
+        ],
+        "target_crops": [
+          "blé",
+          "maïs",
+          "colza",
+          "tournesol"
+        ],
+        "application_conditions": {
+          "temperature_min": 10,
+          "temperature_max": 25,
+          "humidity_max": 70,
+          "wind_max": 15
+        },
+        "dose_range": {
+          "min": "0.2L/ha",
+          "max": "0.5L/ha",
+          "recommended": "0.3L/ha"
+        },
+        "waiting_period": "21 jours",
+        "compatibility": [
+          "fongicides",
+          "engrais_foliaires"
+        ]
+      },
+      "insecticide_contact": {
+        "name": "Insecticide de contact",
+        "category": "pest_control",
+        "cost_per_hectare": 30.0,
+        "effectiveness": "moderate",
+        "application_method": "pulvérisation",
+        "timing": "curatif",
+        "safety_class": "moderate",
+        "environmental_impact": "moderate",
+        "target_pests": [
+          "altises",
+          "noctuelles",
+          "charançons"
+        ],
+        "target_crops": [
+          "blé",
+          "maïs",
+          "colza"
+        ],
+        "application_conditions": {
+          "temperature_min": 15,
+          "temperature_max": 30,
+          "humidity_max": 80,
+          "wind_max": 20
+        },
+        "dose_range": {
+          "min": "0.3L/ha",
+          "max": "0.8L/ha",
+          "recommended": "0.5L/ha"
+        },
+        "waiting_period": "14 jours",
+        "compatibility": [
+          "fongicides",
+          "engrais_foliaires"
+        ]
+      },
+      "biocontrôle": {
+        "name": "Produit de biocontrôle",
+        "category": "pest_control",
+        "cost_per_hectare": 35.0,
+        "effectiveness": "moderate",
+        "application_method": "pulvérisation",
+        "timing": "préventif_curatif",
+        "safety_class": "low",
+        "environmental_impact": "low",
+        "target_pests": [
+          "pucerons",
+          "thrips",
+          "acariens"
+        ],
+        "target_crops": [
+          "blé",
+          "maïs",
+          "colza",
+          "légumes"
+        ],
+        "application_conditions": {
+          "temperature_min": 10,
+          "temperature_max": 25,
+          "humidity_max": 80,
+          "wind_max": 10
+        },
+        "dose_range": {
+          "min": "0.5L/ha",
+          "max": "1L/ha",
+          "recommended": "0.75L/ha"
+        },
+        "waiting_period": "0 jours",
+        "compatibility": [
+          "fongicides",
+          "engrais_foliaires"
+        ]
+      }
+    },
+    "nutrient_treatments": {
+      "engrais_azoté": {
+        "name": "Engrais azoté",
+        "category": "nutrient_supplement",
+        "cost_per_hectare": 25.0,
+        "effectiveness": "high",
+        "application_method": "épandage",
+        "timing": "préventif_curatif",
+        "safety_class": "low",
+        "environmental_impact": "moderate",
+        "target_nutrients": [
+          "azote",
+          "N"
+        ],
+        "target_crops": [
+          "blé",
+          "maïs",
+          "colza",
+          "tournesol"
+        ],
+        "application_conditions": {
+          "temperature_min": 5,
+          "temperature_max": 30,
+          "humidity_max": 90,
+          "wind_max": 25
+        },
+        "dose_range": {
+          "min": "50kg/ha",
+          "max": "200kg/ha",
+          "recommended": "120kg/ha"
+        },
+        "waiting_period": "0 jours",
+        "compatibility": [
+          "engrais_phosphorés",
+          "engrais_potassiques"
+        ]
+      },
+      "engrais_phosphoré": {
+        "name": "Engrais phosphoré",
+        "category": "nutrient_supplement",
+        "cost_per_hectare": 30.0,
+        "effectiveness": "high",
+        "application_method": "épandage",
+        "timing": "préventif",
+        "safety_class": "low",
+        "environmental_impact": "moderate",
+        "target_nutrients": [
+          "phosphore",
+          "P"
+        ],
+        "target_crops": [
+          "blé",
+          "maïs",
+          "colza",
+          "tournesol"
+        ],
+        "application_conditions": {
+          "temperature_min": 5,
+          "temperature_max": 30,
+          "humidity_max": 90,
+          "wind_max": 25
+        },
+        "dose_range": {
+          "min": "30kg/ha",
+          "max": "150kg/ha",
+          "recommended": "80kg/ha"
+        },
+        "waiting_period": "0 jours",
+        "compatibility": [
+          "engrais_azotés",
+          "engrais_potassiques"
+        ]
+      },
+      "engrais_potassique": {
+        "name": "Engrais potassique",
+        "category": "nutrient_supplement",
+        "cost_per_hectare": 35.0,
+        "effectiveness": "high",
+        "application_method": "épandage",
+        "timing": "préventif",
+        "safety_class": "low",
+        "environmental_impact": "moderate",
+        "target_nutrients": [
+          "potassium",
+          "K"
+        ],
+        "target_crops": [
+          "blé",
+          "maïs",
+          "colza",
+          "tournesol"
+        ],
+        "application_conditions": {
+          "temperature_min": 5,
+          "temperature_max": 30,
+          "humidity_max": 90,
+          "wind_max": 25
+        },
+        "dose_range": {
+          "min": "40kg/ha",
+          "max": "180kg/ha",
+          "recommended": "100kg/ha"
+        },
+        "waiting_period": "0 jours",
+        "compatibility": [
+          "engrais_azotés",
+          "engrais_phosphorés"
+        ]
+      },
+      "compost": {
+        "name": "Compost organique",
+        "category": "nutrient_supplement",
+        "cost_per_hectare": 15.0,
+        "effectiveness": "moderate",
+        "application_method": "épandage",
+        "timing": "préventif",
+        "safety_class": "low",
+        "environmental_impact": "low",
+        "target_nutrients": [
+          "azote",
+          "phosphore",
+          "potassium",
+          "matière_organique"
+        ],
+        "target_crops": [
+          "blé",
+          "maïs",
+          "colza",
+          "légumes"
+        ],
+        "application_conditions": {
+          "temperature_min": 5,
+          "temperature_max": 30,
+          "humidity_max": 90,
+          "wind_max": 20
+        },
+        "dose_range": {
+          "min": "5t/ha",
+          "max": "20t/ha",
+          "recommended": "10t/ha"
+        },
+        "waiting_period": "0 jours",
+        "compatibility": [
+          "engrais_minéraux",
+          "amendements"
+        ]
+      },
+      "chaulage": {
+        "name": "Chaulgage du sol",
+        "category": "soil_amendment",
+        "cost_per_hectare": 20.0,
+        "effectiveness": "high",
+        "application_method": "épandage",
+        "timing": "préventif",
+        "safety_class": "low",
+        "environmental_impact": "low",
+        "target_nutrients": [
+          "calcium",
+          "magnésium",
+          "pH"
+        ],
+        "target_crops": [
+          "blé",
+          "maïs",
+          "colza",
+          "légumes"
+        ],
+        "application_conditions": {
+          "temperature_min": 5,
+          "temperature_max": 30,
+          "humidity_max": 90,
+          "wind_max": 20
+        },
+        "dose_range": {
+          "min": "1t/ha",
+          "max": "5t/ha",
+          "recommended": "2t/ha"
+        },
+        "waiting_period": "0 jours",
+        "compatibility": [
+          "engrais",
+          "compost"
+        ]
+      }
+    }
+  },
+  "crop_specific_treatments": {
+    "blé": {
+      "priority_treatments": [
+        "fongicide_systémique",
+        "insecticide_systémique",
+        "engrais_azoté"
+      ],
+      "seasonal_timing": {
+        "automne": ["engrais_phosphoré", "chaulage"],
+        "hiver": ["fongicide_contact"],
+        "printemps": ["engrais_azoté", "fongicide_systémique"],
+        "été": ["insecticide_systémique"]
+      },
+      "growth_stages": {
+        "tallage": ["engrais_azoté"],
+        "montaison": ["fongicide_systémique"],
+        "épiaison": ["fongicide_systémique", "insecticide_systémique"],
+        "floraison": ["fongicide_contact"]
+      }
+    },
+    "maïs": {
+      "priority_treatments": [
+        "insecticide_systémique",
+        "engrais_azoté",
+        "engrais_phosphoré"
+      ],
+      "seasonal_timing": {
+        "printemps": ["engrais_phosphoré", "engrais_azoté"],
+        "été": ["insecticide_systémique", "engrais_azoté"],
+        "automne": ["compost"]
+      },
+      "growth_stages": {
+        "levée": ["engrais_phosphoré"],
+        "floraison": ["insecticide_systémique"],
+        "formation_épis": ["engrais_azoté"]
+      }
+    },
+    "colza": {
+      "priority_treatments": [
+        "fongicide_systémique",
+        "insecticide_systémique",
+        "engrais_azoté"
+      ],
+      "seasonal_timing": {
+        "automne": ["engrais_phosphoré", "chaulage"],
+        "hiver": ["fongicide_contact"],
+        "printemps": ["engrais_azoté", "fongicide_systémique"],
+        "été": ["insecticide_systémique"]
+      },
+      "growth_stages": {
+        "rosette": ["engrais_azoté"],
+        "montaison": ["fongicide_systémique"],
+        "floraison": ["fongicide_systémique", "insecticide_systémique"],
+        "formation_siliques": ["fongicide_contact"]
+      }
+    }
+  },
+  "treatment_scheduling": {
+    "immediate_actions": {
+      "conditions": [
+        "severity_high",
+        "confidence_high",
+        "disease_active"
+      ],
+      "timing": "0-3 jours",
+      "priority": "urgent"
+    },
+    "short_term_actions": {
+      "conditions": [
+        "severity_moderate",
+        "confidence_moderate",
+        "pest_active"
+      ],
+      "timing": "3-7 jours",
+      "priority": "high"
+    },
+    "long_term_actions": {
+      "conditions": [
+        "severity_low",
+        "confidence_low",
+        "nutrient_deficiency"
+      ],
+      "timing": "7-14 jours",
+      "priority": "moderate"
+    }
+  },
+  "cost_estimation": {
+    "base_costs": {
+      "fongicide_systémique": 45.0,
+      "fongicide_contact": 35.0,
+      "fongicide_soufre": 25.0,
+      "insecticide_systémique": 40.0,
+      "insecticide_contact": 30.0,
+      "biocontrôle": 35.0,
+      "engrais_azoté": 25.0,
+      "engrais_phosphoré": 30.0,
+      "engrais_potassique": 35.0,
+      "compost": 15.0,
+      "chaulage": 20.0
+    },
+    "cost_factors": {
+      "crop_type": {
+        "blé": 1.0,
+        "maïs": 1.1,
+        "colza": 1.2,
+        "tournesol": 1.0,
+        "légumes": 1.3
+      },
+      "season": {
+        "printemps": 1.0,
+        "été": 1.1,
+        "automne": 0.9,
+        "hiver": 0.8
+      },
+      "urgency": {
+        "urgent": 1.2,
+        "high": 1.1,
+        "moderate": 1.0,
+        "low": 0.9
+      }
+    }
+  }
+}

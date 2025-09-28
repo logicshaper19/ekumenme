@@ -1,0 +1,31 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Task optimization knowledge base for agricultural planning"
+  },
+  "optimization_weights": {
+    "cost": 0.3,
+    "time": 0.25,
+    "yield": 0.25,
+    "equipment_efficiency": 0.2
+  },
+  "equipment_constraints": {
+    "charrue": {"max_concurrent": 1, "setup_time_hours": 0.5},
+    "herse": {"max_concurrent": 2, "setup_time_hours": 0.3},
+    "semoir": {"max_concurrent": 1, "setup_time_hours": 1.0},
+    "épandeur": {"max_concurrent": 1, "setup_time_hours": 0.5},
+    "pulvérisateur": {"max_concurrent": 1, "setup_time_hours": 0.8},
+    "moissonneuse": {"max_concurrent": 1, "setup_time_hours": 2.0}
+  },
+  "weather_constraints": {
+    "spraying": {"max_wind_speed": 15.0, "min_temperature": 5.0, "max_temperature": 30.0},
+    "fertilization": {"max_wind_speed": 20.0, "min_temperature": 0.0, "max_temperature": 35.0},
+    "harvesting": {"max_wind_speed": 25.0, "min_temperature": 5.0, "max_temperature": 40.0}
+  },
+  "optimization_algorithms": {
+    "greedy": {"description": "Simple greedy optimization", "complexity": "low"},
+    "genetic": {"description": "Genetic algorithm optimization", "complexity": "high"},
+    "simulated_annealing": {"description": "Simulated annealing optimization", "complexity": "medium"}
+  }
+}

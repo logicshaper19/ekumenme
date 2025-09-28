@@ -1,0 +1,17 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Planning tasks configuration"
+  },
+  "default_priority_threshold": 3,
+  "require_crops": true,
+  "validate_surface_area": true,
+  "validate_planning_objective": true,
+  "min_surface_ha": 0.1,
+  "max_surface_ha": 1000.0,
+  "min_crops": 1,
+  "max_crops": 10,
+  "strict_validation": true,
+  "return_validation_errors": true
+}

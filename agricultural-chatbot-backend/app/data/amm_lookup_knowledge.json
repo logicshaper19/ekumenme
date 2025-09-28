@@ -1,0 +1,428 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "AMM (Autorisation de Mise sur le Marché) lookup knowledge base for French agricultural products",
+    "total_products": 8,
+    "total_categories": 4
+  },
+  "analysis_config": {
+    "confidence_thresholds": {
+      "minimum_confidence": 0.3,
+      "high_confidence": 0.8,
+      "moderate_confidence": 0.6
+    },
+    "weighting": {
+      "product_name_weight": 0.4,
+      "active_ingredient_weight": 0.4,
+      "product_type_weight": 0.2
+    },
+    "scoring": {
+      "exact_match_bonus": 0.2,
+      "partial_match_bonus": 0.1
+    }
+  },
+  "products": {
+    "Roundup": {
+      "amm_number": "AMM-2024-001",
+      "active_ingredient": "glyphosate",
+      "product_type": "herbicide",
+      "manufacturer": "Bayer",
+      "authorized_uses": [
+        "désherbage_total",
+        "désherbage_sélectif",
+        "désherbage_interlignes",
+        "désherbage_parcelles"
+      ],
+      "restrictions": [
+        "interdiction_usage_public",
+        "dose_maximale_3L_ha",
+        "interdiction_usage_parcs_publics",
+        "respect_délai_rentrée_6h"
+      ],
+      "safety_measures": [
+        "port_EPI_complet",
+        "respect_ZNT_5m",
+        "vent_inférieur_20kmh",
+        "température_inférieure_25°C"
+      ],
+      "validity_period": "2024-2029",
+      "registration_date": "2024-01-15",
+      "expiry_date": "2029-01-15",
+      "target_crops": [
+        "blé",
+        "maïs",
+        "colza",
+        "tournesol"
+      ],
+      "target_weeds": [
+        "chiendent",
+        "liseron",
+        "ortie",
+        "rumex"
+      ],
+      "application_methods": [
+        "pulvérisation",
+        "épandage"
+      ],
+      "dosage_range": {
+        "min": "1.5L/ha",
+        "max": "3L/ha",
+        "recommended": "2L/ha"
+      },
+      "phytotoxicity_risk": "moderate",
+      "environmental_impact": "high",
+      "resistance_risk": "high"
+    },
+    "Decis": {
+      "amm_number": "AMM-2024-002",
+      "active_ingredient": "deltaméthrine",
+      "product_type": "insecticide",
+      "manufacturer": "Bayer",
+      "authorized_uses": [
+        "lutte_insectes",
+        "protection_cultures",
+        "lutte_ravageurs",
+        "protection_stockage"
+      ],
+      "restrictions": [
+        "interdiction_usage_abeilles",
+        "dose_maximale_0.5L_ha",
+        "interdiction_usage_floraison",
+        "respect_délai_rentrée_12h"
+      ],
+      "safety_measures": [
+        "port_EPI_complet",
+        "respect_ZNT_20m",
+        "vent_inférieur_15kmh",
+        "température_inférieure_30°C"
+      ],
+      "validity_period": "2024-2028",
+      "registration_date": "2024-02-01",
+      "expiry_date": "2028-02-01",
+      "target_crops": [
+        "blé",
+        "maïs",
+        "colza",
+        "pomme_de_terre"
+      ],
+      "target_pests": [
+        "pucerons",
+        "altises",
+        "noctuelles",
+        "charançons"
+      ],
+      "application_methods": [
+        "pulvérisation",
+        "traitement_semences"
+      ],
+      "dosage_range": {
+        "min": "0.2L/ha",
+        "max": "0.5L/ha",
+        "recommended": "0.3L/ha"
+      },
+      "phytotoxicity_risk": "low",
+      "environmental_impact": "moderate",
+      "resistance_risk": "moderate"
+    },
+    "Tilt": {
+      "amm_number": "AMM-2024-003",
+      "active_ingredient": "propiconazole",
+      "product_type": "fongicide",
+      "manufacturer": "Syngenta",
+      "authorized_uses": [
+        "lutte_maladies_fongiques",
+        "protection_céréales",
+        "lutte_rouille",
+        "lutte_septoriose"
+      ],
+      "restrictions": [
+        "dose_maximale_1L_ha",
+        "interdiction_usage_maïs",
+        "respect_délai_rentrée_24h",
+        "interdiction_mélange_certains_produits"
+      ],
+      "safety_measures": [
+        "port_EPI_complet",
+        "respect_ZNT_10m",
+        "vent_inférieur_25kmh",
+        "température_inférieure_35°C"
+      ],
+      "validity_period": "2024-2027",
+      "registration_date": "2024-03-01",
+      "expiry_date": "2027-03-01",
+      "target_crops": [
+        "blé",
+        "orge",
+        "triticale",
+        "avoine"
+      ],
+      "target_diseases": [
+        "rouille_jaune",
+        "rouille_brune",
+        "septoriose",
+        "oïdium"
+      ],
+      "application_methods": [
+        "pulvérisation",
+        "traitement_foliaire"
+      ],
+      "dosage_range": {
+        "min": "0.5L/ha",
+        "max": "1L/ha",
+        "recommended": "0.75L/ha"
+      },
+      "phytotoxicity_risk": "low",
+      "environmental_impact": "moderate",
+      "resistance_risk": "high"
+    },
+    "Azote 46": {
+      "amm_number": "AMM-2024-004",
+      "active_ingredient": "urée",
+      "product_type": "engrais",
+      "manufacturer": "Yara",
+      "authorized_uses": [
+        "fertilisation_azotée",
+        "amélioration_rendement",
+        "développement_végétatif",
+        "qualité_grains"
+      ],
+      "restrictions": [
+        "dose_maximale_200kg_ha",
+        "interdiction_usage_eau",
+        "respect_délai_épandage",
+        "interdiction_usage_zones_sensibles"
+      ],
+      "safety_measures": [
+        "port_EPI_basique",
+        "stockage_sécurisé",
+        "épandage_contrôlé",
+        "respect_conditions_météo"
+      ],
+      "validity_period": "2024-2030",
+      "registration_date": "2024-01-01",
+      "expiry_date": "2030-01-01",
+      "target_crops": [
+        "blé",
+        "maïs",
+        "colza",
+        "tournesol",
+        "pomme_de_terre"
+      ],
+      "application_methods": [
+        "épandage",
+        "localisation",
+        "fertigation"
+      ],
+      "dosage_range": {
+        "min": "50kg/ha",
+        "max": "200kg/ha",
+        "recommended": "120kg/ha"
+      },
+      "phytotoxicity_risk": "low",
+      "environmental_impact": "moderate",
+      "resistance_risk": "none"
+    },
+    "Phosphate 18": {
+      "amm_number": "AMM-2024-005",
+      "active_ingredient": "phosphate_diammonique",
+      "product_type": "engrais",
+      "manufacturer": "Yara",
+      "authorized_uses": [
+        "fertilisation_phosphorée",
+        "développement_racinaire",
+        "amélioration_floraison",
+        "qualité_grains"
+      ],
+      "restrictions": [
+        "dose_maximale_150kg_ha",
+        "interdiction_usage_eau",
+        "respect_délai_épandage",
+        "interdiction_usage_zones_sensibles"
+      ],
+      "safety_measures": [
+        "port_EPI_basique",
+        "stockage_sécurisé",
+        "épandage_contrôlé",
+        "respect_conditions_météo"
+      ],
+      "validity_period": "2024-2030",
+      "registration_date": "2024-01-01",
+      "expiry_date": "2030-01-01",
+      "target_crops": [
+        "blé",
+        "maïs",
+        "colza",
+        "tournesol",
+        "pomme_de_terre"
+      ],
+      "application_methods": [
+        "épandage",
+        "localisation",
+        "fertigation"
+      ],
+      "dosage_range": {
+        "min": "30kg/ha",
+        "max": "150kg/ha",
+        "recommended": "80kg/ha"
+      },
+      "phytotoxicity_risk": "low",
+      "environmental_impact": "moderate",
+      "resistance_risk": "none"
+    },
+    "Confidor": {
+      "amm_number": "AMM-2024-006",
+      "active_ingredient": "imidaclopride",
+      "product_type": "insecticide",
+      "manufacturer": "Bayer",
+      "authorized_uses": [
+        "lutte_pucerons",
+        "protection_cultures",
+        "traitement_semences",
+        "lutte_ravageurs_sol"
+      ],
+      "restrictions": [
+        "interdiction_usage_abeilles",
+        "dose_maximale_0.3L_ha",
+        "interdiction_usage_floraison",
+        "respect_délai_rentrée_48h"
+      ],
+      "safety_measures": [
+        "port_EPI_complet",
+        "respect_ZNT_50m",
+        "vent_inférieur_10kmh",
+        "température_inférieure_25°C"
+      ],
+      "validity_period": "2024-2026",
+      "registration_date": "2024-04-01",
+      "expiry_date": "2026-04-01",
+      "target_crops": [
+        "blé",
+        "maïs",
+        "colza",
+        "tournesol"
+      ],
+      "target_pests": [
+        "pucerons",
+        "thrips",
+        "cicadelles",
+        "charançons"
+      ],
+      "application_methods": [
+        "pulvérisation",
+        "traitement_semences",
+        "traitement_sol"
+      ],
+      "dosage_range": {
+        "min": "0.1L/ha",
+        "max": "0.3L/ha",
+        "recommended": "0.2L/ha"
+      },
+      "phytotoxicity_risk": "low",
+      "environmental_impact": "high",
+      "resistance_risk": "high"
+    },
+    "Score": {
+      "amm_number": "AMM-2024-007",
+      "active_ingredient": "difenoconazole",
+      "product_type": "fongicide",
+      "manufacturer": "Syngenta",
+      "authorized_uses": [
+        "lutte_maladies_fongiques",
+        "protection_céréales",
+        "lutte_rouille",
+        "lutte_septoriose"
+      ],
+      "restrictions": [
+        "dose_maximale_0.8L_ha",
+        "interdiction_usage_maïs",
+        "respect_délai_rentrée_24h",
+        "interdiction_mélange_certains_produits"
+      ],
+      "safety_measures": [
+        "port_EPI_complet",
+        "respect_ZNT_10m",
+        "vent_inférieur_25kmh",
+        "température_inférieure_35°C"
+      ],
+      "validity_period": "2024-2027",
+      "registration_date": "2024-03-15",
+      "expiry_date": "2027-03-15",
+      "target_crops": [
+        "blé",
+        "orge",
+        "triticale",
+        "avoine"
+      ],
+      "target_diseases": [
+        "rouille_jaune",
+        "rouille_brune",
+        "septoriose",
+        "oïdium"
+      ],
+      "application_methods": [
+        "pulvérisation",
+        "traitement_foliaire"
+      ],
+      "dosage_range": {
+        "min": "0.4L/ha",
+        "max": "0.8L/ha",
+        "recommended": "0.6L/ha"
+      },
+      "phytotoxicity_risk": "low",
+      "environmental_impact": "moderate",
+      "resistance_risk": "high"
+    },
+    "Kerb": {
+      "amm_number": "AMM-2024-008",
+      "active_ingredient": "propyzamide",
+      "product_type": "herbicide",
+      "manufacturer": "Dow AgroSciences",
+      "authorized_uses": [
+        "désherbage_graminées",
+        "lutte_chiendent",
+        "désherbage_céréales",
+        "désherbage_colza"
+      ],
+      "restrictions": [
+        "dose_maximale_2L_ha",
+        "interdiction_usage_maïs",
+        "respect_délai_rentrée_12h",
+        "interdiction_usage_zones_sensibles"
+      ],
+      "safety_measures": [
+        "port_EPI_complet",
+        "respect_ZNT_5m",
+        "vent_inférieur_20kmh",
+        "température_inférieure_15°C"
+      ],
+      "validity_period": "2024-2028",
+      "registration_date": "2024-02-15",
+      "expiry_date": "2028-02-15",
+      "target_crops": [
+        "blé",
+        "orge",
+        "colza",
+        "triticale"
+      ],
+      "target_weeds": [
+        "chiendent",
+        "vulpin",
+        "ray-grass",
+        "brome"
+      ],
+      "application_methods": [
+        "pulvérisation",
+        "épandage"
+      ],
+      "dosage_range": {
+        "min": "1L/ha",
+        "max": "2L/ha",
+        "recommended": "1.5L/ha"
+      },
+      "phytotoxicity_risk": "moderate",
+      "environmental_impact": "moderate",
+      "resistance_risk": "moderate"
+    }
+  }
+}

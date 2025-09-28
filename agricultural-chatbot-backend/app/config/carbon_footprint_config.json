@@ -1,0 +1,19 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Carbon footprint configuration"
+  },
+  "minimum_emission_threshold": 10.0,
+  "high_emission_threshold": 50.0,
+  "default_area_ha": 1.0,
+  "default_duration_days": 1,
+  "require_practice_type": true,
+  "validate_area_range": true,
+  "min_area_ha": 0.1,
+  "max_area_ha": 1000.0,
+  "min_duration_days": 1,
+  "max_duration_days": 365,
+  "strict_validation": true,
+  "return_validation_errors": true
+}

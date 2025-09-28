@@ -1,0 +1,16 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Intervention windows configuration"
+  },
+  "default_confidence_threshold": 0.7,
+  "high_confidence_threshold": 0.9,
+  "require_weather_data": true,
+  "validate_intervention_type": true,
+  "min_forecast_days": 1,
+  "max_forecast_days": 14,
+  "require_location": true,
+  "strict_validation": true,
+  "return_validation_errors": true
+}

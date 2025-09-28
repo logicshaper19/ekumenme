@@ -1,0 +1,33 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Nutrient analysis configuration for production use"
+  },
+  "analysis_config": {
+    "minimum_confidence": 0.3,
+    "high_confidence": 0.8,
+    "moderate_confidence": 0.6,
+    "symptom_weight": 0.7,
+    "soil_weight": 0.3,
+    "symptom_match_bonus": 0.1,
+    "soil_match_bonus": 0.05,
+    "max_deficiencies": 5,
+    "include_prevention": true,
+    "include_dosage": true,
+    "min_symptoms": 1,
+    "max_symptoms": 20,
+    "supported_crops": ["blé", "maïs", "colza"]
+  },
+  "validation_config": {
+    "require_crop_type": true,
+    "allow_unknown_crops": false,
+    "require_symptoms": true,
+    "min_symptom_length": 2,
+    "max_symptom_length": 100,
+    "require_soil_conditions": false,
+    "max_soil_parameters": 20,
+    "strict_validation": true,
+    "return_validation_errors": true
+  }
+}

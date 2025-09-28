@@ -1,0 +1,60 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Planning report knowledge base for agricultural planning reports"
+  },
+  "report_sections": {
+    "executive_summary": {
+      "priority": 1,
+      "required": true,
+      "max_length": 500
+    },
+    "task_overview": {
+      "priority": 2,
+      "required": true,
+      "max_length": 1000
+    },
+    "cost_analysis": {
+      "priority": 3,
+      "required": false,
+      "max_length": 800
+    },
+    "resource_requirements": {
+      "priority": 4,
+      "required": false,
+      "max_length": 600
+    },
+    "optimization_results": {
+      "priority": 5,
+      "required": false,
+      "max_length": 700
+    },
+    "recommendations": {
+      "priority": 6,
+      "required": true,
+      "max_length": 1000
+    }
+  },
+  "report_templates": {
+    "executive_summary": "Résumé exécutif: {total_tasks} tâches planifiées pour {surface_ha} hectares de {crops}. Coût total estimé: {total_cost}€. Impact sur le rendement: {yield_impact}%.",
+    "task_overview": "Vue d'ensemble des tâches: {task_summary}. Durée totale estimée: {total_duration} heures. Équipements requis: {equipment_list}.",
+    "cost_analysis": "Analyse des coûts: Coût total {total_cost}€ ({cost_per_ha}€/ha). Répartition: {cost_breakdown}.",
+    "resource_requirements": "Besoins en ressources: {resource_summary}. Contraintes identifiées: {constraints}.",
+    "optimization_results": "Résultats d'optimisation: {optimization_summary}. Amélioration de l'efficacité: {efficiency_gain}%.",
+    "recommendations": "Recommandations: {recommendations_list}. Prochaines étapes: {next_steps}."
+  },
+  "recommendation_templates": {
+    "cost_optimization": "Optimiser les coûts en regroupant les tâches similaires",
+    "resource_efficiency": "Améliorer l'efficacité des ressources en planifiant les maintenances",
+    "yield_improvement": "Maximiser le rendement en optimisant le timing des interventions",
+    "risk_mitigation": "Réduire les risques en planifiant des alternatives"
+  },
+  "report_formatting": {
+    "include_charts": true,
+    "include_tables": true,
+    "include_summary_metrics": true,
+    "language": "french",
+    "date_format": "DD/MM/YYYY"
+  }
+}

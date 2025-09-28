@@ -1,0 +1,17 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Planning costs configuration"
+  },
+  "require_tasks": true,
+  "validate_cost_components": true,
+  "include_labor_costs": true,
+  "include_equipment_costs": true,
+  "include_material_costs": true,
+  "min_tasks": 1,
+  "max_tasks": 100,
+  "require_region": true,
+  "strict_validation": true,
+  "return_validation_errors": true
+}

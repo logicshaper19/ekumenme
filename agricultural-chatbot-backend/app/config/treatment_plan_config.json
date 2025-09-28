@@ -1,0 +1,53 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Treatment plan configuration for production use"
+  },
+  "treatment_config": {
+    "minimum_confidence": 0.6,
+    "high_confidence": 0.8,
+    "moderate_confidence": 0.7,
+    "disease_weight": 0.4,
+    "pest_weight": 0.3,
+    "nutrient_weight": 0.3,
+    "default_cost": 25.0,
+    "cost_multiplier": 1.0,
+    "max_treatment_steps": 20,
+    "include_cost_analysis": true,
+    "include_monitoring_plan": true,
+    "include_prevention_measures": true,
+    "include_treatment_schedule": true,
+    "high_priority_threshold": 5,
+    "moderate_priority_threshold": 2,
+    "low_priority_threshold": 1,
+    "high_priority_duration": "3-4 weeks",
+    "moderate_priority_duration": "2-3 weeks",
+    "low_priority_duration": "1-2 weeks",
+    "default_hectares": 10,
+    "cost_per_hectare_calculation": true,
+    "default_monitoring_frequency": "quotidien",
+    "default_monitoring_duration": "2-4 semaines",
+    "require_at_least_one_analysis": true,
+    "max_analyses": 10,
+    "supported_crops": [
+      "blé",
+      "maïs",
+      "colza",
+      "tournesol",
+      "légumes"
+    ]
+  },
+  "validation_config": {
+    "require_disease_analysis": false,
+    "require_pest_analysis": false,
+    "require_nutrient_analysis": false,
+    "require_at_least_one_analysis": true,
+    "validate_json_format": true,
+    "max_json_size": 10000,
+    "require_crop_type": false,
+    "validate_crop_type": true,
+    "strict_validation": true,
+    "return_validation_errors": true
+  }
+}

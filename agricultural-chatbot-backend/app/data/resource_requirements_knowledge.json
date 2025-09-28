@@ -1,0 +1,105 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Resource requirements knowledge base for agricultural planning"
+  },
+  "equipment_specifications": {
+    "charrue": {
+      "power_requirement_hp": 80,
+      "operator_requirement": 1,
+      "fuel_consumption_l_h": 8.0,
+      "maintenance_hours_per_100h": 5.0,
+      "availability_percentage": 90
+    },
+    "herse": {
+      "power_requirement_hp": 60,
+      "operator_requirement": 1,
+      "fuel_consumption_l_h": 6.0,
+      "maintenance_hours_per_100h": 3.0,
+      "availability_percentage": 95
+    },
+    "semoir": {
+      "power_requirement_hp": 100,
+      "operator_requirement": 1,
+      "fuel_consumption_l_h": 10.0,
+      "maintenance_hours_per_100h": 8.0,
+      "availability_percentage": 85
+    },
+    "épandeur": {
+      "power_requirement_hp": 70,
+      "operator_requirement": 1,
+      "fuel_consumption_l_h": 7.0,
+      "maintenance_hours_per_100h": 4.0,
+      "availability_percentage": 90
+    },
+    "pulvérisateur": {
+      "power_requirement_hp": 90,
+      "operator_requirement": 1,
+      "fuel_consumption_l_h": 9.0,
+      "maintenance_hours_per_100h": 6.0,
+      "availability_percentage": 80
+    },
+    "moissonneuse": {
+      "power_requirement_hp": 200,
+      "operator_requirement": 1,
+      "fuel_consumption_l_h": 20.0,
+      "maintenance_hours_per_100h": 15.0,
+      "availability_percentage": 70
+    }
+  },
+  "labor_requirements": {
+    "skilled_operator": {
+      "hourly_rate": 18.0,
+      "availability_hours_per_day": 8.0,
+      "overtime_rate": 1.5,
+      "skill_level": "high"
+    },
+    "general_worker": {
+      "hourly_rate": 12.0,
+      "availability_hours_per_day": 8.0,
+      "overtime_rate": 1.5,
+      "skill_level": "medium"
+    },
+    "supervisor": {
+      "hourly_rate": 25.0,
+      "availability_hours_per_day": 8.0,
+      "overtime_rate": 1.5,
+      "skill_level": "high"
+    }
+  },
+  "material_requirements": {
+    "seeds": {
+      "storage_requirements": "dry_cool",
+      "handling_equipment": "conveyor",
+      "safety_requirements": "standard"
+    },
+    "fertilizers": {
+      "storage_requirements": "dry_ventilated",
+      "handling_equipment": "loader",
+      "safety_requirements": "chemical_protection"
+    },
+    "pesticides": {
+      "storage_requirements": "secure_locked",
+      "handling_equipment": "specialized",
+      "safety_requirements": "high_protection"
+    }
+  },
+  "resource_constraints": {
+    "equipment_availability": {
+      "peak_season_multiplier": 0.8,
+      "maintenance_buffer_hours": 2.0,
+      "transport_time_hours": 0.5
+    },
+    "labor_availability": {
+      "seasonal_variation": 0.7,
+      "weekend_multiplier": 1.5,
+      "holiday_multiplier": 2.0
+    },
+    "material_availability": {
+      "lead_time_days": 7,
+      "minimum_order_quantity": 100,
+      "storage_capacity_limitation": 0.9
+    }
+  }
+}

@@ -1,0 +1,338 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Disease diagnosis knowledge base for French agricultural crops",
+    "total_crops": 3,
+    "total_diseases": 7
+  },
+  "analysis_config": {
+    "confidence_thresholds": {
+      "minimum_confidence": 0.3,
+      "high_confidence": 0.8,
+      "moderate_confidence": 0.6
+    },
+    "weighting": {
+      "symptom_weight": 0.7,
+      "environmental_weight": 0.3
+    },
+    "scoring": {
+      "symptom_match_bonus": 0.1,
+      "environmental_match_bonus": 0.05
+    }
+  },
+  "crops": {
+    "blé": {
+      "name": "Blé tendre",
+      "scientific_name": "Triticum aestivum",
+      "diseases": {
+        "rouille_jaune": {
+          "name": "Rouille jaune du blé",
+          "scientific_name": "Puccinia striiformis",
+          "symptoms": [
+            "taches_jaunes",
+            "pustules_jaunes",
+            "feuilles_jaunies",
+            "stries_jaunes",
+            "croissance_ralentie"
+          ],
+          "environmental_conditions": {
+            "humidity": "high",
+            "temperature": "moderate",
+            "rainfall": "frequent",
+            "wind": "moderate"
+          },
+          "severity": "moderate",
+          "critical_stages": ["tallage", "montaison", "épiaison"],
+          "treatment": [
+            "fongicide_triazole",
+            "fongicide_strobilurine",
+            "rotation_cultures",
+            "défoliation_précoce"
+          ],
+          "prevention": [
+            "variétés_résistantes",
+            "drainage_amélioré",
+            "espacement_plants",
+            "fertilisation_équilibrée"
+          ],
+          "economic_threshold": "5-10% de feuilles atteintes",
+          "monitoring_methods": [
+            "observation_visuelle",
+            "pièges_spores",
+            "modèles_prédictifs"
+          ],
+          "spread_conditions": {
+            "temperature_range": [10, 25],
+            "humidity_min": 80,
+            "rainfall_frequency": "high"
+          }
+        },
+        "oïdium": {
+          "name": "Oïdium du blé",
+          "scientific_name": "Blumeria graminis",
+          "symptoms": [
+            "poudre_blanche",
+            "feuilles_blanches",
+            "croissance_ralentie",
+            "feuilles_déformées",
+            "taches_cotonneuses"
+          ],
+          "environmental_conditions": {
+            "humidity": "high",
+            "temperature": "cool",
+            "rainfall": "moderate",
+            "wind": "low"
+          },
+          "severity": "moderate",
+          "critical_stages": ["tallage", "montaison"],
+          "treatment": [
+            "fongicide_soufre",
+            "fongicide_triazole",
+            "aération_améliorée",
+            "irrigation_contrôlée"
+          ],
+          "prevention": [
+            "espacement_plants",
+            "irrigation_contrôlée",
+            "variétés_résistantes",
+            "fertilisation_azotée_modérée"
+          ],
+          "economic_threshold": "10-15% de feuilles atteintes",
+          "monitoring_methods": [
+            "observation_visuelle",
+            "pièges_spores",
+            "modèles_prédictifs"
+          ],
+          "spread_conditions": {
+            "temperature_range": [15, 22],
+            "humidity_min": 70,
+            "rainfall_frequency": "moderate"
+          }
+        },
+        "septoriose": {
+          "name": "Septoriose du blé",
+          "scientific_name": "Zymoseptoria tritici",
+          "symptoms": [
+            "taches_brunes",
+            "feuilles_brunies",
+            "chute_feuilles",
+            "taches_elliptiques",
+            "croissance_ralentie"
+          ],
+          "environmental_conditions": {
+            "humidity": "very_high",
+            "temperature": "moderate",
+            "rainfall": "very_frequent",
+            "wind": "moderate"
+          },
+          "severity": "high",
+          "critical_stages": ["montaison", "épiaison", "floraison"],
+          "treatment": [
+            "fongicide_systémique",
+            "fongicide_contact",
+            "défoliation",
+            "rotation_cultures"
+          ],
+          "prevention": [
+            "rotation_cultures",
+            "drainage_amélioré",
+            "variétés_résistantes",
+            "gestion_residus"
+          ],
+          "economic_threshold": "5-8% de feuilles atteintes",
+          "monitoring_methods": [
+            "observation_visuelle",
+            "pièges_spores",
+            "modèles_prédictifs"
+          ],
+          "spread_conditions": {
+            "temperature_range": [12, 25],
+            "humidity_min": 85,
+            "rainfall_frequency": "very_high"
+          }
+        }
+      }
+    },
+    "maïs": {
+      "name": "Maïs grain",
+      "scientific_name": "Zea mays",
+      "diseases": {
+        "helminthosporiose": {
+          "name": "Helminthosporiose du maïs",
+          "scientific_name": "Helminthosporium turcicum",
+          "symptoms": [
+            "taches_brunes",
+            "feuilles_brunies",
+            "croissance_ralentie",
+            "taches_elliptiques",
+            "feuilles_flétries"
+          ],
+          "environmental_conditions": {
+            "humidity": "high",
+            "temperature": "warm",
+            "rainfall": "frequent",
+            "wind": "moderate"
+          },
+          "severity": "moderate",
+          "critical_stages": ["floraison", "formation_épis"],
+          "treatment": [
+            "fongicide_contact",
+            "fongicide_systémique",
+            "rotation_cultures",
+            "défoliation"
+          ],
+          "prevention": [
+            "variétés_résistantes",
+            "drainage_amélioré",
+            "espacement_plants",
+            "gestion_residus"
+          ],
+          "economic_threshold": "10-15% de feuilles atteintes",
+          "monitoring_methods": [
+            "observation_visuelle",
+            "pièges_spores",
+            "modèles_prédictifs"
+          ],
+          "spread_conditions": {
+            "temperature_range": [20, 30],
+            "humidity_min": 75,
+            "rainfall_frequency": "high"
+          }
+        },
+        "charbon": {
+          "name": "Charbon du maïs",
+          "scientific_name": "Ustilago maydis",
+          "symptoms": [
+            "excroissances_noires",
+            "grains_noirs",
+            "croissance_anormale",
+            "tumeurs_noires",
+            "épis_déformés"
+          ],
+          "environmental_conditions": {
+            "humidity": "high",
+            "temperature": "warm",
+            "rainfall": "frequent",
+            "wind": "low"
+          },
+          "severity": "high",
+          "critical_stages": ["floraison", "formation_épis"],
+          "treatment": [
+            "fongicide_systémique",
+            "destruction_plants",
+            "rotation_cultures",
+            "traitement_semences"
+          ],
+          "prevention": [
+            "traitement_semences",
+            "rotation_cultures",
+            "variétés_résistantes",
+            "gestion_residus"
+          ],
+          "economic_threshold": "2-5% de plants atteints",
+          "monitoring_methods": [
+            "observation_visuelle",
+            "pièges_spores",
+            "modèles_prédictifs"
+          ],
+          "spread_conditions": {
+            "temperature_range": [22, 32],
+            "humidity_min": 80,
+            "rainfall_frequency": "high"
+          }
+        }
+      }
+    },
+    "colza": {
+      "name": "Colza d'hiver",
+      "scientific_name": "Brassica napus",
+      "diseases": {
+        "sclerotinia": {
+          "name": "Sclérotiniose du colza",
+          "scientific_name": "Sclerotinia sclerotiorum",
+          "symptoms": [
+            "taches_blanches",
+            "pourriture_blanche",
+            "chute_fleurs",
+            "taches_cotonneuses",
+            "croissance_ralentie"
+          ],
+          "environmental_conditions": {
+            "humidity": "very_high",
+            "temperature": "moderate",
+            "rainfall": "very_frequent",
+            "wind": "low"
+          },
+          "severity": "high",
+          "critical_stages": ["floraison", "formation_siliques"],
+          "treatment": [
+            "fongicide_systémique",
+            "fongicide_contact",
+            "défoliation",
+            "rotation_cultures"
+          ],
+          "prevention": [
+            "rotation_cultures",
+            "drainage_amélioré",
+            "variétés_résistantes",
+            "gestion_residus"
+          ],
+          "economic_threshold": "5-10% de plants atteints",
+          "monitoring_methods": [
+            "observation_visuelle",
+            "pièges_spores",
+            "modèles_prédictifs"
+          ],
+          "spread_conditions": {
+            "temperature_range": [15, 25],
+            "humidity_min": 85,
+            "rainfall_frequency": "very_high"
+          }
+        },
+        "phoma": {
+          "name": "Phoma du colza",
+          "scientific_name": "Leptosphaeria maculans",
+          "symptoms": [
+            "taches_noires",
+            "feuilles_noires",
+            "croissance_ralentie",
+            "taches_circulaires",
+            "feuilles_flétries"
+          ],
+          "environmental_conditions": {
+            "humidity": "high",
+            "temperature": "cool",
+            "rainfall": "frequent",
+            "wind": "moderate"
+          },
+          "severity": "moderate",
+          "critical_stages": ["rosette", "montaison"],
+          "treatment": [
+            "fongicide_contact",
+            "fongicide_systémique",
+            "rotation_cultures",
+            "défoliation"
+          ],
+          "prevention": [
+            "variétés_résistantes",
+            "drainage_amélioré",
+            "rotation_cultures",
+            "gestion_residus"
+          ],
+          "economic_threshold": "10-15% de feuilles atteintes",
+          "monitoring_methods": [
+            "observation_visuelle",
+            "pièges_spores",
+            "modèles_prédictifs"
+          ],
+          "spread_conditions": {
+            "temperature_range": [10, 20],
+            "humidity_min": 75,
+            "rainfall_frequency": "high"
+          }
+        }
+      }
+    }
+  }
+}

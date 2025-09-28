@@ -1,0 +1,57 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Planning tasks knowledge base for agricultural operations"
+  },
+  "crop_tasks": {
+    "blé": {
+      "preparation": [
+        {"name": "Labour du sol", "duration_hours": 2.0, "equipment": "charrue", "priority": 1, "cost_per_hectare": 45.0, "yield_impact": 0.1},
+        {"name": "Hersage", "duration_hours": 1.5, "equipment": "herse", "priority": 2, "cost_per_hectare": 25.0, "yield_impact": 0.05}
+      ],
+      "sowing": [
+        {"name": "Semis", "duration_hours": 1.0, "equipment": "semoir", "priority": 1, "cost_per_hectare": 35.0, "yield_impact": 0.2}
+      ],
+      "maintenance": [
+        {"name": "Fertilisation", "duration_hours": 0.8, "equipment": "épandeur", "priority": 2, "cost_per_hectare": 80.0, "yield_impact": 0.3},
+        {"name": "Traitement phytosanitaire", "duration_hours": 1.2, "equipment": "pulvérisateur", "priority": 3, "cost_per_hectare": 60.0, "yield_impact": 0.15}
+      ],
+      "harvest": [
+        {"name": "Récolte", "duration_hours": 3.0, "equipment": "moissonneuse", "priority": 1, "cost_per_hectare": 120.0, "yield_impact": 0.0}
+      ]
+    },
+    "maïs": {
+      "preparation": [
+        {"name": "Préparation du sol", "duration_hours": 2.5, "equipment": "cultivateur", "priority": 1, "cost_per_hectare": 50.0, "yield_impact": 0.1},
+        {"name": "Nivellement", "duration_hours": 1.0, "equipment": "niveleuse", "priority": 2, "cost_per_hectare": 20.0, "yield_impact": 0.05}
+      ],
+      "sowing": [
+        {"name": "Semis de maïs", "duration_hours": 1.5, "equipment": "semoir monograine", "priority": 1, "cost_per_hectare": 40.0, "yield_impact": 0.25}
+      ],
+      "maintenance": [
+        {"name": "Désherbage mécanique", "duration_hours": 1.0, "equipment": "bineuse", "priority": 2, "cost_per_hectare": 30.0, "yield_impact": 0.1},
+        {"name": "Fertilisation azotée", "duration_hours": 0.8, "equipment": "épandeur", "priority": 3, "cost_per_hectare": 90.0, "yield_impact": 0.3}
+      ],
+      "harvest": [
+        {"name": "Récolte du maïs", "duration_hours": 4.0, "equipment": "ensileuse", "priority": 1, "cost_per_hectare": 150.0, "yield_impact": 0.0}
+      ]
+    }
+  },
+  "task_dependencies": {
+    "Labour du sol": [],
+    "Hersage": ["Labour du sol"],
+    "Semis": ["Hersage"],
+    "Fertilisation": ["Semis"],
+    "Traitement phytosanitaire": ["Semis"],
+    "Récolte": ["Fertilisation", "Traitement phytosanitaire"]
+  },
+  "equipment_availability": {
+    "charrue": {"availability": 0.9, "maintenance_hours": 2.0},
+    "herse": {"availability": 0.95, "maintenance_hours": 1.0},
+    "semoir": {"availability": 0.85, "maintenance_hours": 3.0},
+    "épandeur": {"availability": 0.9, "maintenance_hours": 2.0},
+    "pulvérisateur": {"availability": 0.8, "maintenance_hours": 4.0},
+    "moissonneuse": {"availability": 0.7, "maintenance_hours": 8.0}
+  }
+}

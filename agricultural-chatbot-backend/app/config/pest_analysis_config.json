@@ -1,0 +1,34 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Pest analysis configuration for production use"
+  },
+  "analysis_config": {
+    "minimum_confidence": 0.3,
+    "high_confidence": 0.8,
+    "moderate_confidence": 0.6,
+    "damage_pattern_weight": 0.6,
+    "pest_indicator_weight": 0.4,
+    "damage_match_bonus": 0.1,
+    "indicator_match_bonus": 0.05,
+    "max_identifications": 5,
+    "include_prevention": true,
+    "include_monitoring": true,
+    "include_economic_threshold": true,
+    "min_symptoms": 1,
+    "max_symptoms": 20,
+    "supported_crops": ["blé", "maïs", "colza"]
+  },
+  "validation_config": {
+    "require_crop_type": true,
+    "allow_unknown_crops": false,
+    "require_damage_symptoms": true,
+    "min_symptom_length": 2,
+    "max_symptom_length": 100,
+    "require_pest_indicators": false,
+    "max_pest_indicators": 20,
+    "strict_validation": true,
+    "return_validation_errors": true
+  }
+}

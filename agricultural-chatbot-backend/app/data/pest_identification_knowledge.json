@@ -1,0 +1,304 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Pest identification knowledge base for French agricultural crops",
+    "total_crops": 3,
+    "total_pests": 8
+  },
+  "analysis_config": {
+    "confidence_thresholds": {
+      "minimum_confidence": 0.3,
+      "high_confidence": 0.8,
+      "moderate_confidence": 0.6
+    },
+    "weighting": {
+      "damage_pattern_weight": 0.6,
+      "pest_indicator_weight": 0.4
+    },
+    "scoring": {
+      "damage_match_bonus": 0.1,
+      "indicator_match_bonus": 0.05
+    }
+  },
+  "crops": {
+    "blé": {
+      "name": "Blé tendre",
+      "scientific_name": "Triticum aestivum",
+      "pests": {
+        "puceron": {
+          "name": "Puceron du blé",
+          "scientific_name": "Sitobion avenae",
+          "damage_patterns": [
+            "feuilles_jaunies",
+            "croissance_ralentie",
+            "miellat_sur_feuilles",
+            "feuilles_déformées",
+            "tallage_faible"
+          ],
+          "pest_indicators": [
+            "pucerons_verts",
+            "pucerons_noirs",
+            "fourmis_sur_plantes",
+            "larves_de_pucerons",
+            "ailes_de_pucerons"
+          ],
+          "severity": "moderate",
+          "critical_stages": ["tallage", "montaison"],
+          "treatment": [
+            "insecticide_systémique",
+            "coccinelles_prédatrices",
+            "savon_noir",
+            "huile_de_neem"
+          ],
+          "prevention": [
+            "variétés_résistantes",
+            "rotation_cultures",
+            "couverture_sol",
+            "gestion_azote"
+          ],
+          "economic_threshold": "5-10 pucerons par tige",
+          "monitoring_methods": [
+            "observation_visuelle",
+            "pièges_jaunes",
+            "comptage_par_tige"
+          ]
+        },
+        "cécidomyie": {
+          "name": "Cécidomyie du blé",
+          "scientific_name": "Contarinia tritici",
+          "damage_patterns": [
+            "épis_vides",
+            "grains_abîmés",
+            "croissance_anormale",
+            "épis_déformés",
+            "grains_creux"
+          ],
+          "pest_indicators": [
+            "larves_blanches",
+            "mouches_jaunes",
+            "œufs_dans_épis",
+            "adultes_volants"
+          ],
+          "severity": "high",
+          "critical_stages": ["épiaison", "floraison"],
+          "treatment": [
+            "insecticide_contact",
+            "pièges_phéromones",
+            "traitement_semences",
+            "lutte_biologique"
+          ],
+          "prevention": [
+            "traitement_semences",
+            "rotation_cultures",
+            "variétés_résistantes",
+            "semis_tardif"
+          ],
+          "economic_threshold": "1-2 larves par épi",
+          "monitoring_methods": [
+            "pièges_phéromones",
+            "observation_épis",
+            "comptage_larves"
+          ]
+        },
+        "limace": {
+          "name": "Limace grise",
+          "scientific_name": "Deroceras reticulatum",
+          "damage_patterns": [
+            "feuilles_rongées",
+            "trous_irréguliers",
+            "traces_visqueuses",
+            "plants_flétris",
+            "semis_détruits"
+          ],
+          "pest_indicators": [
+            "limaces_visibles",
+            "traces_argentées",
+            "mucus_sur_sol",
+            "œufs_blancs"
+          ],
+          "severity": "moderate",
+          "critical_stages": ["levée", "tallage"],
+          "treatment": [
+            "anti-limaces",
+            "pièges_bière",
+            "barrières_physiques",
+            "prédateurs_naturels"
+          ],
+          "prevention": [
+            "drainage_amélioré",
+            "paillage",
+            "travail_sol",
+            "rotation_cultures"
+          ],
+          "economic_threshold": "5-10 limaces par m²",
+          "monitoring_methods": [
+            "pièges_bière",
+            "observation_nocturne",
+            "comptage_traces"
+          ]
+        }
+      }
+    },
+    "maïs": {
+      "name": "Maïs grain",
+      "scientific_name": "Zea mays",
+      "pests": {
+        "pyrale": {
+          "name": "Pyrale du maïs",
+          "scientific_name": "Ostrinia nubilalis",
+          "damage_patterns": [
+            "trous_dans_tiges",
+            "épis_abîmés",
+            "croissance_ralentie",
+            "tiges_cassées",
+            "grains_abîmés"
+          ],
+          "pest_indicators": [
+            "chenilles_vertes",
+            "papillons_bruns",
+            "œufs_sur_feuilles",
+            "larves_dans_tiges"
+          ],
+          "severity": "high",
+          "critical_stages": ["floraison", "formation_épis"],
+          "treatment": [
+            "insecticide_systémique",
+            "trichogrammes",
+            "pièges_phéromones",
+            "lutte_biologique"
+          ],
+          "prevention": [
+            "variétés_bt",
+            "rotation_cultures",
+            "traitement_semences",
+            "gestion_residus"
+          ],
+          "economic_threshold": "2-3 chenilles par plante",
+          "monitoring_methods": [
+            "pièges_phéromones",
+            "observation_tiges",
+            "comptage_chenilles"
+          ]
+        },
+        "taupin": {
+          "name": "Taupin du maïs",
+          "scientific_name": "Agriotes lineatus",
+          "damage_patterns": [
+            "racines_rongées",
+            "plants_flétris",
+            "croissance_ralentie",
+            "plants_morts",
+            "trous_dans_racines"
+          ],
+          "pest_indicators": [
+            "larves_jaunes",
+            "adultes_noirs",
+            "œufs_dans_sol",
+            "larves_dans_racines"
+          ],
+          "severity": "moderate",
+          "critical_stages": ["levée", "développement_racines"],
+          "treatment": [
+            "insecticide_sol",
+            "nématodes",
+            "traitement_semences",
+            "chaulage"
+          ],
+          "prevention": [
+            "traitement_semences",
+            "rotation_cultures",
+            "travail_sol",
+            "gestion_humidité"
+          ],
+          "economic_threshold": "1-2 larves par plante",
+          "monitoring_methods": [
+            "pièges_phéromones",
+            "observation_racines",
+            "comptage_larves"
+          ]
+        }
+      }
+    },
+    "colza": {
+      "name": "Colza d'hiver",
+      "scientific_name": "Brassica napus",
+      "pests": {
+        "altise": {
+          "name": "Altise du colza",
+          "scientific_name": "Phyllotreta cruciferae",
+          "damage_patterns": [
+            "feuilles_trouées",
+            "croissance_ralentie",
+            "plants_flétris",
+            "feuilles_déformées",
+            "plants_morts"
+          ],
+          "pest_indicators": [
+            "coléoptères_noirs",
+            "larves_blanches",
+            "saut_insectes",
+            "œufs_sur_feuilles"
+          ],
+          "severity": "moderate",
+          "critical_stages": ["levée", "rosette"],
+          "treatment": [
+            "insecticide_contact",
+            "pièges_jaunes",
+            "traitement_semences",
+            "lutte_biologique"
+          ],
+          "prevention": [
+            "traitement_semences",
+            "rotation_cultures",
+            "semis_tardif",
+            "couverture_sol"
+          ],
+          "economic_threshold": "5-10 altises par plante",
+          "monitoring_methods": [
+            "pièges_jaunes",
+            "observation_feuilles",
+            "comptage_insectes"
+          ]
+        },
+        "charançon": {
+          "name": "Charançon du bourgeon terminal",
+          "scientific_name": "Ceutorhynchus picitarsis",
+          "damage_patterns": [
+            "boutons_flétris",
+            "fleurs_abîmées",
+            "croissance_anormale",
+            "boutons_vides",
+            "fleurs_avortées"
+          ],
+          "pest_indicators": [
+            "charançons_bruns",
+            "larves_blanches",
+            "œufs_dans_boutons",
+            "adultes_volants"
+          ],
+          "severity": "high",
+          "critical_stages": ["montaison", "floraison"],
+          "treatment": [
+            "insecticide_systémique",
+            "pièges_phéromones",
+            "traitement_semences",
+            "lutte_biologique"
+          ],
+          "prevention": [
+            "variétés_résistantes",
+            "rotation_cultures",
+            "traitement_semences",
+            "gestion_residus"
+          ],
+          "economic_threshold": "1-2 charançons par plante",
+          "monitoring_methods": [
+            "pièges_phéromones",
+            "observation_boutons",
+            "comptage_larves"
+          ]
+        }
+      }
+    }
+  }
+}

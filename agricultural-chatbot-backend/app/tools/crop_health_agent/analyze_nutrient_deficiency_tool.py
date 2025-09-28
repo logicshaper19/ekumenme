@@ -1,5 +1,5 @@
 """
-Analyze Nutrient Deficiency Tool - Single Purpose Tool
+Analyze Nutrient Deficiency Tool - Enhanced Production-Ready Tool
 
 Job: Analyze nutrient deficiencies from plant symptoms and soil conditions.
 Input: crop_type, plant_symptoms, soil_conditions
@@ -11,14 +11,33 @@ This tool does ONLY:
 - Contain domain-specific business logic
 - Be stateless and reusable
 
+Enhanced Features:
+- External knowledge base (JSON file)
+- Configurable analysis parameters
+- Asynchronous support
+- Comprehensive input validation
+- Vector database ready architecture
+
 No prompting logic, no orchestration, no agent responsibilities.
 """
 
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Union
 from langchain.tools import BaseTool
 import logging
 import json
+import asyncio
+import aiofiles
 from dataclasses import dataclass, asdict
+from pathlib import Path
+import os
+
+# Import configuration system
+from ...config.nutrient_analysis_config import (
+    get_analysis_config, 
+    get_validation_config,
+    AnalysisConfig,
+    ValidationConfig
+)
 
 logger = logging.getLogger(__name__)
 

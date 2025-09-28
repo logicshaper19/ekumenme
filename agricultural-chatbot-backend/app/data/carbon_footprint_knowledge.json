@@ -1,0 +1,63 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Carbon footprint knowledge base for agricultural practices"
+  },
+  "emission_factors": {
+    "fertilizers": {
+      "azote": {"co2_per_kg": 4.2, "reduction_potential": 0.3, "category": "nitrogen"},
+      "phosphore": {"co2_per_kg": 1.2, "reduction_potential": 0.2, "category": "phosphorus"},
+      "potassium": {"co2_per_kg": 0.8, "reduction_potential": 0.1, "category": "potassium"},
+      "compost": {"co2_per_kg": 0.3, "reduction_potential": 0.5, "category": "organic"}
+    },
+    "pesticides": {
+      "herbicide": {"co2_per_kg": 8.5, "reduction_potential": 0.4, "category": "herbicide"},
+      "insecticide": {"co2_per_kg": 12.3, "reduction_potential": 0.5, "category": "insecticide"},
+      "fongicide": {"co2_per_kg": 6.7, "reduction_potential": 0.3, "category": "fungicide"}
+    },
+    "fuel": {
+      "diesel": {"co2_per_liter": 2.68, "reduction_potential": 0.2, "category": "fossil"},
+      "essence": {"co2_per_liter": 2.31, "reduction_potential": 0.2, "category": "fossil"}
+    },
+    "machinery": {
+      "tracteur": {"co2_per_hour": 15.2, "reduction_potential": 0.3, "category": "heavy"},
+      "moissonneuse": {"co2_per_hour": 25.8, "reduction_potential": 0.4, "category": "heavy"},
+      "pulvérisateur": {"co2_per_hour": 8.5, "reduction_potential": 0.2, "category": "light"}
+    },
+    "practices": {
+      "spraying": {"co2_per_ha": 12.5, "reduction_potential": 0.3, "category": "treatment"},
+      "fertilization": {"co2_per_ha": 18.7, "reduction_potential": 0.4, "category": "nutrition"},
+      "irrigation": {"co2_per_ha": 8.3, "reduction_potential": 0.2, "category": "water"},
+      "harvesting": {"co2_per_ha": 22.1, "reduction_potential": 0.3, "category": "harvest"}
+    }
+  },
+  "default_usage_rates": {
+    "fertilizer_kg_per_ha": 0.1,
+    "pesticide_kg_per_ha": 0.05,
+    "fuel_liters_per_ha": 2.0,
+    "machinery_hours_per_ha": 1.0
+  },
+  "reduction_strategies": {
+    "fertilizer": [
+      "Optimiser les doses selon les analyses de sol",
+      "Utiliser des engrais à libération lente",
+      "Implémenter la fertilisation de précision"
+    ],
+    "pesticide": [
+      "Adopter la lutte intégrée",
+      "Utiliser des variétés résistantes",
+      "Optimiser les seuils d'intervention"
+    ],
+    "fuel": [
+      "Optimiser les parcours",
+      "Maintenir les équipements",
+      "Utiliser des carburants alternatifs"
+    ],
+    "practice": [
+      "Agriculture de conservation",
+      "Rotation des cultures",
+      "Couverts végétaux"
+    ]
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Disease analysis configuration for production use"
+  },
+  "analysis_config": {
+    "minimum_confidence": 0.3,
+    "high_confidence": 0.8,
+    "moderate_confidence": 0.6,
+    "symptom_weight": 0.7,
+    "environmental_weight": 0.3,
+    "symptom_match_bonus": 0.1,
+    "environmental_match_bonus": 0.05,
+    "max_diagnoses": 5,
+    "include_prevention": true,
+    "include_monitoring": true,
+    "include_economic_threshold": true,
+    "include_spread_conditions": true,
+    "min_symptoms": 1,
+    "max_symptoms": 20,
+    "supported_crops": ["blé", "maïs", "colza"],
+    "humidity_thresholds": {
+      "low": 40.0,
+      "moderate": 70.0,
+      "high": 80.0,
+      "very_high": 85.0
+    },
+    "temperature_thresholds": {
+      "cool": 20.0,
+      "moderate": 25.0,
+      "warm": 30.0
+    }
+  },
+  "validation_config": {
+    "require_crop_type": true,
+    "allow_unknown_crops": false,
+    "require_symptoms": true,
+    "min_symptom_length": 2,
+    "max_symptom_length": 100,
+    "require_environmental_conditions": false,
+    "max_environmental_conditions": 20,
+    "validate_environmental_values": true,
+    "strict_validation": true,
+    "return_validation_errors": true
+  }
+}

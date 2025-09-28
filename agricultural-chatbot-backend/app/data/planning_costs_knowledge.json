@@ -1,0 +1,73 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Planning costs knowledge base for agricultural economic analysis"
+  },
+  "cost_components": {
+    "labor": {
+      "hourly_rate": 15.0,
+      "overtime_multiplier": 1.5,
+      "benefits_percentage": 0.25
+    },
+    "equipment": {
+      "hourly_rates": {
+        "charrue": 25.0,
+        "herse": 20.0,
+        "semoir": 30.0,
+        "épandeur": 35.0,
+        "pulvérisateur": 40.0,
+        "moissonneuse": 80.0
+      },
+      "maintenance_percentage": 0.15,
+      "fuel_cost_per_hour": 5.0
+    },
+    "materials": {
+      "seeds": {
+        "blé": 0.8,
+        "maïs": 1.2,
+        "tournesol": 0.6
+      },
+      "fertilizers": {
+        "azote": 1.5,
+        "phosphore": 1.8,
+        "potassium": 1.2
+      },
+      "pesticides": {
+        "herbicide": 12.0,
+        "insecticide": 15.0,
+        "fongicide": 18.0
+      }
+    }
+  },
+  "economic_indicators": {
+    "crop_prices": {
+      "blé": 200.0,
+      "maïs": 180.0,
+      "tournesol": 350.0
+    },
+    "yield_impact_multipliers": {
+      "high": 1.2,
+      "medium": 1.0,
+      "low": 0.8
+    },
+    "cost_efficiency_thresholds": {
+      "excellent": 0.3,
+      "good": 0.4,
+      "average": 0.5,
+      "poor": 0.6
+    }
+  },
+  "regional_factors": {
+    "france": {
+      "labor_cost_multiplier": 1.0,
+      "equipment_cost_multiplier": 1.0,
+      "material_cost_multiplier": 1.0
+    },
+    "europe": {
+      "labor_cost_multiplier": 1.1,
+      "equipment_cost_multiplier": 1.05,
+      "material_cost_multiplier": 1.08
+    }
+  }
+}

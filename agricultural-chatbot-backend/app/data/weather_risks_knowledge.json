@@ -1,0 +1,74 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Weather risks knowledge base for agricultural analysis"
+  },
+  "risk_thresholds": {
+    "temperature": {
+      "frost_risk": {"min_temp": -2.0, "severity": "high"},
+      "heat_stress": {"max_temp": 35.0, "severity": "medium"},
+      "extreme_heat": {"max_temp": 40.0, "severity": "high"}
+    },
+    "wind": {
+      "strong_wind": {"speed_kmh": 30.0, "severity": "medium"},
+      "dangerous_wind": {"speed_kmh": 50.0, "severity": "high"}
+    },
+    "precipitation": {
+      "heavy_rain": {"mm_per_hour": 10.0, "severity": "medium"},
+      "flood_risk": {"mm_per_day": 50.0, "severity": "high"},
+      "drought_risk": {"mm_per_week": 5.0, "severity": "high"}
+    },
+    "humidity": {
+      "high_humidity": {"percentage": 85.0, "severity": "medium"},
+      "low_humidity": {"percentage": 30.0, "severity": "medium"}
+    }
+  },
+  "crop_specific_risks": {
+    "blé": {
+      "sensitive_stages": ["floraison", "maturation"],
+      "frost_tolerance": -5.0,
+      "heat_tolerance": 30.0,
+      "water_needs": {"min_mm_week": 15.0, "optimal_mm_week": 25.0}
+    },
+    "maïs": {
+      "sensitive_stages": ["floraison", "pollinisation"],
+      "frost_tolerance": 0.0,
+      "heat_tolerance": 35.0,
+      "water_needs": {"min_mm_week": 20.0, "optimal_mm_week": 35.0}
+    },
+    "tournesol": {
+      "sensitive_stages": ["floraison"],
+      "frost_tolerance": -2.0,
+      "heat_tolerance": 40.0,
+      "water_needs": {"min_mm_week": 10.0, "optimal_mm_week": 20.0}
+    }
+  },
+  "risk_recommendations": {
+    "frost_risk": [
+      "Surveiller les températures nocturnes",
+      "Préparer les protections anti-gel",
+      "Éviter les interventions sensibles"
+    ],
+    "heat_stress": [
+      "Augmenter l'irrigation si possible",
+      "Surveiller l'état des cultures",
+      "Éviter les traitements en journée"
+    ],
+    "strong_wind": [
+      "Reporter les traitements phytosanitaires",
+      "Vérifier les équipements",
+      "Surveiller les cultures sensibles"
+    ],
+    "heavy_rain": [
+      "Éviter les interventions sur sol détrempé",
+      "Surveiller les risques d'érosion",
+      "Vérifier le drainage"
+    ],
+    "drought_risk": [
+      "Planifier l'irrigation",
+      "Surveiller le stress hydrique",
+      "Adapter les pratiques culturales"
+    ]
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "AMM analysis configuration for production use"
+  },
+  "analysis_config": {
+    "minimum_confidence": 0.3,
+    "high_confidence": 0.8,
+    "moderate_confidence": 0.6,
+    "product_name_weight": 0.4,
+    "active_ingredient_weight": 0.4,
+    "product_type_weight": 0.2,
+    "exact_match_bonus": 0.2,
+    "partial_match_bonus": 0.1,
+    "max_results": 10,
+    "include_restrictions": true,
+    "include_safety_measures": true,
+    "include_dosage_info": true,
+    "include_environmental_info": true,
+    "min_search_criteria": 1,
+    "max_search_criteria": 10,
+    "supported_product_types": [
+      "herbicide",
+      "insecticide", 
+      "fongicide",
+      "engrais",
+      "fertilisant",
+      "pesticide",
+      "biocontrôle"
+    ],
+    "case_sensitive": false,
+    "fuzzy_matching": true,
+    "similarity_threshold": 0.7
+  },
+  "validation_config": {
+    "require_product_name": false,
+    "min_product_name_length": 2,
+    "max_product_name_length": 100,
+    "require_active_ingredient": false,
+    "min_active_ingredient_length": 2,
+    "max_active_ingredient_length": 100,
+    "require_product_type": false,
+    "validate_product_type": true,
+    "require_at_least_one_criteria": true,
+    "max_total_criteria": 10,
+    "strict_validation": true,
+    "return_validation_errors": true
+  }
+}

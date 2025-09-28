@@ -1,0 +1,16 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Weather risks configuration"
+  },
+  "default_risk_threshold": 0.5,
+  "high_risk_threshold": 0.8,
+  "require_weather_data": true,
+  "validate_crop_type": true,
+  "min_forecast_days": 1,
+  "max_forecast_days": 14,
+  "require_location": true,
+  "strict_validation": true,
+  "return_validation_errors": true
+}

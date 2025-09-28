@@ -1,0 +1,55 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Intervention windows knowledge base for agricultural timing"
+  },
+  "intervention_conditions": {
+    "spraying": {
+      "optimal_temperature": {"min": 10.0, "max": 25.0},
+      "optimal_humidity": {"min": 40.0, "max": 80.0},
+      "max_wind_speed": 15.0,
+      "min_duration_hours": 4.0,
+      "precipitation_tolerance": 0.0
+    },
+    "fertilization": {
+      "optimal_temperature": {"min": 5.0, "max": 30.0},
+      "optimal_humidity": {"min": 30.0, "max": 90.0},
+      "max_wind_speed": 20.0,
+      "min_duration_hours": 2.0,
+      "precipitation_tolerance": 2.0
+    },
+    "irrigation": {
+      "optimal_temperature": {"min": 8.0, "max": 35.0},
+      "optimal_humidity": {"min": 20.0, "max": 70.0},
+      "max_wind_speed": 25.0,
+      "min_duration_hours": 1.0,
+      "precipitation_tolerance": 0.0
+    },
+    "harvesting": {
+      "optimal_temperature": {"min": 5.0, "max": 30.0},
+      "optimal_humidity": {"min": 30.0, "max": 60.0},
+      "max_wind_speed": 20.0,
+      "min_duration_hours": 6.0,
+      "precipitation_tolerance": 0.0
+    }
+  },
+  "crop_specific_timing": {
+    "blé": {
+      "spraying": {"optimal_hours": "06:00-10:00", "avoid_hours": "12:00-16:00"},
+      "fertilization": {"optimal_hours": "08:00-12:00", "avoid_hours": "14:00-18:00"},
+      "harvesting": {"optimal_hours": "08:00-18:00", "avoid_hours": "20:00-06:00"}
+    },
+    "maïs": {
+      "spraying": {"optimal_hours": "06:00-09:00", "avoid_hours": "11:00-15:00"},
+      "fertilization": {"optimal_hours": "07:00-11:00", "avoid_hours": "13:00-17:00"},
+      "harvesting": {"optimal_hours": "09:00-17:00", "avoid_hours": "19:00-07:00"}
+    }
+  },
+  "weather_priorities": {
+    "temperature": 0.3,
+    "humidity": 0.2,
+    "wind": 0.3,
+    "precipitation": 0.2
+  }
+}

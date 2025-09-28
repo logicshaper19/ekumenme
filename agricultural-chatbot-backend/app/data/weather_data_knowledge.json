@@ -1,0 +1,510 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2024-09-28",
+    "description": "Weather data knowledge base for agricultural weather forecasting",
+    "total_locations": 10,
+    "total_weather_conditions": 15
+  },
+  "analysis_config": {
+    "confidence_thresholds": {
+      "minimum_confidence": 0.7,
+      "high_confidence": 0.9,
+      "moderate_confidence": 0.8
+    },
+    "weather_parameters": {
+      "temperature_weight": 0.3,
+      "humidity_weight": 0.2,
+      "wind_weight": 0.2,
+      "precipitation_weight": 0.3
+    },
+    "forecast_limits": {
+      "max_days": 14,
+      "min_days": 1,
+      "default_days": 7
+    }
+  },
+  "api_config": {
+    "weather_api": {
+      "base_url": "https://api.weatherapi.com/v1",
+      "api_key": "b6683958ab174bb6ae0134111252809",
+      "endpoints": {
+        "forecast": "/forecast.json",
+        "current": "/current.json",
+        "history": "/history.json"
+      },
+      "rate_limits": {
+        "requests_per_day": 1000000,
+        "requests_per_minute": 1000
+      }
+    }
+  },
+  "weather_conditions": {
+    "sunny": {
+      "condition_code": 1000,
+      "description": "Ensoleillé",
+      "agricultural_impact": "favorable",
+      "recommended_activities": [
+        "traitements_phytosanitaires",
+        "récolte",
+        "semis",
+        "irrigation"
+      ],
+      "restrictions": [],
+      "temperature_range": {
+        "min": 15,
+        "max": 35
+      },
+      "humidity_range": {
+        "min": 30,
+        "max": 70
+      },
+      "wind_range": {
+        "min": 0,
+        "max": 20
+      }
+    },
+    "partly_cloudy": {
+      "condition_code": 1003,
+      "description": "Partiellement nuageux",
+      "agricultural_impact": "favorable",
+      "recommended_activities": [
+        "traitements_phytosanitaires",
+        "récolte",
+        "semis"
+      ],
+      "restrictions": [],
+      "temperature_range": {
+        "min": 10,
+        "max": 30
+      },
+      "humidity_range": {
+        "min": 40,
+        "max": 80
+      },
+      "wind_range": {
+        "min": 0,
+        "max": 25
+      }
+    },
+    "cloudy": {
+      "condition_code": 1006,
+      "description": "Nuageux",
+      "agricultural_impact": "modéré",
+      "recommended_activities": [
+        "traitements_phytosanitaires",
+        "semis"
+      ],
+      "restrictions": [
+        "éviter_récolte_humide"
+      ],
+      "temperature_range": {
+        "min": 5,
+        "max": 25
+      },
+      "humidity_range": {
+        "min": 50,
+        "max": 90
+      },
+      "wind_range": {
+        "min": 0,
+        "max": 30
+      }
+    },
+    "overcast": {
+      "condition_code": 1009,
+      "description": "Couvert",
+      "agricultural_impact": "défavorable",
+      "recommended_activities": [
+        "traitements_phytosanitaires"
+      ],
+      "restrictions": [
+        "éviter_récolte",
+        "éviter_semis"
+      ],
+      "temperature_range": {
+        "min": 0,
+        "max": 20
+      },
+      "humidity_range": {
+        "min": 60,
+        "max": 95
+      },
+      "wind_range": {
+        "min": 0,
+        "max": 35
+      }
+    },
+    "light_rain": {
+      "condition_code": 1183,
+      "description": "Pluie légère",
+      "agricultural_impact": "favorable",
+      "recommended_activities": [
+        "irrigation_naturelle",
+        "fertilisation"
+      ],
+      "restrictions": [
+        "éviter_traitements",
+        "éviter_récolte"
+      ],
+      "temperature_range": {
+        "min": 5,
+        "max": 25
+      },
+      "humidity_range": {
+        "min": 70,
+        "max": 95
+      },
+      "wind_range": {
+        "min": 0,
+        "max": 25
+      }
+    },
+    "moderate_rain": {
+      "condition_code": 1186,
+      "description": "Pluie modérée",
+      "agricultural_impact": "défavorable",
+      "recommended_activities": [
+        "irrigation_naturelle"
+      ],
+      "restrictions": [
+        "éviter_traitements",
+        "éviter_récolte",
+        "éviter_semis",
+        "risque_lessivage"
+      ],
+      "temperature_range": {
+        "min": 0,
+        "max": 20
+      },
+      "humidity_range": {
+        "min": 80,
+        "max": 98
+      },
+      "wind_range": {
+        "min": 0,
+        "max": 30
+      }
+    },
+    "heavy_rain": {
+      "condition_code": 1189,
+      "description": "Pluie forte",
+      "agricultural_impact": "très_défavorable",
+      "recommended_activities": [],
+      "restrictions": [
+        "éviter_traitements",
+        "éviter_récolte",
+        "éviter_semis",
+        "risque_lessivage_élevé",
+        "risque_érosion"
+      ],
+      "temperature_range": {
+        "min": -5,
+        "max": 15
+      },
+      "humidity_range": {
+        "min": 85,
+        "max": 99
+      },
+      "wind_range": {
+        "min": 0,
+        "max": 40
+      }
+    },
+    "light_snow": {
+      "condition_code": 1213,
+      "description": "Neige légère",
+      "agricultural_impact": "défavorable",
+      "recommended_activities": [],
+      "restrictions": [
+        "éviter_traitements",
+        "éviter_récolte",
+        "éviter_semis",
+        "risque_gel"
+      ],
+      "temperature_range": {
+        "min": -10,
+        "max": 5
+      },
+      "humidity_range": {
+        "min": 70,
+        "max": 95
+      },
+      "wind_range": {
+        "min": 0,
+        "max": 25
+      }
+    },
+    "moderate_snow": {
+      "condition_code": 1216,
+      "description": "Neige modérée",
+      "agricultural_impact": "très_défavorable",
+      "recommended_activities": [],
+      "restrictions": [
+        "éviter_traitements",
+        "éviter_récolte",
+        "éviter_semis",
+        "risque_gel_élevé",
+        "risque_dégâts"
+      ],
+      "temperature_range": {
+        "min": -15,
+        "max": 0
+      },
+      "humidity_range": {
+        "min": 80,
+        "max": 98
+      },
+      "wind_range": {
+        "min": 0,
+        "max": 35
+      }
+    },
+    "fog": {
+      "condition_code": 1135,
+      "description": "Brouillard",
+      "agricultural_impact": "défavorable",
+      "recommended_activities": [],
+      "restrictions": [
+        "éviter_traitements",
+        "éviter_récolte",
+        "risque_humidité_élevée"
+      ],
+      "temperature_range": {
+        "min": -5,
+        "max": 15
+      },
+      "humidity_range": {
+        "min": 90,
+        "max": 99
+      },
+      "wind_range": {
+        "min": 0,
+        "max": 10
+      }
+    },
+    "mist": {
+      "condition_code": 1030,
+      "description": "Brume",
+      "agricultural_impact": "modéré",
+      "recommended_activities": [
+        "traitements_phytosanitaires"
+      ],
+      "restrictions": [
+        "éviter_récolte_humide"
+      ],
+      "temperature_range": {
+        "min": 0,
+        "max": 20
+      },
+      "humidity_range": {
+        "min": 80,
+        "max": 95
+      },
+      "wind_range": {
+        "min": 0,
+        "max": 15
+      }
+    },
+    "thunderstorm": {
+      "condition_code": 1087,
+      "description": "Orage",
+      "agricultural_impact": "très_défavorable",
+      "recommended_activities": [],
+      "restrictions": [
+        "éviter_traitements",
+        "éviter_récolte",
+        "éviter_semis",
+        "risque_grêle",
+        "risque_vent_fort"
+      ],
+      "temperature_range": {
+        "min": 10,
+        "max": 30
+      },
+      "humidity_range": {
+        "min": 70,
+        "max": 95
+      },
+      "wind_range": {
+        "min": 20,
+        "max": 60
+      }
+    },
+    "hail": {
+      "condition_code": 1237,
+      "description": "Grêle",
+      "agricultural_impact": "catastrophique",
+      "recommended_activities": [],
+      "restrictions": [
+        "éviter_traitements",
+        "éviter_récolte",
+        "éviter_semis",
+        "risque_dégâts_graves",
+        "urgence_protection"
+      ],
+      "temperature_range": {
+        "min": 5,
+        "max": 25
+      },
+      "humidity_range": {
+        "min": 60,
+        "max": 90
+      },
+      "wind_range": {
+        "min": 15,
+        "max": 50
+      }
+    },
+    "freezing_rain": {
+      "condition_code": 1063,
+      "description": "Pluie verglaçante",
+      "agricultural_impact": "très_défavorable",
+      "recommended_activities": [],
+      "restrictions": [
+        "éviter_traitements",
+        "éviter_récolte",
+        "éviter_semis",
+        "risque_gel_plantes",
+        "risque_dégâts"
+      ],
+      "temperature_range": {
+        "min": -5,
+        "max": 5
+      },
+      "humidity_range": {
+        "min": 80,
+        "max": 98
+      },
+      "wind_range": {
+        "min": 0,
+        "max": 30
+      }
+    },
+    "dust_storm": {
+      "condition_code": 1273,
+      "description": "Tempête de poussière",
+      "agricultural_impact": "très_défavorable",
+      "recommended_activities": [],
+      "restrictions": [
+        "éviter_traitements",
+        "éviter_récolte",
+        "éviter_semis",
+        "risque_érosion",
+        "risque_dégâts_cultures"
+      ],
+      "temperature_range": {
+        "min": 15,
+        "max": 40
+      },
+      "humidity_range": {
+        "min": 10,
+        "max": 50
+      },
+      "wind_range": {
+        "min": 30,
+        "max": 80
+      }
+    }
+  },
+  "agricultural_weather_guidelines": {
+    "treatment_conditions": {
+      "optimal": {
+        "temperature_range": [10, 25],
+        "humidity_range": [40, 80],
+        "wind_speed_max": 20,
+        "precipitation_max": 0,
+        "uv_index_min": 2
+      },
+      "acceptable": {
+        "temperature_range": [5, 30],
+        "humidity_range": [30, 90],
+        "wind_speed_max": 25,
+        "precipitation_max": 0.5,
+        "uv_index_min": 1
+      },
+      "unfavorable": {
+        "temperature_range": [0, 35],
+        "humidity_range": [20, 95],
+        "wind_speed_max": 30,
+        "precipitation_max": 2,
+        "uv_index_min": 0
+      }
+    },
+    "harvest_conditions": {
+      "optimal": {
+        "temperature_range": [15, 30],
+        "humidity_range": [30, 70],
+        "wind_speed_max": 15,
+        "precipitation_max": 0,
+        "cloud_cover_max": 30
+      },
+      "acceptable": {
+        "temperature_range": [10, 35],
+        "humidity_range": [20, 80],
+        "wind_speed_max": 20,
+        "precipitation_max": 0.5,
+        "cloud_cover_max": 50
+      },
+      "unfavorable": {
+        "temperature_range": [5, 40],
+        "humidity_range": [10, 90],
+        "wind_speed_max": 25,
+        "precipitation_max": 2,
+        "cloud_cover_max": 80
+      }
+    },
+    "planting_conditions": {
+      "optimal": {
+        "temperature_range": [10, 25],
+        "humidity_range": [40, 80],
+        "wind_speed_max": 15,
+        "precipitation_range": [0, 5],
+        "soil_temperature_min": 8
+      },
+      "acceptable": {
+        "temperature_range": [5, 30],
+        "humidity_range": [30, 90],
+        "wind_speed_max": 20,
+        "precipitation_range": [0, 10],
+        "soil_temperature_min": 5
+      },
+      "unfavorable": {
+        "temperature_range": [0, 35],
+        "humidity_range": [20, 95],
+        "wind_speed_max": 25,
+        "precipitation_range": [0, 20],
+        "soil_temperature_min": 0
+      }
+    }
+  },
+  "location_data": {
+    "france_regions": {
+      "ile_de_france": {
+        "coordinates": {"lat": 48.8566, "lon": 2.3522},
+        "climate_zone": "tempéré_océanique",
+        "typical_weather": ["partly_cloudy", "light_rain", "sunny"]
+      },
+      "provence_alpes_cote_azur": {
+        "coordinates": {"lat": 43.9352, "lon": 6.0679},
+        "climate_zone": "méditerranéen",
+        "typical_weather": ["sunny", "partly_cloudy", "light_rain"]
+      },
+      "bretagne": {
+        "coordinates": {"lat": 48.2020, "lon": -2.9326},
+        "climate_zone": "tempéré_océanique",
+        "typical_weather": ["cloudy", "light_rain", "mist"]
+      },
+      "alsace": {
+        "coordinates": {"lat": 48.5734, "lon": 7.7521},
+        "climate_zone": "tempéré_continental",
+        "typical_weather": ["partly_cloudy", "sunny", "light_rain"]
+      },
+      "aquitaine": {
+        "coordinates": {"lat": 44.8378, "lon": -0.5792},
+        "climate_zone": "tempéré_océanique",
+        "typical_weather": ["sunny", "partly_cloudy", "light_rain"]
+      }
+    }
+  }
+}
