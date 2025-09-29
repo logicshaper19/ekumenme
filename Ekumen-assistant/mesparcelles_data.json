@@ -1,0 +1,216 @@
+{
+  "parcels": [
+    {
+      "nom": "Tuferes",
+      "millesime": 2024,
+      "insee_commune": "75120",
+      "uuid_parcelle": "60dff7b9-3183-412b-b7a2-dd6d895f181c",
+      "geometrie_vide": false,
+      "siret_exploitation": "93429231900019",
+      "surface_mesuree_ha": 228.54,
+      "succession_cultures": [
+        {
+          "rang": 1,
+          "libelle": "Blé",
+          "id_culture": 1438,
+          "varietes_cultures_cepages": [
+            {
+              "libelle": "Hiver",
+              "id_variete": 11438
+            }
+          ]
+        }
+      ],
+      "culture_intermediaire": null,
+      "link_parcelle_millesime_precedent": "",
+      "uuid_parcelle_millesime_precedent": ""
+    }
+  ],
+  "geometries": [
+    {
+      "geometrie": {
+        "crs": {
+          "type": "name",
+          "properties": {
+            "name": "EPSG:2154"
+          }
+        },
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [651262.407, 6825683.347],
+              [650077.54, 6825430.039],
+              [650490.524, 6824356.996],
+              [651554.105, 6824582.179],
+              [651754.473, 6825246.995],
+              [651262.407, 6825683.347]
+            ]
+          ]
+        ]
+      },
+      "bounding_box": {
+        "xmax": 651754.473,
+        "xmin": 650077.54,
+        "ymax": 6825683.347,
+        "ymin": 6824356.996
+      },
+      "uuid_parcelle": "60dff7b9-3183-412b-b7a2-dd6d895f181c"
+    }
+  ],
+  "interventions": [
+    {
+      "culture": { "libelle": "Blé", "id_culture": 1438 },
+      "date_fin": "2025-09-08",
+      "date_debut": "2025-09-08",
+      "extrants": [],
+      "intrants": [
+        {
+          "phyto": {
+            "cible": { "libelle": "", "id_cible": 1 },
+            "code_amm": "2190312"
+          },
+          "libelle": "Saracen Delta",
+          "id_intrant": 1,
+          "type_intrant": {
+            "libelle": "Phytosanitaire",
+            "categorie": "Herbicide",
+            "id_type_intrant": 1
+          },
+          "quantite_totale": 18.283,
+          "unite_intrant_intervention": "L"
+        }
+      ],
+      "materiels": [
+        {
+          "libelle": "Tracteur John Deere 7055E",
+          "categorie": "Unknown",
+          "id_materiel": 1
+        }
+      ],
+      "prestataires": [],
+      "link_parcelle": "",
+      "uuid_parcelle": "60dff7b9-3183-412b-b7a2-dd6d895f181c",
+      "type_intervention": {
+        "libelle": "Traitement phytosanitaire",
+        "id_type_intervention": 1
+      },
+      "uuid_intervention": "837b375b-5836-463f-b912-6feeed9ad193",
+      "siret_exploitation": "93429231900019",
+      "surface_travaillee_ha": 182.83
+    },
+    {
+      "culture": { "libelle": "Blé", "id_culture": 1438 },
+      "date_fin": "2025-08-25",
+      "date_debut": "2025-08-25",
+      "extrants": [],
+      "intrants": [
+        {
+          "libelle": "Codix",
+          "id_intrant": 2,
+          "type_intrant": {
+            "libelle": "Phytosanitaire",
+            "categorie": "",
+            "id_type_intrant": 1
+          },
+          "quantite_totale": 457.08,
+          "unite_intrant_intervention": "L"
+        }
+      ],
+      "materiels": [
+        {
+          "libelle": "Tracteur John Deere",
+          "categorie": "Unknown",
+          "id_materiel": 2
+        }
+      ],
+      "prestataires": [],
+      "link_parcelle": "",
+      "uuid_parcelle": "60dff7b9-3183-412b-b7a2-dd6d895f181c",
+      "type_intervention": {
+        "libelle": "Traitement phytosanitaire",
+        "id_type_intervention": 1
+      },
+      "uuid_intervention": "b3ecd2e5-f734-4f95-bce3-06fb84fd5189",
+      "siret_exploitation": "93429231900019",
+      "surface_travaillee_ha": 228.54
+    },
+    {
+      "culture": { "libelle": "Blé", "id_culture": 1438 },
+      "date_fin": "2025-09-08",
+      "date_debut": "2025-09-08",
+      "extrants": [],
+      "intrants": [
+        {
+          "phyto": {
+            "cible": { "libelle": "", "id_cible": 1 },
+            "code_amm": "2190312"
+          },
+          "libelle": "Saracène Delta",
+          "id_intrant": 3,
+          "type_intrant": {
+            "libelle": "Phytosanitaire",
+            "categorie": "Herbicide",
+            "id_type_intrant": 1
+          },
+          "quantite_totale": 155.4055,
+          "unite_intrant_intervention": "L"
+        }
+      ],
+      "materiels": [
+        {
+          "libelle": "Tracteur John Deere 6575",
+          "categorie": "Unknown",
+          "id_materiel": 3
+        }
+      ],
+      "prestataires": [],
+      "link_parcelle": "",
+      "uuid_parcelle": "60dff7b9-3183-412b-b7a2-dd6d895f181c",
+      "type_intervention": {
+        "libelle": "Traitement phytosanitaire",
+        "id_type_intervention": 1
+      },
+      "uuid_intervention": "7aea91b8-e415-477c-b4d5-4c7c55339eaf",
+      "siret_exploitation": "93429231900019",
+      "surface_travaillee_ha": 182.83
+    },
+    {
+      "culture": { "libelle": "Blé", "id_culture": 1438 },
+      "date_fin": "2025-09-11",
+      "date_debut": "2025-09-11",
+      "extrants": [],
+      "intrants": [
+        {
+          "libelle": "FEEDSER",
+          "id_intrant": 4,
+          "type_intrant": {
+            "libelle": "Fertilisant",
+            "categorie": "",
+            "id_type_intrant": 1
+          },
+          "quantite_totale": 182.832,
+          "unite_intrant_intervention": "L"
+        }
+      ],
+      "materiels": [
+        {
+          "libelle": "Tractor John Deere 7525 E",
+          "categorie": "Unknown",
+          "id_materiel": 4
+        }
+      ],
+      "prestataires": [],
+      "link_parcelle": "",
+      "uuid_parcelle": "60dff7b9-3183-412b-b7a2-dd6d895f181c",
+      "type_intervention": {
+        "libelle": "Apport fertilisant",
+        "id_type_intervention": 2
+      },
+      "uuid_intervention": "65889c18-8df3-45a0-8cf2-975037537dcb",
+      "siret_exploitation": "93429231900019",
+      "surface_travaillee_ha": 182.832
+    }
+  ]
+}
+
