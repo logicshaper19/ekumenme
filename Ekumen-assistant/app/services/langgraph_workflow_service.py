@@ -447,8 +447,15 @@ class LangGraphWorkflowService:
         try:
             processing_steps = state["processing_steps"] + ["synthesis"]
 
-            # Import enhanced prompts
-            from app.prompts.base_prompts import BASE_AGRICULTURAL_SYSTEM_PROMPT, RESPONSE_FORMAT_TEMPLATE
+            # STEP 1: Classify query complexity using LangChain
+            from app.services.query_classifier import get_classifier
+
+            classifier = get_classifier(use_llm=True)  # Use LangChain LLM for classification
+            classification = classifier.classify(state["query"])
+
+            logger.info(f"Query classified as: {classification['complexity']} "
+                       f"(confidence: {classification['confidence']:.2f}, "
+                       f"method: {classification['method']})")
 
             # Format collected data for better readability
             weather_summary = self._format_weather_data(state.get("weather_data"))
@@ -460,70 +467,25 @@ class LangGraphWorkflowService:
             location = state["context"].get("location", self._extract_location_from_query(state["query"]))
             crop = state["context"].get("crop", self._extract_crop_from_query(state["query"]))
 
-            # Create enhanced synthesis prompt with structure
-            synthesis_prompt = f"""{BASE_AGRICULTURAL_SYSTEM_PROMPT}
+            # STEP 2: Create data summary for prompt
+            data_summary = self._create_data_summary(
+                weather_summary,
+                regulatory_summary,
+                farm_summary,
+                feasibility_summary
+            )
 
-QUESTION DE L'UTILISATEUR:
-{state["query"]}
+            # STEP 3: Select appropriate response template based on complexity
+            from app.prompts.response_templates import get_response_template
 
-DONNÉES COLLECTÉES POUR RÉPONDRE:
+            synthesis_prompt = get_response_template(
+                complexity=classification["complexity"],
+                query=state["query"],
+                data_summary=data_summary,
+                location=location
+            )
 
-{weather_summary}
-
-{feasibility_summary}
-
-{regulatory_summary}
-
-{farm_summary}
-
-INSTRUCTIONS DE RÉPONSE STRUCTURÉE:
-
-Génère une réponse en suivant EXACTEMENT cette structure markdown:
-
-## 🌱 [Titre engageant qui reconnaît la demande]
-[1-2 phrases personnelles montrant que tu comprends l'objectif]
-
-### ❄️ La Réalité Climatique
-[Utilise les données météo avec chiffres précis: températures min/max, jours de gel, saison de croissance]
-[Compare avec les exigences de la culture demandée]
-[Conclusion claire: faisable ou non en pleine terre]
-
-### 🏠 Solutions Concrètes
-[Si faisable: étapes numérotées pour réussir]
-[Si infaisable en pleine terre: solution alternative (serre, pot, intérieur)]
-**Étape 1: [Action]**
-- Détail avec chiffres (coût, quantité, timing)
-
-**Étape 2: [Action]**
-- Détail avec chiffres
-
-[Continue pour 4-6 étapes]
-
-### ⏱️ Attentes Réalistes
-- **Première récolte/floraison**: [timeline précis en mois/années]
-- **Rendement attendu**: [chiffres concrets avec unités]
-- **Effort requis**: [description honnête du travail]
-- **Taux de réussite**: [estimation réaliste]
-
-### 🌳 Alternatives Viables pour {location}
-[Si la culture demandée est difficile, propose 3-4 alternatives qui RÉUSSIRONT]
-- **[Culture 1]**: [Description courte + zone de rusticité + avantages]
-- **[Culture 2]**: [Description courte + zone de rusticité + avantages]
-- **[Culture 3]**: [Description courte + zone de rusticité + avantages]
-
-### 💪 Mon Conseil
-[Encouragement personnalisé basé sur la situation]
-[Recommandation finale claire et motivante]
-
-{RESPONSE_FORMAT_TEMPLATE}
-
-RAPPELS IMPORTANTS:
-- Utilise les émojis appropriés (🌱 🌾 ⚠️ ✅ ❌ 🌡️ 💧 ⏱️ 💰 🌳)
-- Tous les chiffres doivent être précis (pas "environ" mais "entre X et Y")
-- Utilise **gras** pour les points clés
-- Crée des sections visuellement distinctes
-- Termine toujours sur une note encourageante
-"""
+            logger.info(f"Using {classification['complexity']} response template")
 
             # Generate response using LLM
             response = await self.llm.ainvoke([HumanMessage(content=synthesis_prompt)])
@@ -708,6 +670,33 @@ RAPPELS IMPORTANTS:
             ],
             "supported_agent_types": ["weather", "regulatory", "farm_data", "general"]
         }
+
+    def _create_data_summary(
+        self,
+        weather_summary: str,
+        regulatory_summary: str,
+        farm_summary: str,
+        feasibility_summary: str
+    ) -> str:
+        """Create concise data summary for prompt"""
+        sections = []
+
+        if weather_summary and weather_summary != "Aucune donnée météo disponible.":
+            sections.append(weather_summary)
+
+        if feasibility_summary and feasibility_summary != "Aucune analyse de faisabilité disponible.":
+            sections.append(feasibility_summary)
+
+        if regulatory_summary and regulatory_summary != "Aucune donnée réglementaire disponible.":
+            sections.append(regulatory_summary)
+
+        if farm_summary and farm_summary != "Aucune donnée d'exploitation disponible.":
+            sections.append(farm_summary)
+
+        if not sections:
+            return "Aucune donnée spécifique disponible pour cette requête."
+
+        return "\n\n".join(sections)
 
     def _format_weather_data(self, weather_data: Optional[Dict[str, Any]]) -> str:
         """Format weather data for synthesis prompt"""
