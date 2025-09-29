@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Send, Bot, User, Loader2 } from 'lucide-react'
 import { useWebSocket } from '../services/websocket'
+import { useAuth } from '../hooks/useAuth'
 import VoiceInterface from '../components/VoiceInterface'
 
 interface Message {
@@ -11,6 +12,12 @@ interface Message {
   agent?: string
   agentName?: string
   isStreaming?: boolean
+  metadata?: {
+    agent_type?: string
+    confidence?: number
+    recommendations?: any[]
+    [key: string]: any
+  }
 }
 
 interface AgentInfo {
@@ -21,12 +28,15 @@ interface AgentInfo {
 }
 
 const ChatInterface: React.FC = () => {
+  const { isAuthenticated } = useAuth()
   const [messages, setMessages] = useState<Message[]>([])
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [currentAgent, setCurrentAgent] = useState<AgentInfo | null>(null)
   const [isStreaming, setIsStreaming] = useState(false)
   const [showVoiceInterface, setShowVoiceInterface] = useState(false)
+  const [conversationId, setConversationId] = useState<string | null>(null)
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const webSocket = useWebSocket()
 
@@ -47,10 +57,78 @@ const ChatInterface: React.FC = () => {
     scrollToBottom()
   }, [messages])
 
+  // Function to create a new conversation
+  const createConversation = async (): Promise<string | null> => {
+    try {
+      setIsCreatingConversation(true)
+      const token = localStorage.getItem('auth_token')
+
+      if (!token) {
+        console.error('No auth token found')
+        return null
+      }
+
+      const response = await fetch('/api/v1/chat/conversations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          agent_type: 'farm_data',
+          title: 'Nouvelle conversation'
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to create conversation: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      console.log('Conversation created:', data.id)
+      return data.id
+    } catch (error) {
+      console.error('Error creating conversation:', error)
+      return null
+    } finally {
+      setIsCreatingConversation(false)
+    }
+  }
+
+  // Initialize conversation only once when component mounts and user is authenticated
   useEffect(() => {
-    // Initialize conversation
-    const conversationId = 'default-conversation' // In real app, get from user session
-    webSocket.joinConversation(conversationId)
+    if (!isAuthenticated) {
+      return
+    }
+
+    // Only create conversation if we don't have one and aren't already creating one
+    if (!conversationId && !isCreatingConversation) {
+      const initializeChat = async () => {
+        console.log('Initializing chat conversation...')
+        const newConversationId = await createConversation()
+        if (!newConversationId) {
+          console.error('Failed to create conversation')
+          return
+        }
+
+        setConversationId(newConversationId)
+        console.log('Connecting to conversation:', newConversationId)
+
+        // Wait a bit for the conversation to be fully created before connecting
+        setTimeout(() => {
+          webSocket.joinConversation(newConversationId)
+        }, 100)
+      }
+
+      initializeChat()
+    }
+  }, [isAuthenticated, conversationId, isCreatingConversation])
+
+  // Set up WebSocket event listeners (separate effect)
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return
+    }
 
     // Set up WebSocket event listeners
     webSocket.onMessageResponse((data) => {
@@ -71,7 +149,7 @@ const ChatInterface: React.FC = () => {
     webSocket.onStreamingStart((data) => {
       const assistantMessage: Message = {
         id: data.message_id,
-        content: '',
+        content: '🌾 Traitement en cours...',
         sender: 'assistant',
         timestamp: new Date(),
         isStreaming: true
@@ -96,6 +174,92 @@ const ChatInterface: React.FC = () => {
         setIsLoading(false)
         setIsStreaming(false)
       }
+    })
+
+    // Handle workflow completion with final response
+    webSocket.onStreamingComplete((data) => {
+      console.log('Received streaming complete:', data)
+      setMessages(prev => {
+        // First try to find streaming assistant message by message_id
+        let streamingMessage = data.message_id
+          ? prev.find(msg => msg.id === data.message_id && msg.isStreaming && msg.sender === 'assistant')
+          : null
+
+        // If not found by message_id, try to find any streaming assistant message
+        if (!streamingMessage) {
+          streamingMessage = prev.find(msg => msg.isStreaming && msg.sender === 'assistant')
+        }
+
+        if (streamingMessage) {
+          // Update the existing streaming message
+          return prev.map(msg =>
+            msg.id === streamingMessage.id
+              ? {
+                  ...msg,
+                  content: data.message,
+                  isStreaming: false,
+                  metadata: {
+                    agent_type: data.agent_type,
+                    confidence: data.confidence,
+                    recommendations: data.recommendations,
+                    thread_id: data.thread_id,
+                    ...data.metadata
+                  }
+                }
+              : msg
+          )
+        } else {
+          // No streaming message found, create a new assistant message
+          const newMessage: Message = {
+            id: data.message_id || `response-${Date.now()}`,
+            content: data.message,
+            sender: 'assistant',
+            timestamp: new Date(),
+            isStreaming: false,
+            metadata: {
+              agent_type: data.agent_type,
+              confidence: data.confidence,
+              recommendations: data.recommendations,
+              thread_id: data.thread_id,
+              ...data.metadata
+            }
+          }
+          return [...prev, newMessage]
+        }
+      })
+      setIsLoading(false)
+      setIsStreaming(false)
+    })
+
+    // Handle workflow status updates
+    webSocket.onWorkflowStart((data) => {
+      console.log('Workflow started:', data.message)
+      // Update the existing assistant message with workflow status
+      setMessages(prev => prev.map(msg =>
+        msg.sender === 'assistant' && msg.isStreaming
+          ? { ...msg, content: data.message }
+          : msg
+      ))
+    })
+
+    webSocket.onWorkflowInit((data) => {
+      console.log('Workflow initialized:', data.message)
+      // Update the existing assistant message with initialization status
+      setMessages(prev => prev.map(msg =>
+        msg.sender === 'assistant' && msg.isStreaming
+          ? { ...msg, content: data.message }
+          : msg
+      ))
+    })
+
+    webSocket.onWorkflowStep((data) => {
+      console.log('Workflow step:', data.step, data.message)
+      // Update the existing assistant message with step progress
+      setMessages(prev => prev.map(msg =>
+        msg.sender === 'assistant' && msg.isStreaming
+          ? { ...msg, content: data.message }
+          : msg
+      ))
     })
 
     webSocket.onAgentSelected((data) => {
@@ -125,10 +289,14 @@ const ChatInterface: React.FC = () => {
       webSocket.off('chat:message_response')
       webSocket.off('chat:streaming_start')
       webSocket.off('chat:streaming_chunk')
+      webSocket.off('chat:streaming_complete')
+      webSocket.off('chat:workflow_start')
+      webSocket.off('chat:workflow_init')
+      webSocket.off('chat:workflow_step')
       webSocket.off('chat:agent_selected')
       webSocket.off('error')
     }
-  }, [webSocket])
+  }, [isAuthenticated])
 
   // Smart agent selection based on message content
   const selectAgentForMessage = (message: string): AgentInfo => {
@@ -169,13 +337,16 @@ const ChatInterface: React.FC = () => {
   }
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || isLoading) return
+    if (!inputValue.trim() || isLoading || !conversationId) return
 
+    const threadId = `thread-${Date.now()}`
+    const messageId = `msg-${Date.now()}`
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: messageId,
       content: inputValue.trim(),
       sender: 'user',
-      timestamp: new Date()
+      timestamp: new Date(),
+      metadata: { thread_id: threadId }
     }
 
     // Select appropriate agent
@@ -187,8 +358,8 @@ const ChatInterface: React.FC = () => {
     setIsStreaming(true)
 
     try {
-      // Send message via WebSocket
-      webSocket.sendMessage(userMessage.content, selectedAgent.type)
+      // Send message via WebSocket with thread ID
+      await webSocket.sendMessage(userMessage.content, selectedAgent.type, messageId, threadId)
     } catch (error) {
       console.error('Error sending message:', error)
 
@@ -227,11 +398,23 @@ const ChatInterface: React.FC = () => {
     setShowVoiceInterface(!showVoiceInterface)
   }
 
+  // Show loading state while creating conversation or if no conversation ID yet
+  if (isCreatingConversation || (!conversationId && isAuthenticated)) {
+    return (
+      <div className="flex flex-col h-full bg-gray-50 items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-green-600" />
+          <p className="text-gray-600">Initialisation de la conversation...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col h-full bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
+      <div className="bg-white border-b border-gray-200 px-8 py-4">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold text-gray-900">Ekumen Assistant</h1>
             <p className="text-sm text-gray-600">
@@ -253,135 +436,140 @@ const ChatInterface: React.FC = () => {
           )}
         </div>
       </div>
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-        {messages.length === 0 ? (
-          <div className="text-center py-12">
-            <Bot className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Bienvenue sur Ekumen Assistant</h3>
-            <p className="text-gray-600 mb-6">
-              Posez vos questions agricoles, je sélectionnerai automatiquement l'expert le plus approprié.
-            </p>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-w-2xl mx-auto">
-              {Object.values(agents).map((agent) => (
-                <div key={agent.type} className="bg-white rounded-lg p-3 border border-gray-200 text-center">
-                  <div className="text-2xl mb-1">{agent.icon}</div>
-                  <div className="text-sm font-medium text-gray-900">{agent.name}</div>
-                  <div className="text-xs text-gray-600">{agent.description}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          messages.map((message) => (
-            <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`flex max-w-xs lg:max-w-md xl:max-w-lg ${message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'} gap-3`}>
-                {/* Avatar */}
-                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                  message.sender === 'user'
-                    ? 'bg-green-600 text-white'
-                    : 'bg-gray-200 text-gray-600'
-                }`}>
-                  {message.sender === 'user' ? (
-                    <User className="h-4 w-4" />
-                  ) : (
-                    <Bot className="h-4 w-4" />
-                  )}
-                </div>
 
-                {/* Message Content */}
-                <div className={`rounded-lg px-4 py-2 ${
-                  message.sender === 'user'
-                    ? 'bg-green-600 text-white'
-                    : 'bg-white border border-gray-200 text-gray-900'
-                }`}>
-                  {message.sender === 'assistant' && message.agentName && (
-                    <div className="text-xs text-gray-500 mb-1 flex items-center gap-1">
-                      {agents[message.agent || '']?.icon}
-                      <span>{message.agentName}</span>
-                    </div>
-                  )}
-                  <div className="text-sm whitespace-pre-wrap">
-                    {message.content}
-                    {message.isStreaming && (
-                      <span className="inline-block w-2 h-4 bg-gray-400 ml-1 animate-pulse" />
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto px-8 py-6">
+        <div className="max-w-4xl mx-auto space-y-6">
+          {messages.length === 0 ? (
+            <div className="text-center py-12">
+              <Bot className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Bienvenue sur Ekumen Assistant</h3>
+              <p className="text-gray-600 mb-6">
+                Posez vos questions agricoles, je sélectionnerai automatiquement l'expert le plus approprié.
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-w-2xl mx-auto">
+                {Object.values(agents).map((agent) => (
+                  <div key={agent.type} className="bg-white rounded-lg p-3 border border-gray-200 text-center">
+                    <div className="text-2xl mb-1">{agent.icon}</div>
+                    <div className="text-sm font-medium text-gray-900">{agent.name}</div>
+                    <div className="text-xs text-gray-600">{agent.description}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            messages.map((message) => (
+              <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`flex max-w-2xl ${message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'} gap-3`}>
+                  {/* Avatar */}
+                  <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
+                    message.sender === 'user'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-200 text-gray-600'
+                  }`}>
+                    {message.sender === 'user' ? (
+                      <User className="h-5 w-5" />
+                    ) : (
+                      <Bot className="h-5 w-5" />
                     )}
                   </div>
-                  <div className="text-xs opacity-70 mt-1">
-                    {message.timestamp.toLocaleTimeString('fr-FR', {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
+
+                  {/* Message Content */}
+                  <div className={`rounded-lg px-4 py-3 ${
+                    message.sender === 'user'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-white border border-gray-200 text-gray-900 shadow-sm'
+                  }`}>
+                    {message.sender === 'assistant' && message.agentName && (
+                      <div className="text-xs text-gray-500 mb-2 flex items-center gap-1">
+                        {agents[message.agent || '']?.icon}
+                        <span>{message.agentName}</span>
+                      </div>
+                    )}
+                    <div className="text-base whitespace-pre-wrap leading-relaxed">
+                      {message.content}
+                      {message.isStreaming && (
+                        <span className="inline-block w-2 h-5 bg-gray-400 ml-1 animate-pulse" />
+                      )}
+                    </div>
+                    <div className="text-xs opacity-70 mt-2">
+                      {message.timestamp.toLocaleTimeString('fr-FR', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))
-        )}
-        <div ref={messagesEndRef} />
+            ))
+          )}
+          <div ref={messagesEndRef} />
+        </div>
       </div>
 
-      {/* Input Area */}
-      <div className="bg-white border-t border-gray-200 px-6 py-4">
-        <div className="flex items-end gap-3">
-          {/* Voice Interface Toggle */}
-          <button
-            onClick={toggleVoiceInterface}
-            className={`flex-shrink-0 p-2 rounded-full transition-colors ${
-              showVoiceInterface
-                ? 'bg-green-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-            disabled={isLoading}
-            title="Interface vocale"
-          >
-            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2C13.1 2 14 2.9 14 4V10C14 11.1 13.1 12 12 12S10 11.1 10 10V4C10 2.9 10.9 2 12 2M19 10V12C19 15.9 15.9 19 12 19S5 15.9 5 12V10H7V12C7 14.8 9.2 17 12 17S17 14.8 17 12V10H19Z"/>
-            </svg>
-          </button>
-
-          {/* Text Input */}
-          <div className="flex-1 relative">
-            <textarea
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Posez votre question agricole..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              rows={1}
+      {/* Input Area - At the bottom like normal chat */}
+      <div className="bg-white border-t border-gray-200 px-8 py-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-end gap-3">
+            {/* Voice Interface Toggle */}
+            <button
+              onClick={toggleVoiceInterface}
+              className={`flex-shrink-0 p-2 rounded-full transition-colors ${
+                showVoiceInterface
+                  ? 'bg-green-600 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
               disabled={isLoading}
-            />
+              title="Interface vocale"
+            >
+              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C13.1 2 14 2.9 14 4V10C14 11.1 13.1 12 12 12S10 11.1 10 10V4C10 2.9 10.9 2 12 2M19 10V12C19 15.9 15.9 19 12 19S5 15.9 5 12V10H7V12C7 14.8 9.2 17 12 17S17 14.8 17 12V10H19Z"/>
+              </svg>
+            </button>
+
+            {/* Text Input */}
+            <div className="flex-1 relative">
+              <textarea
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Posez votre question agricole..."
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-base"
+                rows={1}
+                disabled={isLoading}
+              />
+            </div>
+
+            {/* Send Button */}
+            <button
+              onClick={handleSendMessage}
+              disabled={!inputValue.trim() || isLoading}
+              className="flex-shrink-0 p-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Send className="h-5 w-5" />
+              )}
+            </button>
           </div>
 
-          {/* Send Button */}
-          <button
-            onClick={handleSendMessage}
-            disabled={!inputValue.trim() || isLoading}
-            className="flex-shrink-0 p-2 bg-green-600 text-white rounded-full hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {isLoading ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <Send className="h-5 w-5" />
-            )}
-          </button>
+          {/* Agent Selection Indicator */}
+          {inputValue.trim() && !isLoading && (
+            <div className="mt-3 text-sm text-gray-600 flex items-center gap-2">
+              <span>Agent suggéré:</span>
+              {(() => {
+                const suggestedAgent = selectAgentForMessage(inputValue)
+                return (
+                  <span className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
+                    <span>{suggestedAgent.icon}</span>
+                    <span>{suggestedAgent.name}</span>
+                  </span>
+                )
+              })()}
+            </div>
+          )}
         </div>
-
-        {/* Agent Selection Indicator */}
-        {inputValue.trim() && !isLoading && (
-          <div className="mt-2 text-xs text-gray-600 flex items-center gap-2">
-            <span>Agent suggéré:</span>
-            {(() => {
-              const suggestedAgent = selectAgentForMessage(inputValue)
-              return (
-                <span className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
-                  <span>{suggestedAgent.icon}</span>
-                  <span>{suggestedAgent.name}</span>
-                </span>
-              )
-            })()}
-          </div>
-        )}
       </div>
 
       {/* Voice Interface Modal */}

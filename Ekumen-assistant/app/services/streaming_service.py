@@ -24,62 +24,67 @@ logger = logging.getLogger(__name__)
 class StreamingCallbackHandler(BaseCallbackHandler):
     """Callback handler for streaming LangChain responses"""
     
-    def __init__(self, websocket: WebSocket = None, callback: Callable = None):
+    def __init__(self, websocket: WebSocket = None, callback: Callable = None, message_id: str = None):
         self.websocket = websocket
         self.callback = callback
+        self.message_id = message_id
         self.tokens = []
         self.current_step = ""
     
     async def on_llm_start(self, serialized: Dict[str, Any], prompts: List[str], **kwargs) -> None:
         """Called when LLM starts generating"""
+        message_data = {
+            "type": "llm_start",
+            "message": "🤖 Analyse en cours...",
+            "timestamp": datetime.now().isoformat()
+        }
+
+        # Add message_id if available
+        if hasattr(self, 'message_id') and self.message_id:
+            message_data["message_id"] = self.message_id
+
         if self.websocket:
-            await self.websocket.send_text(json.dumps({
-                "type": "llm_start",
-                "message": "🤖 Analyse en cours...",
-                "timestamp": datetime.now().isoformat()
-            }))
+            await self.websocket.send_text(json.dumps(message_data))
         elif self.callback:
-            await self.callback({
-                "type": "llm_start",
-                "message": "🤖 Analyse en cours...",
-                "timestamp": datetime.now().isoformat()
-            })
+            await self.callback(message_data)
     
     async def on_llm_new_token(self, token: str, **kwargs) -> None:
         """Called when LLM generates a new token"""
         self.tokens.append(token)
-        
+
+        message_data = {
+            "type": "token",
+            "token": token,
+            "partial_response": "".join(self.tokens),
+            "timestamp": datetime.now().isoformat()
+        }
+
+        # Add message_id if available
+        if hasattr(self, 'message_id') and self.message_id:
+            message_data["message_id"] = self.message_id
+
         if self.websocket:
-            await self.websocket.send_text(json.dumps({
-                "type": "token",
-                "token": token,
-                "partial_response": "".join(self.tokens),
-                "timestamp": datetime.now().isoformat()
-            }))
+            await self.websocket.send_text(json.dumps(message_data))
         elif self.callback:
-            await self.callback({
-                "type": "token",
-                "token": token,
-                "partial_response": "".join(self.tokens),
-                "timestamp": datetime.now().isoformat()
-            })
+            await self.callback(message_data)
     
     async def on_llm_end(self, response, **kwargs) -> None:
         """Called when LLM finishes generating"""
+        message_data = {
+            "type": "complete",
+            "message": "✅ Analyse terminée",
+            "final_response": "".join(self.tokens),
+            "timestamp": datetime.now().isoformat()
+        }
+
+        # Add message_id if available
+        if hasattr(self, 'message_id') and self.message_id:
+            message_data["message_id"] = self.message_id
+
         if self.websocket:
-            await self.websocket.send_text(json.dumps({
-                "type": "llm_end",
-                "message": "✅ Analyse terminée",
-                "final_response": "".join(self.tokens),
-                "timestamp": datetime.now().isoformat()
-            }))
+            await self.websocket.send_text(json.dumps(message_data))
         elif self.callback:
-            await self.callback({
-                "type": "llm_end",
-                "message": "✅ Analyse terminée",
-                "final_response": "".join(self.tokens),
-                "timestamp": datetime.now().isoformat()
-            })
+            await self.callback(message_data)
     
     async def on_tool_start(self, serialized: Dict[str, Any], input_str: str, **kwargs) -> None:
         """Called when a tool starts executing"""
@@ -187,9 +192,13 @@ class StreamingService:
                 # Use LangGraph workflow
                 async for chunk in self._stream_workflow_response(query, context, connection_id):
                     yield chunk
-            else:
+            elif self.advanced_service:
                 # Use advanced LangChain service
                 async for chunk in self._stream_advanced_response(query, context, connection_id):
+                    yield chunk
+            else:
+                # Fallback response when services are not available
+                async for chunk in self._stream_fallback_response(query, context, connection_id):
                     yield chunk
             
             # Send completion message
@@ -217,7 +226,92 @@ class StreamingService:
                 await websocket.send_text(json.dumps(error_message))
             
             yield error_message
-    
+
+    async def _stream_fallback_response(
+        self,
+        query: str,
+        context: Optional[Dict[str, Any]],
+        connection_id: str = None
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """Fallback response when AI services are not available"""
+        try:
+            websocket = None
+            if connection_id and connection_id in self.active_connections:
+                websocket = self.active_connections[connection_id]
+
+            # Send fallback message
+            fallback_message = {
+                "type": "fallback_response",
+                "message": f"🌾 Merci pour votre question: '{query}'. Je suis un assistant agricole en cours de configuration. Voici une réponse basique:",
+                "timestamp": datetime.now().isoformat()
+            }
+
+            if websocket:
+                await websocket.send_text(json.dumps(fallback_message))
+            yield fallback_message
+
+            # Simple response based on keywords
+            response_text = self._generate_simple_response(query)
+
+            # Stream the response word by word
+            words = response_text.split()
+            for i, word in enumerate(words):
+                token_message = {
+                    "type": "token",
+                    "token": word + (" " if i < len(words) - 1 else ""),
+                    "timestamp": datetime.now().isoformat()
+                }
+
+                if websocket:
+                    await websocket.send_text(json.dumps(token_message))
+                yield token_message
+
+                # Small delay for streaming effect
+                await asyncio.sleep(0.05)
+
+            # Final response
+            final_message = {
+                "type": "workflow_result",
+                "response": response_text,
+                "timestamp": datetime.now().isoformat()
+            }
+
+            if websocket:
+                await websocket.send_text(json.dumps(final_message))
+            yield final_message
+
+        except Exception as e:
+            error_message = {
+                "type": "error",
+                "message": f"❌ Erreur dans la réponse de secours: {str(e)}",
+                "timestamp": datetime.now().isoformat()
+            }
+
+            if connection_id and connection_id in self.active_connections:
+                websocket = self.active_connections[connection_id]
+                await websocket.send_text(json.dumps(error_message))
+
+            yield error_message
+
+    def _generate_simple_response(self, query: str) -> str:
+        """Generate a simple response based on keywords"""
+        query_lower = query.lower()
+
+        if any(word in query_lower for word in ['météo', 'temps', 'pluie', 'soleil']):
+            return "Pour les informations météorologiques, je recommande de consulter Météo-France ou votre station météo locale. Les conditions météo sont cruciales pour planifier vos interventions agricoles."
+
+        elif any(word in query_lower for word in ['traitement', 'produit', 'phyto', 'pesticide']):
+            return "Pour les traitements phytosanitaires, vérifiez toujours l'autorisation des produits sur le site e-phy.fr. Respectez les doses homologuées et les délais avant récolte."
+
+        elif any(word in query_lower for word in ['semis', 'plantation', 'culture']):
+            return "Pour les semis et plantations, tenez compte de votre région, du type de sol et de la période optimale pour chaque culture. Consultez les calendriers agricoles locaux."
+
+        elif any(word in query_lower for word in ['récolte', 'moisson']):
+            return "Pour la récolte, surveillez la maturité des cultures et les conditions météorologiques. Planifiez vos équipements et main-d'œuvre en conséquence."
+
+        else:
+            return "Je suis votre assistant agricole. Posez-moi des questions sur la météo, les traitements, les semis, ou la récolte. Je peux vous aider avec des conseils pratiques pour votre exploitation."
+
     async def _stream_workflow_response(
         self,
         query: str,
@@ -268,6 +362,8 @@ class StreamingService:
                 "confidence": result.get("confidence", 0.0),
                 "recommendations": result.get("recommendations", []),
                 "metadata": result.get("metadata", {}),
+                "message_id": context.get("message_id"),
+                "thread_id": context.get("thread_id"),
                 "timestamp": datetime.now().isoformat()
             }
             
@@ -291,8 +387,9 @@ class StreamingService:
             if connection_id and connection_id in self.active_connections:
                 websocket = self.active_connections[connection_id]
             
-            # Create streaming callback
-            callback_handler = StreamingCallbackHandler(websocket=websocket)
+            # Create streaming callback with message_id
+            message_id = context.get("message_id") if context else None
+            callback_handler = StreamingCallbackHandler(websocket=websocket, message_id=message_id)
             
             # Send advanced processing start
             advanced_start = {

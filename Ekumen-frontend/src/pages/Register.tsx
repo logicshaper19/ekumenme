@@ -53,7 +53,7 @@ const Register: React.FC = () => {
         role: data.role,
         region_code: data.region_code
       })
-      navigate('/dashboard')
+      navigate('/assistant')
     } catch (error) {
       setError('root', {
         type: 'manual',

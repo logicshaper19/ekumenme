@@ -1,5 +1,5 @@
 import React from 'react'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
 
@@ -108,6 +108,12 @@ function AppContent() {
                 </ProtectedRoute>
               }
             />
+
+            {/* Redirect old dashboard route to assistant */}
+            <Route path="/dashboard" element={<Navigate to="/assistant" replace />} />
+
+            {/* Catch-all route - redirect to assistant for authenticated users, login for others */}
+            <Route path="*" element={<Navigate to="/assistant" replace />} />
           </Routes>
           
           {/* Toast notifications */}

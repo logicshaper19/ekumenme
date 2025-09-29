@@ -90,7 +90,11 @@ class Message(Base):
     content = Column(Text, nullable=False)
     sender = Column(String(20), nullable=False, index=True)  # "user" or "agent"
     agent_type = Column(SQLEnum(AgentType), nullable=True)  # Only for agent messages
-    
+
+    # Threading information
+    thread_id = Column(String(100), nullable=True, index=True)  # For tracking message threads
+    parent_message_id = Column(UUID(as_uuid=True), ForeignKey("messages.id"), nullable=True)  # For message replies
+
     # Message metadata
     message_type = Column(String(50), nullable=True)  # "text", "voice", "image", etc.
     message_metadata = Column(JSONB, nullable=True)  # Additional message data
