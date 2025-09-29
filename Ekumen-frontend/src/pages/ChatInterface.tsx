@@ -3,6 +3,7 @@ import { Send, Bot, User, Loader2 } from 'lucide-react'
 import { useWebSocket } from '../services/websocket'
 import { useAuth } from '../hooks/useAuth'
 import VoiceInterface from '../components/VoiceInterface'
+import MarkdownRenderer from '../components/MarkdownRenderer'
 
 interface Message {
   id: string
@@ -498,8 +499,12 @@ const ChatInterface: React.FC = () => {
                         <span>{message.agentName}</span>
                       </div>
                     )}
-                    <div className="text-base whitespace-pre-wrap leading-relaxed">
-                      {message.content}
+                    <div className="text-base leading-relaxed">
+                      {message.sender === 'assistant' ? (
+                        <MarkdownRenderer content={message.content} />
+                      ) : (
+                        <div className="whitespace-pre-wrap">{message.content}</div>
+                      )}
                       {message.isStreaming && (
                         <span className="inline-block w-2 h-5 bg-gray-400 ml-1 animate-pulse" />
                       )}
