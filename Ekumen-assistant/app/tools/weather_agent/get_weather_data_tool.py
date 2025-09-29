@@ -108,6 +108,14 @@ class GetWeatherDataTool(BaseTool):
     ) -> Optional[Dict[str, Any]]:
         """Get weather data from real weather APIs."""
 
+        # Try WeatherAPI.com first (primary API)
+        api_key = os.getenv("WEATHER_API_KEY")
+        if api_key:
+            try:
+                return self._get_weatherapi_data(location, days, api_key)
+            except Exception as e:
+                logger.warning(f"WeatherAPI.com failed: {e}")
+
         # Try OpenWeatherMap API (free tier)
         api_key = os.getenv("OPENWEATHER_API_KEY")
         if api_key:
@@ -123,6 +131,58 @@ class GetWeatherDataTool(BaseTool):
             logger.warning(f"Météo-France API failed: {e}")
 
         return None
+
+    def _get_weatherapi_data(
+        self,
+        location: str,
+        days: int,
+        api_key: str
+    ) -> Dict[str, Any]:
+        """Get weather data from WeatherAPI.com."""
+
+        # Call WeatherAPI.com API
+        url = f"http://api.weatherapi.com/v1/forecast.json"
+        params = {
+            "key": api_key,
+            "q": location,
+            "days": min(days, 14),  # WeatherAPI.com supports up to 14 days
+            "lang": "fr"
+        }
+
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+
+        data = response.json()
+
+        # Process WeatherAPI.com response
+        forecast_conditions = []
+
+        for day in data["forecast"]["forecastday"]:
+            condition = {
+                "date": day["date"],
+                "temperature_min": day["day"]["mintemp_c"],
+                "temperature_max": day["day"]["maxtemp_c"],
+                "humidity": day["day"]["avghumidity"],
+                "wind_speed": day["day"]["maxwind_kph"],
+                "wind_direction": self._degrees_to_direction(day["hour"][12].get("wind_degree", 0)),
+                "precipitation": day["day"]["totalprecip_mm"],
+                "cloud_cover": day["day"]["avgvis_km"],
+                "uv_index": day["day"]["uv"]
+            }
+            forecast_conditions.append(condition)
+
+        return {
+            "location": data["location"]["name"],
+            "coordinates": {
+                "lat": data["location"]["lat"],
+                "lon": data["location"]["lon"]
+            },
+            "forecast_period_days": days,
+            "weather_conditions": forecast_conditions,
+            "total_days": len(forecast_conditions),
+            "data_source": "weatherapi.com",
+            "retrieved_at": datetime.now().isoformat()
+        }
 
     def _get_openweather_data(
         self,
