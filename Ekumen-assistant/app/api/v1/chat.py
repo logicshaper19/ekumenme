@@ -413,9 +413,19 @@ async def websocket_chat(
             await websocket.close(code=1008, reason="Conversation not found")
             return
 
+        # IMPORTANT: Accept the WebSocket connection BEFORE any send operations
+        await websocket.accept()
+
         # Connect to streaming service
         connection_id = await streaming_service.connect_websocket(websocket)
         logger.info(f"Enhanced WebSocket connection established: {connection_id}")
+
+        # Send connection confirmation
+        await websocket.send_json({
+            "type": "connection",
+            "connection_id": connection_id,
+            "message": "Connected to Ekumen Assistant"
+        })
 
         while True:
             # Receive message from client
