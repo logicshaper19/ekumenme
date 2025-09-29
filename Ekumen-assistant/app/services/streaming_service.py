@@ -17,6 +17,7 @@ from langchain.schema import BaseMessage
 from app.services.advanced_langchain_service import AdvancedLangChainService
 from app.services.langgraph_workflow_service import LangGraphWorkflowService
 from app.services.conditional_routing_service import ConditionalRoutingService
+from app.services.fast_query_service import FastQueryService
 
 logger = logging.getLogger(__name__)
 
@@ -127,15 +128,17 @@ class StreamingService:
     def __init__(self):
         self.advanced_service = None
         self.workflow_service = None
+        self.fast_service = None
         self.active_connections: Dict[str, WebSocket] = {}
         self._initialize_services()
-    
+
     def _initialize_services(self):
         """Initialize AI services"""
         try:
             self.advanced_service = AdvancedLangChainService()
             self.workflow_service = LangGraphWorkflowService()
-            logger.info("Streaming service initialized successfully")
+            self.fast_service = FastQueryService()
+            logger.info("Streaming service initialized successfully (with fast path)")
         except Exception as e:
             logger.error(f"Failed to initialize streaming service: {e}")
     
@@ -171,33 +174,49 @@ class StreamingService:
         connection_id: str = None,
         use_workflow: bool = True
     ) -> AsyncGenerator[Dict[str, Any], None]:
-        """Stream agricultural AI response"""
+        """Stream agricultural AI response with intelligent routing"""
         try:
+            # Check if we can use fast path (< 5 seconds)
+            use_fast_path = False
+            if self.fast_service and self.fast_service.should_use_fast_path(query):
+                use_fast_path = True
+                logger.info(f"Using FAST PATH for query: {query[:50]}...")
+            else:
+                logger.info(f"Using WORKFLOW for query: {query[:50]}...")
+
             # Send initial status
             initial_message = {
                 "type": "start",
-                "message": "🌾 Traitement de votre demande agricole...",
+                "message": "⚡ Réponse rapide..." if use_fast_path else "🌾 Analyse approfondie...",
                 "query": query,
+                "fast_path": use_fast_path,
                 "timestamp": datetime.now().isoformat()
             }
-            
+
             if connection_id and connection_id in self.active_connections:
                 websocket = self.active_connections[connection_id]
                 await websocket.send_text(json.dumps(initial_message))
-            
+
             yield initial_message
-            
-            # Process query
-            if use_workflow and self.workflow_service:
-                # Use LangGraph workflow
+
+            # Route to appropriate service
+            if use_fast_path:
+                # FAST PATH: < 5 seconds for simple queries
+                async for chunk in self.fast_service.stream_fast_response(query, context):
+                    if connection_id and connection_id in self.active_connections:
+                        websocket = self.active_connections[connection_id]
+                        await websocket.send_text(json.dumps(chunk))
+                    yield chunk
+            elif use_workflow and self.workflow_service:
+                # SLOW PATH: Full workflow for complex queries
                 async for chunk in self._stream_workflow_response(query, context, connection_id):
                     yield chunk
             elif self.advanced_service:
-                # Use advanced LangChain service
+                # MEDIUM PATH: Advanced service without full workflow
                 async for chunk in self._stream_advanced_response(query, context, connection_id):
                     yield chunk
             else:
-                # Fallback response when services are not available
+                # FALLBACK: Basic response
                 async for chunk in self._stream_fallback_response(query, context, connection_id):
                     yield chunk
             
