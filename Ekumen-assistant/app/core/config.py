@@ -29,14 +29,15 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     
-    # Database Configuration
+    # Database Configuration - Connect to main Ekumenbackend database (agri_db)
+    # This database contains both MesParcelles data and EPHY regulatory data
     DATABASE_URL: str = os.getenv(
-        "DATABASE_URL", 
-        "postgresql+asyncpg://postgres:postgres@localhost:5432/ekumen_assistant"
+        "DATABASE_URL",
+        "postgresql+asyncpg://agri_user:agri_password@localhost:5432/agri_db"
     )
     DATABASE_URL_SYNC: str = os.getenv(
         "DATABASE_URL_SYNC",
-        "postgresql://postgres:postgres@localhost:5432/ekumen_assistant"
+        "postgresql://agri_user:agri_password@localhost:5432/agri_db"
     )
     
     # Redis Configuration

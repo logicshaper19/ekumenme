@@ -4,9 +4,15 @@ from .farm import Farm, Parcel, CropRotation
 from .organization import Organization, OrganizationMembership, OrganizationFarmAccess, KnowledgeBaseEntry
 from .conversation import Conversation, Message
 from .intervention import VoiceJournalEntry, ProductUsage
-from .product import Product, Usage, SubstanceActive, ProductSubstance
 from .disease import Disease
 from .pest import Pest
+from .ephy import (
+    Produit, SubstanceActive, ProduitSubstance,
+    UsageProduit, Titulaire, Formulation, Fonction,
+    PhraseRisque, ProduitPhraseRisque, ProduitClassification,
+    ConditionEmploi, PermisImportation,
+    ProductType, CommercialType, GammeUsage, EtatAutorisation
+)
 
 __all__ = [
     "User", "UserSession", "UserActivity",
@@ -14,6 +20,10 @@ __all__ = [
     "Organization", "OrganizationMembership", "OrganizationFarmAccess", "KnowledgeBaseEntry",
     "Conversation", "Message",
     "VoiceJournalEntry", "ProductUsage",
-    "Product", "Usage", "SubstanceActive", "ProductSubstance",
-    "Disease", "Pest"
+    "Disease", "Pest",
+    "Produit", "SubstanceActive", "ProduitSubstance", "UsageProduit",
+    "Titulaire", "Formulation", "Fonction",
+    "PhraseRisque", "ProduitPhraseRisque", "ProduitClassification",
+    "ConditionEmploi", "PermisImportation",
+    "ProductType", "CommercialType", "GammeUsage", "EtatAutorisation"
 ]

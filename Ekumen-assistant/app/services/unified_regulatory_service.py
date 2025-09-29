@@ -10,9 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
 from dataclasses import dataclass
 
-from app.models.product import (
-    Product, SubstanceActive, ProductSubstance, Usage,
-    ProductType, AuthorizationStatus, UsageStatus
+from app.models.ephy import (
+    Produit as Product, SubstanceActive, ProduitSubstance as ProductSubstance,
+    UsageProduit as Usage, ProductType, EtatAutorisation as AuthorizationStatus
 )
 from app.services.configuration_service import get_configuration_service
 from app.services.product_service import ProductService
@@ -124,25 +124,25 @@ class UnifiedRegulatoryService:
         query = select(Product).where(
             Product.etat_autorisation == AuthorizationStatus.AUTORISE
         )
-        
+
         # Add search filters
         if product_name:
             query = query.where(
                 Product.nom_produit.ilike(f"%{product_name}%")
             )
-        
+
         if product_type:
             try:
                 prod_type = ProductType(product_type.upper())
                 query = query.where(Product.type_produit == prod_type)
             except ValueError:
                 logger.warning(f"Invalid product type: {product_type}")
-        
+
         # If searching by active ingredient, join with substances
         if active_ingredient:
-            query = query.join(ProductSubstance).join(SubstanceActive).where(
-                SubstanceActive.nom_substance.ilike(f"%{active_ingredient}%")
-            )
+            query = query.join(ProductSubstance, Product.numero_amm == ProductSubstance.numero_amm)\
+                         .join(SubstanceActive, ProductSubstance.substance_id == SubstanceActive.id)\
+                         .where(SubstanceActive.nom_substance.ilike(f"%{active_ingredient}%"))
         
         # Limit results for performance
         query = query.limit(50)
@@ -270,7 +270,7 @@ class UnifiedRegulatoryService:
         query = select(Usage).where(
             and_(
                 Usage.product_id == product.id,
-                Usage.etat_usage == UsageStatus.AUTORISE
+                Usage.etat_usage == AuthorizationStatus.AUTORISE
             )
         )
         
