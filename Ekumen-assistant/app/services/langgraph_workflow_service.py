@@ -243,13 +243,17 @@ class LangGraphWorkflowService:
         """Perform weather analysis"""
         try:
             processing_steps = state["processing_steps"] + ["weather_analysis"]
-            
+
             # Get weather data using tool
             from app.tools.weather_agent.get_weather_data_tool import GetWeatherDataTool
             weather_tool = GetWeatherDataTool()
-            
-            # Extract location from context or use default
-            location = state["context"].get("location", "France")
+
+            # Extract location from context OR query
+            location = state["context"].get("location")
+            if not location:
+                location = self._extract_location_from_query(state["query"])
+
+            logger.info(f"Weather analysis for location: {location}")
             weather_result = weather_tool._run(location=location, days=7)
             
             # Parse weather data
@@ -706,18 +710,45 @@ class LangGraphWorkflowService:
         try:
             formatted = "**DONNÉES MÉTÉOROLOGIQUES:**\n"
             if isinstance(weather_data, dict):
+                # Location
                 if "location" in weather_data:
                     formatted += f"- Localisation: {weather_data['location']}\n"
-                if "temperature" in weather_data:
+
+                # Handle new weather_conditions structure
+                if "weather_conditions" in weather_data and isinstance(weather_data["weather_conditions"], list):
+                    conditions = weather_data["weather_conditions"]
+                    if conditions:
+                        # Current/first day
+                        today = conditions[0]
+                        formatted += f"- Température aujourd'hui: {today.get('temperature_min', 'N/A')}°C - {today.get('temperature_max', 'N/A')}°C\n"
+                        formatted += f"- Humidité: {today.get('humidity', 'N/A')}%\n"
+                        formatted += f"- Vent: {today.get('wind_speed', 'N/A')} km/h ({today.get('wind_direction', 'N/A')})\n"
+                        formatted += f"- Précipitations: {today.get('precipitation', 0)} mm\n"
+
+                        # 7-day forecast summary
+                        if len(conditions) > 1:
+                            temps_min = [c.get('temperature_min', 0) for c in conditions]
+                            temps_max = [c.get('temperature_max', 0) for c in conditions]
+                            precip_total = sum(c.get('precipitation', 0) for c in conditions)
+                            formatted += f"- Prévisions 7 jours: {min(temps_min)}°C à {max(temps_max)}°C\n"
+                            formatted += f"- Précipitations totales prévues: {precip_total} mm\n"
+
+                # Fallback for old structure
+                elif "temperature" in weather_data:
                     formatted += f"- Température actuelle: {weather_data['temperature']}°C\n"
-                if "forecast" in weather_data and isinstance(weather_data["forecast"], list):
-                    temps = [f["temperature"] for f in weather_data["forecast"] if "temperature" in f]
-                    if temps:
-                        formatted += f"- Température min/max prévue: {min(temps)}°C / {max(temps)}°C\n"
-                if "conditions" in weather_data:
-                    formatted += f"- Conditions: {weather_data['conditions']}\n"
+                    if "forecast" in weather_data and isinstance(weather_data["forecast"], list):
+                        temps = [f["temperature"] for f in weather_data["forecast"] if "temperature" in f]
+                        if temps:
+                            formatted += f"- Température min/max prévue: {min(temps)}°C / {max(temps)}°C\n"
+
+                # Data source
+                if "data_source" in weather_data:
+                    source = "API réelle" if weather_data["data_source"] != "mock_data" else "données simulées"
+                    formatted += f"- Source: {source}\n"
+
             return formatted
         except Exception as e:
+            logger.error(f"Weather data formatting error: {e}")
             return f"**Données météo**: Disponibles mais erreur de formatage ({str(e)})"
 
     def _format_regulatory_data(self, regulatory_status: Optional[Dict[str, Any]]) -> str:
