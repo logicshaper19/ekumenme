@@ -247,12 +247,30 @@ const ChatInterface: React.FC = () => {
     // Handle workflow status updates
     webSocket.onWorkflowStart((data) => {
       console.log('Workflow started:', data.message)
-      // Update the existing assistant message with workflow status
-      setMessages(prev => prev.map(msg =>
-        msg.sender === 'assistant' && msg.isStreaming
-          ? { ...msg, content: data.message }
-          : msg
-      ))
+
+      // Check if there's already a streaming assistant message
+      setMessages(prev => {
+        const hasStreamingMessage = prev.some(msg => msg.sender === 'assistant' && msg.isStreaming)
+
+        if (hasStreamingMessage) {
+          // Update existing streaming message
+          return prev.map(msg =>
+            msg.sender === 'assistant' && msg.isStreaming
+              ? { ...msg, content: data.message }
+              : msg
+          )
+        } else {
+          // Create new streaming assistant message
+          const newMessage: Message = {
+            id: data.message_id || `workflow-${Date.now()}`,
+            content: data.message,
+            sender: 'assistant',
+            timestamp: new Date(),
+            isStreaming: true
+          }
+          return [...prev, newMessage]
+        }
+      })
     })
 
     webSocket.onWorkflowInit((data) => {

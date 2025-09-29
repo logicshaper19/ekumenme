@@ -239,12 +239,8 @@ class OptimizedStreamingService:
         self.websocket_connections[connection_id] = websocket
         logger.info(f"✅ WebSocket connected: {connection_id}")
 
-        # Send connection confirmation
-        await websocket.send_json({
-            "type": "connection",
-            "connection_id": connection_id,
-            "message": "Connected to optimized streaming service"
-        })
+        # NOTE: Do NOT send messages here - websocket.accept() must be called first
+        # The connection confirmation will be sent after accept() in the WebSocket handler
 
         return connection_id
 
@@ -342,17 +338,54 @@ class OptimizedStreamingService:
                 "message": f"Query routed to {routing_decision.execution_path.value} path"
             }
 
-            # Step 3: Execute based on path (simplified for now)
-            # TODO: Implement actual tool execution
+            # Step 3: Execute tools if needed
+            tool_results = {}
+            if routing_decision.required_tools and self.tool_executor:
+                tool_start = time.time()
+                try:
+                    # Execute tools in parallel
+                    tool_results = await self.tool_executor.execute_tools(
+                        tools=routing_decision.required_tools,
+                        query=query,
+                        context=context or {}
+                    )
+                    metrics["tool_execution_time"] = time.time() - tool_start
+
+                    if websocket:
+                        await websocket.send_json({
+                            "type": "workflow_step",
+                            "step": "tools",
+                            "message": f"Executed {len(tool_results)} tools",
+                            "message_id": context.get("message_id") if context else None
+                        })
+                except Exception as e:
+                    logger.error(f"Tool execution error: {e}")
+                    metrics["tool_execution_time"] = time.time() - tool_start
+
+            # Step 4: Synthesize response using LLM
             synthesis_start = time.time()
 
-            # For now, generate a simple response
-            response = f"✅ Optimized response for: {query}\n\n"
-            response += f"**Routing**: {routing_decision.execution_path.value}\n"
-            response += f"**Complexity**: {routing_decision.complexity.value}\n"
-            response += f"**Tools**: {', '.join(routing_decision.required_tools)}\n"
-            response += f"**Model**: {'GPT-4' if routing_decision.use_gpt4 else 'GPT-3.5'}\n\n"
-            response += "This is using the NEW optimized streaming service! 🚀"
+            try:
+                # Use the LLM service to generate actual response
+                response = await self.llm_service.synthesize_response(
+                    query=query,
+                    tool_results=tool_results,
+                    complexity=routing_decision.complexity,
+                    max_tokens=800 if routing_decision.complexity == LLMComplexity.SIMPLE else 1500
+                )
+
+                if websocket:
+                    await websocket.send_json({
+                        "type": "workflow_step",
+                        "step": "synthesis",
+                        "message": "Generated AI response",
+                        "message_id": context.get("message_id") if context else None
+                    })
+
+            except Exception as e:
+                logger.error(f"LLM synthesis error: {e}")
+                # Fallback response
+                response = f"Je suis désolé, j'ai rencontré une erreur lors de la génération de la réponse: {str(e)}"
 
             metrics["synthesis_time"] = time.time() - synthesis_start
 
