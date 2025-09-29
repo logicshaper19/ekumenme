@@ -222,45 +222,86 @@ class OptimizedLLMService:
     ) -> str:
         """
         Synthesize final response from tool results.
-        
+
         This is the main synthesis step that combines all tool outputs.
         """
+        # Adjust max_tokens based on complexity
+        if complexity == LLMComplexity.COMPLEX:
+            max_tokens = max(max_tokens, 1500)  # Ensure detailed responses for complex queries
+        elif complexity == LLMComplexity.SIMPLE:
+            max_tokens = min(max_tokens, 300)   # Keep simple responses concise
+
         # Build synthesis prompt
-        prompt = self._build_synthesis_prompt(query, tool_results)
-        
-        # Create synthesis task
+        prompt = self._build_synthesis_prompt(query, tool_results, complexity)
+
+        # Create synthesis task with complexity-appropriate system message
+        system_message = self._get_system_message(complexity)
+
         task = LLMTask(
             task_id="synthesis",
             prompt=prompt,
             complexity=complexity,
             max_tokens=max_tokens,
             temperature=0.3,
-            system_message=(
-                "Tu es un assistant agricole expert. "
-                "Synthétise les informations des outils pour répondre à la question de l'agriculteur. "
-                "Sois concis, précis et pratique."
-            )
+            system_message=system_message
         )
-        
+
         # Execute
         result = await self.execute_task(task)
-        
+
         return result.response
-    
+
+    def _get_system_message(self, complexity: LLMComplexity) -> str:
+        """Get appropriate system message based on complexity"""
+        if complexity == LLMComplexity.COMPLEX:
+            return (
+                "Tu es un assistant agricole expert spécialisé dans l'analyse de données. "
+                "Pour les questions analytiques complexes:\n"
+                "1. Analyse en détail toutes les données fournies\n"
+                "2. Effectue les calculs nécessaires (moyennes, totaux, comparaisons)\n"
+                "3. Explique ton raisonnement étape par étape\n"
+                "4. Fournis des réponses complètes avec contexte et justifications\n"
+                "5. Si des données semblent incohérentes, explique les possibilités\n"
+                "Sois précis, détaillé et pédagogique."
+            )
+        elif complexity == LLMComplexity.SIMPLE:
+            return (
+                "Tu es un assistant agricole amical. "
+                "Réponds de manière concise et directe."
+            )
+        else:  # MEDIUM
+            return (
+                "Tu es un assistant agricole expert. "
+                "Synthétise les informations des outils pour répondre à la question de l'agriculteur. "
+                "Sois clair, précis et pratique."
+            )
+
     def _build_synthesis_prompt(
         self,
         query: str,
-        tool_results: Dict[str, Any]
+        tool_results: Dict[str, Any],
+        complexity: LLMComplexity = LLMComplexity.MEDIUM
     ) -> str:
         """Build prompt for synthesis"""
         prompt = f"Question de l'agriculteur: {query}\n\n"
         prompt += "Résultats des outils:\n"
-        
+
         for tool_name, result in tool_results.items():
             prompt += f"\n{tool_name}:\n{result}\n"
-        
-        prompt += "\nSynthétise ces informations pour répondre à la question de manière claire et pratique."
-        
+
+        # Add complexity-specific instructions
+        if complexity == LLMComplexity.COMPLEX:
+            prompt += (
+                "\nCette question nécessite une analyse approfondie. "
+                "Fournis une réponse détaillée qui:\n"
+                "- Analyse toutes les données pertinentes\n"
+                "- Effectue les calculs nécessaires\n"
+                "- Explique le raisonnement\n"
+                "- Répond complètement à la question posée"
+            )
+        else:
+            prompt += "\nSynthétise ces informations pour répondre à la question de manière claire et pratique."
+
         return prompt
     
     async def classify_query_complexity(
