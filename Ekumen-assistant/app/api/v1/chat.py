@@ -4,10 +4,12 @@ Handles conversations with agricultural AI agents
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 import logging
 import json
+import asyncio
 
 from app.core.database import get_async_db
 from app.models.user import User
@@ -15,6 +17,7 @@ from app.schemas.chat import ChatMessage, ChatResponse, ConversationCreate, Conv
 from app.services.auth_service import AuthService
 from app.services.chat_service import ChatService
 from app.services.agent_service import AgentService
+from app.services.streaming_service import StreamingService
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +25,7 @@ router = APIRouter()
 auth_service = AuthService()
 chat_service = ChatService()
 agent_service = AgentService()
+streaming_service = StreamingService()
 
 @router.post("/conversations", response_model=ConversationResponse, status_code=status.HTTP_201_CREATED)
 async def create_conversation(
@@ -173,6 +177,109 @@ async def send_message(
             detail="Failed to process message"
         )
 
+
+@router.post("/conversations/{conversation_id}/messages/stream")
+async def send_message_stream(
+    conversation_id: str,
+    message: ChatMessage,
+    current_user: User = Depends(auth_service.get_current_user),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    Send a message and get streaming response from agricultural agent
+
+    Args:
+        conversation_id: ID of the conversation
+        message: Message to send
+        current_user: Current authenticated user
+        db: Database session
+
+    Returns:
+        StreamingResponse: Real-time agent response
+    """
+    try:
+        # Verify conversation belongs to user
+        conversation = await chat_service.get_conversation(
+            db=db,
+            conversation_id=conversation_id,
+            user_id=current_user.id
+        )
+
+        if not conversation:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Conversation not found"
+            )
+
+        # Save user message
+        await chat_service.save_message(
+            db=db,
+            conversation_id=conversation_id,
+            content=message.content,
+            sender="user",
+            message_type="text"
+        )
+
+        # Create context for streaming
+        context = {
+            "conversation_id": conversation_id,
+            "farm_siret": conversation.farm_siret,
+            "agent_type": conversation.agent_type,
+            "user_id": current_user.id
+        }
+
+        # Create streaming generator
+        async def generate_stream():
+            try:
+                async for chunk in streaming_service.stream_response(
+                    query=message.content,
+                    context=context,
+                    use_workflow=True
+                ):
+                    # Format as Server-Sent Events
+                    yield f"data: {json.dumps(chunk)}\n\n"
+
+                    # Save final response if it's the complete result
+                    if chunk.get("type") in ["workflow_result", "advanced_result"]:
+                        await chat_service.save_message(
+                            db=db,
+                            conversation_id=conversation_id,
+                            content=chunk.get("response", ""),
+                            sender="assistant",
+                            agent_type=chunk.get("agent_type", conversation.agent_type),
+                            message_type="text",
+                            metadata=chunk.get("metadata", {})
+                        )
+
+            except Exception as e:
+                logger.error(f"Streaming error: {e}")
+                error_chunk = {
+                    "type": "error",
+                    "message": f"Erreur de streaming: {str(e)}",
+                    "timestamp": "2024-01-01T00:00:00"
+                }
+                yield f"data: {json.dumps(error_chunk)}\n\n"
+
+        return StreamingResponse(
+            generate_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Headers": "*"
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Streaming setup error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to setup streaming"
+        )
+
 @router.get("/conversations/{conversation_id}/messages", response_model=List[ChatMessage])
 async def get_conversation_messages(
     conversation_id: str,
@@ -268,59 +375,96 @@ async def websocket_chat(
     token: str
 ):
     """
-    WebSocket endpoint for real-time chat
-    
+    Enhanced WebSocket endpoint for real-time streaming chat
+
     Args:
         websocket: WebSocket connection
         conversation_id: ID of the conversation
         token: JWT authentication token
     """
-    await websocket.accept()
-    
+    connection_id = None
+
     try:
         # Verify token and get user
         user = await auth_service.verify_websocket_token(token)
         if not user:
             await websocket.close(code=1008, reason="Invalid token")
             return
-        
+
         # Verify conversation belongs to user
-        db = next(get_async_db())
-        conversation = await chat_service.get_conversation(
-            db=db,
-            conversation_id=conversation_id,
-            user_id=user.id
-        )
-        
+        async for db in get_async_db():
+            conversation = await chat_service.get_conversation(
+                db=db,
+                conversation_id=conversation_id,
+                user_id=user.id
+            )
+            break
+
         if not conversation:
             await websocket.close(code=1008, reason="Conversation not found")
             return
-        
-        logger.info(f"WebSocket connection established for conversation {conversation_id}")
-        
+
+        # Connect to streaming service
+        connection_id = await streaming_service.connect_websocket(websocket)
+        logger.info(f"Enhanced WebSocket connection established: {connection_id}")
+
         while True:
             # Receive message from client
             data = await websocket.receive_text()
             message_data = json.loads(data)
-            
-            # Process message with agent
-            response = await agent_service.process_message(
-                db=db,
-                conversation=conversation,
-                message=message_data["content"],
-                user=user
-            )
-            
-            # Send response back to client
-            await websocket.send_text(json.dumps({
-                "content": response.content,
+
+            # Save user message
+            async for db in get_async_db():
+                await chat_service.save_message(
+                    db=db,
+                    conversation_id=conversation_id,
+                    content=message_data["content"],
+                    sender="user",
+                    message_type="text"
+                )
+                break
+
+            # Create context
+            context = {
+                "conversation_id": conversation_id,
+                "farm_siret": conversation.farm_siret,
                 "agent_type": conversation.agent_type,
-                "timestamp": response.timestamp.isoformat(),
-                "metadata": response.metadata
-            }))
-            
+                "user_id": user.id
+            }
+
+            # Stream response through WebSocket
+            final_response = ""
+            async for chunk in streaming_service.stream_response(
+                query=message_data["content"],
+                context=context,
+                connection_id=connection_id,
+                use_workflow=True
+            ):
+                # Extract final response for saving
+                if chunk.get("type") in ["workflow_result", "advanced_result"]:
+                    final_response = chunk.get("response", "")
+
+            # Save AI response
+            if final_response:
+                async for db in get_async_db():
+                    await chat_service.save_message(
+                        db=db,
+                        conversation_id=conversation_id,
+                        content=final_response,
+                        sender="assistant",
+                        agent_type=conversation.agent_type,
+                        message_type="text"
+                    )
+                    break
+
     except WebSocketDisconnect:
-        logger.info(f"WebSocket disconnected for conversation {conversation_id}")
+        logger.info(f"Enhanced WebSocket disconnected: {connection_id}")
     except Exception as e:
-        logger.error(f"WebSocket error: {e}")
-        await websocket.close(code=1011, reason="Internal server error")
+        logger.error(f"Enhanced WebSocket error: {e}")
+        try:
+            await websocket.close(code=1011, reason="Internal server error")
+        except:
+            pass
+    finally:
+        if connection_id:
+            await streaming_service.disconnect_websocket(connection_id)

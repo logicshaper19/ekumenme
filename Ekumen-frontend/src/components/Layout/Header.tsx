@@ -36,12 +36,12 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, user }) => {
           </button>
           
           {/* Logo */}
-          <Logo 
+          <Logo
             size="md"
             showText={true}
             text="Assistant Agricole IA"
             clickable={true}
-            onClick={() => window.location.href = '/dashboard'}
+            onClick={() => window.location.href = '/assistant'}
           />
         </div>
         

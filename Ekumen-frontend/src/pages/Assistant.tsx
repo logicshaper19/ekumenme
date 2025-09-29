@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import { Paperclip, Menu, Lightbulb, ArrowRight, Eye, Cloud, Shovel, TrendingUp, DollarSign, Bell, User, LogOut, Home, MessageCircle, Mic, Wheat, BarChart3, Users, FileText, Settings } from 'lucide-react'
+import React from 'react'
+import { useNavigate, Link, useLocation } from 'react-router-dom'
+import { Bell, User, LogOut, MessageCircle, Mic, BarChart3, Settings, MapPin, Beaker, Menu } from 'lucide-react'
 
 // Components
 import { Button } from '@components/ui/Button'
@@ -8,59 +8,70 @@ import { Button } from '@components/ui/Button'
 // Hooks
 import { useAuth } from '@hooks/useAuth'
 
+// Pages
+import ChatInterface from './ChatInterface'
+import VoiceJournal from './VoiceJournal'
+import Activities from './Activities'
+import Treatments from './Treatments'
+import Parcelles from './Parcelles'
+
 const Assistant: React.FC = () => {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const [inputValue, setInputValue] = useState('')
+  const location = useLocation()
 
   const handleLogout = () => {
     logout()
     navigate('/login')
   }
 
+  // Determine which content to show based on current route
+  const renderMainContent = () => {
+    switch (location.pathname) {
+      case '/journal':
+        return <VoiceJournal />
+      case '/activities':
+        return <Activities />
+      case '/treatments':
+        return <Treatments />
+      case '/parcelles':
+        return <Parcelles />
+      case '/assistant':
+      default:
+        return <ChatInterface />
+    }
+  }
+
   const navigation = [
     {
-      name: 'Tableau de bord',
-      href: '/dashboard',
-      icon: Home,
-      description: 'Vue d\'ensemble de votre exploitation'
-    },
-    {
-      name: 'Assistant IA',
+      name: 'Ekumen Assistant',
       href: '/assistant',
       icon: MessageCircle,
-      description: 'Chat avec les agents spécialisés',
-      active: true
+      description: 'Chat avec les agents spécialisés'
     },
     {
-      name: 'Journal Vocal',
+      name: 'Journal',
       href: '/journal',
       icon: Mic,
       description: 'Enregistrement d\'interventions'
     },
     {
-      name: 'Gestion Exploitation',
-      href: '/farms',
-      icon: Wheat,
-      description: 'Données et parcelles'
-    },
-    {
-      name: 'Analyses',
-      href: '/analyses',
+      name: 'Activités',
+      href: '/activities',
       icon: BarChart3,
-      description: 'Rapports et statistiques'
+      description: 'Historique des activités agricoles'
     },
     {
-      name: 'Équipe',
-      href: '/team',
-      icon: Users,
-      description: 'Gestion des utilisateurs'
+      name: 'Traitements',
+      href: '/treatments',
+      icon: Beaker,
+      description: 'Produits phytosanitaires utilisés'
     },
     {
-      name: 'Documents',
-      href: '/documents',
-      icon: FileText,
-      description: 'Réglementation et guides'
+      name: 'Parcelles',
+      href: '/parcelles',
+      icon: MapPin,
+      description: 'Gestion des parcelles'
     },
     {
       name: 'Paramètres',
@@ -70,50 +81,9 @@ const Assistant: React.FC = () => {
     }
   ]
 
-  const suggestions = [
-    {
-      id: 1,
-      title: 'Crop Health',
-      icon: Eye,
-      color: 'text-green-600'
-    },
-    {
-      id: 2,
-      title: 'Weather',
-      icon: Cloud,
-      color: 'text-gray-600'
-    },
-    {
-      id: 3,
-      title: 'Soil Analysis',
-      icon: Shovel,
-      color: 'text-gray-600'
-    },
-    {
-      id: 4,
-      title: 'Yield Forecast',
-      icon: TrendingUp,
-      color: 'text-green-600'
-    },
-    {
-      id: 5,
-      title: 'Market Prices',
-      icon: DollarSign,
-      color: 'text-gray-600'
-    }
-  ]
-
-  const handleSuggestionClick = (suggestion: string) => {
-    setInputValue(suggestion)
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (inputValue.trim()) {
-      // Handle chat submission here
-      console.log('Chat message:', inputValue)
-      setInputValue('')
-    }
+  // Check if navigation item is active
+  const isActive = (href: string) => {
+    return location.pathname === href
   }
 
   return (
@@ -169,9 +139,9 @@ const Assistant: React.FC = () => {
                   key={item.name}
                   to={item.href}
                   className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    item.active
+                    isActive(item.href)
                       ? 'bg-green-50 text-green-700 border-r-2 border-green-500'
-                      : 'text-gray-700 hover:bg-gray-50'
+                      : 'text-gray-700 hover:bg-gray-50 hover:text-green-600'
                   }`}
                 >
                   <Icon className="h-5 w-5 mr-3" />
@@ -186,94 +156,8 @@ const Assistant: React.FC = () => {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 bg-white flex flex-col items-center justify-center px-4">
-          {/* Chat Interface */}
-          <div className="text-center mb-12">
-            <div className="flex items-center justify-center mb-6">
-              <div className="w-6 h-6 bg-green-600 rounded flex items-center justify-center mr-2">
-                <div className="w-3 h-3 bg-white rounded-sm transform rotate-45"></div>
-              </div>
-              <h1 className="text-2xl font-semibold text-gray-900">ekumen</h1>
-            </div>
-            <p className="text-base text-gray-700">
-              Welcome, {user?.full_name?.split(' ')[0]?.toLowerCase() || 'elisha'}
-            </p>
-          </div>
-
-      {/* Chat Input */}
-      <div className="w-full max-w-4xl mb-12">
-        <form onSubmit={handleSubmit} className="relative">
-          <div className="flex items-center bg-gray-100 rounded-2xl p-4">
-            <input
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Ask anything about your farm or crops..."
-              className="flex-1 bg-transparent text-gray-900 placeholder-gray-500 focus:outline-none text-base"
-            />
-            
-            {/* Action Icons */}
-            <div className="flex items-center space-x-2 ml-4">
-              <button
-                type="button"
-                className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
-                aria-label="Attach file"
-              >
-                <Paperclip className="h-4 w-4" />
-              </button>
-              
-              <button
-                type="button"
-                className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
-                aria-label="Menu"
-              >
-                <Menu className="h-4 w-4" />
-              </button>
-              
-              <button
-                type="button"
-                className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
-                aria-label="Suggestions"
-              >
-                <Lightbulb className="h-4 w-4" />
-              </button>
-              
-              <button
-                type="submit"
-                className="p-2 bg-green-600 text-white rounded-full hover:bg-green-700 transition-colors ml-2"
-                aria-label="Send message"
-              >
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
-
-      {/* Suggestion Buttons */}
-      <div className="w-full max-w-4xl">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {suggestions.map((suggestion) => {
-            const Icon = suggestion.icon
-            return (
-              <button
-                key={suggestion.id}
-                onClick={() => handleSuggestionClick(suggestion.title)}
-                className="bg-gray-100 rounded-xl p-4 hover:bg-gray-200 transition-colors text-left group"
-              >
-                <div className="flex flex-col items-center text-center">
-                  <div className={`p-2 rounded-lg mb-3`}>
-                    <Icon className={`h-5 w-5 ${suggestion.color}`} />
-                  </div>
-                  <span className="text-sm font-medium text-gray-900">
-                    {suggestion.title}
-                  </span>
-                </div>
-              </button>
-            )
-          })}
-        </div>
-      </div>
+        <main className="flex-1 bg-white flex flex-col">
+          {renderMainContent()}
         </main>
       </div>
     </div>

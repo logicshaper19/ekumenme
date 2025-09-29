@@ -5,10 +5,12 @@ import { Toaster } from 'react-hot-toast'
 
 // Pages
 import LandingPage from '@pages/LandingPage'
-import Dashboard from '@pages/Dashboard'
 import Assistant from '@pages/Assistant'
 import ChatInterface from '@pages/ChatInterface'
 import VoiceJournal from '@pages/VoiceJournal'
+import Activities from '@pages/Activities'
+import Treatments from '@pages/Treatments'
+import Parcelles from '@pages/Parcelles'
 import FarmManagement from '@pages/FarmManagement'
 import Login from '@pages/Login'
 import Register from '@pages/Register'
@@ -47,16 +49,6 @@ function AppContent() {
             
             {/* Protected routes */}
             <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Dashboard />
-                  </Layout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="/assistant"
               element={
                 <ProtectedRoute>
@@ -78,9 +70,31 @@ function AppContent() {
               path="/journal"
               element={
                 <ProtectedRoute>
-                  <Layout>
-                    <VoiceJournal />
-                  </Layout>
+                  <Assistant />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/activities"
+              element={
+                <ProtectedRoute>
+                  <Assistant />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/treatments"
+              element={
+                <ProtectedRoute>
+                  <Assistant />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/parcelles"
+              element={
+                <ProtectedRoute>
+                  <Assistant />
                 </ProtectedRoute>
               }
             />

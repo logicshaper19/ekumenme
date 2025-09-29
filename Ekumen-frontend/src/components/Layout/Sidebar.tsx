@@ -1,12 +1,11 @@
 import React from 'react'
 import { NavLink } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  Home, 
-  MessageCircle, 
-  Mic, 
-  Wheat, 
-  Settings, 
+import {
+  MessageCircle,
+  Mic,
+  Wheat,
+  Settings,
   X,
   BarChart3,
   Users,
@@ -23,12 +22,6 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, user }) => {
   const navigation = [
-    {
-      name: 'Tableau de bord',
-      href: '/dashboard',
-      icon: Home,
-      description: 'Vue d\'ensemble de votre exploitation'
-    },
     {
       name: 'Assistant IA',
       href: '/assistant',
