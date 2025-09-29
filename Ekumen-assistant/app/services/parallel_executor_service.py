@@ -307,13 +307,28 @@ class ParallelExecutorService:
     ) -> Any:
         """
         Call the actual tool.
-        
-        This is a placeholder - actual implementation will depend on tool_executor interface.
+
+        Supports multiple tool executor interfaces:
+        - ToolRegistryService (preferred)
+        - Any object with execute_tool method
+        - Callable function
         """
-        # TODO: Implement actual tool calling logic
-        # For now, simulate tool execution
-        await asyncio.sleep(0.1)  # Simulate work
-        return {"tool": tool_name, "status": "success"}
+        # Try ToolRegistryService interface (preferred)
+        if hasattr(tool_executor, 'execute_tool'):
+            return await tool_executor.execute_tool(
+                tool_name,
+                context=context,
+                previous_results=previous_results
+            )
+        # Try callable interface
+        elif callable(tool_executor):
+            return await tool_executor(
+                tool_name,
+                context=context,
+                previous_results=previous_results
+            )
+        else:
+            raise ValueError(f"Invalid tool executor: {tool_executor}")
     
     def _get_tool_type(self, tool_name: str) -> str:
         """Get tool type from tool name"""
