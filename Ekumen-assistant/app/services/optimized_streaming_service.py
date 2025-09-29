@@ -51,19 +51,22 @@ class OptimizedStreamingService:
     This replaces the old streaming_service.py with a fully optimized version.
     """
     
-    def __init__(self):
+    def __init__(self, tool_executor: Optional[Any] = None):
         # Initialize all optimization components
         self.router = UnifiedRouterService()
         self.executor = ParallelExecutorService()
         self.tool_selector = SmartToolSelectorService()
         self.llm_service = OptimizedLLMService()
         self.cache = MultiLayerCacheService()
-        
+
+        # Tool executor (for actual tool execution)
+        self.tool_executor = tool_executor
+
         # Statistics
         self.total_queries = 0
         self.cache_hits = 0
         self.total_time_saved = 0.0
-        
+
         logger.info("✅ Initialized Optimized Streaming Service")
     
     async def _handle_direct_answer(
