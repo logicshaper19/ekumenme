@@ -23,46 +23,10 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, user }) => {
   const navigation = [
     {
-      name: 'Assistant IA',
+      name: 'Ekumen Assistant',
       href: '/assistant',
       icon: MessageCircle,
       description: 'Chat avec les agents spécialisés'
-    },
-    {
-      name: 'Journal Vocal',
-      href: '/journal',
-      icon: Mic,
-      description: 'Enregistrement d\'interventions'
-    },
-    {
-      name: 'Gestion Exploitation',
-      href: '/farms',
-      icon: Wheat,
-      description: 'Données et parcelles'
-    },
-    {
-      name: 'Analyses',
-      href: '/analytics',
-      icon: BarChart3,
-      description: 'Rapports et statistiques'
-    },
-    {
-      name: 'Équipe',
-      href: '/team',
-      icon: Users,
-      description: 'Gestion des utilisateurs'
-    },
-    {
-      name: 'Documents',
-      href: '/documents',
-      icon: FileText,
-      description: 'Réglementation et guides'
-    },
-    {
-      name: 'Paramètres',
-      href: '/settings',
-      icon: Settings,
-      description: 'Configuration du système'
     }
   ]
 
