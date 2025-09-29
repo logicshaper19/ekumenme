@@ -154,7 +154,10 @@ class FastQueryService:
             # Generate concise response
             system_prompt = """Tu es un assistant agricole rapide et concis.
 Réponds en 2-3 phrases maximum.
-Utilise des emojis pour rendre la réponse plus lisible.
+N'utilise AUCUN emoji.
+N'utilise JAMAIS de ## ou ### pour les titres.
+Utilise **Titre en Gras:** pour les sections si nécessaire.
+Utilise des listes à puces (- ) pour les recommandations.
 Concentre-toi sur l'essentiel."""
             
             user_prompt = f"""Question: {query}
@@ -195,6 +198,9 @@ Réponds de manière concise et pratique."""
         try:
             system_prompt = """Tu es un assistant agricole rapide.
 Réponds en 1-2 phrases maximum.
+N'utilise AUCUN emoji.
+N'utilise JAMAIS de ## ou ### pour les titres.
+Utilise **gras** pour les points clés.
 Sois direct et précis."""
             
             messages = [
@@ -225,7 +231,10 @@ Sois direct et précis."""
             system_prompt = """Tu es un assistant agricole expert.
 Réponds de manière concise mais complète.
 Maximum 4-5 phrases.
-Utilise des emojis pour structurer ta réponse."""
+N'utilise AUCUN emoji.
+N'utilise JAMAIS de ## ou ### pour les titres.
+Utilise **Titre en Gras:** pour les sections si nécessaire.
+Utilise des listes à puces (- ) pour les recommandations."""
             
             messages = [
                 SystemMessage(content=system_prompt),
