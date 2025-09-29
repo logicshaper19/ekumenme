@@ -52,7 +52,9 @@ function AppContent() {
               path="/assistant"
               element={
                 <ProtectedRoute>
-                  <Assistant />
+                  <Layout>
+                    <ChatInterface />
+                  </Layout>
                 </ProtectedRoute>
               }
             />
@@ -70,7 +72,9 @@ function AppContent() {
               path="/journal"
               element={
                 <ProtectedRoute>
-                  <Assistant />
+                  <Layout>
+                    <VoiceJournal />
+                  </Layout>
                 </ProtectedRoute>
               }
             />
@@ -78,7 +82,9 @@ function AppContent() {
               path="/activities"
               element={
                 <ProtectedRoute>
-                  <Assistant />
+                  <Layout>
+                    <Activities />
+                  </Layout>
                 </ProtectedRoute>
               }
             />
@@ -86,7 +92,9 @@ function AppContent() {
               path="/treatments"
               element={
                 <ProtectedRoute>
-                  <Assistant />
+                  <Layout>
+                    <Treatments />
+                  </Layout>
                 </ProtectedRoute>
               }
             />
@@ -94,7 +102,9 @@ function AppContent() {
               path="/parcelles"
               element={
                 <ProtectedRoute>
-                  <Assistant />
+                  <Layout>
+                    <Parcelles />
+                  </Layout>
                 </ProtectedRoute>
               }
             />
@@ -104,6 +114,19 @@ function AppContent() {
                 <ProtectedRoute>
                   <Layout>
                     <FarmManagement />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <div className="p-6">
+                      <h1 className="text-2xl font-bold text-gray-900 mb-4">Paramètres</h1>
+                      <p className="text-gray-600">Configuration du système</p>
+                    </div>
                   </Layout>
                 </ProtectedRoute>
               }
