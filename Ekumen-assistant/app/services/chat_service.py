@@ -3,7 +3,7 @@ Chat service for agricultural chatbot
 Handles conversation management and message processing
 """
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, desc
 from sqlalchemy.orm import selectinload
@@ -155,7 +155,9 @@ class ChatService:
         sender: str,
         agent_type: Optional[str] = None,
         message_type: str = "text",
-        metadata: Optional[dict] = None
+        metadata: Optional[dict] = None,
+        thread_id: Optional[str] = None,
+        parent_message_id: Optional[str] = None
     ) -> Message:
         """Save a message to a conversation"""
         message = Message(
@@ -164,7 +166,9 @@ class ChatService:
             sender=sender,
             agent_type=agent_type,
             message_type=message_type,
-            metadata=metadata
+            message_metadata=metadata,
+            thread_id=thread_id,
+            parent_message_id=parent_message_id
         )
         
         db.add(message)

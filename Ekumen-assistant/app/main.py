@@ -3,13 +3,15 @@ Agricultural Chatbot FastAPI Application
 Main entry point for the agricultural AI assistant
 """
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 import time
 import logging
 import uuid
+import json
+import asyncio
 from datetime import datetime
 
 # Rate limiting imports (optional - only if slowapi is installed)
@@ -87,6 +89,8 @@ async def health_check():
         "version": settings.VERSION,
         "timestamp": time.time()
     }
+
+
 
 # Root endpoint
 @app.get("/")

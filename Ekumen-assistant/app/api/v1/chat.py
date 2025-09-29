@@ -10,6 +10,7 @@ from typing import List, Optional
 import logging
 import json
 import asyncio
+import time
 
 from app.core.database import get_async_db
 from app.models.user import User
@@ -56,7 +57,7 @@ async def create_conversation(
         logger.info(f"New conversation created: {conversation.id} for user {current_user.email}")
         
         return ConversationResponse(
-            id=conversation.id,
+            id=str(conversation.id),  # Convert UUID to string explicitly
             title=conversation.title,
             agent_type=conversation.agent_type,
             farm_siret=conversation.farm_siret,
@@ -100,7 +101,7 @@ async def get_user_conversations(
         
         return [
             ConversationResponse(
-                id=conv.id,
+                id=str(conv.id),
                 title=conv.title,
                 agent_type=conv.agent_type,
                 farm_siret=conv.farm_siret,
@@ -413,29 +414,43 @@ async def websocket_chat(
             data = await websocket.receive_text()
             message_data = json.loads(data)
 
-            # Save user message
+            # Extract message content (handle both 'content' and 'message' keys)
+            message_content = message_data.get("content") or message_data.get("message", "")
+            if not message_content:
+                logger.error(f"No message content found in: {message_data}")
+                continue
+
+            # Get thread_id from message data (frontend should provide this)
+            thread_id = message_data.get("thread_id") or message_data.get("message_id") or f"thread-{int(time.time() * 1000)}"
+
+            # Save user message and get message ID
+            user_message_id = None
             async for db in get_async_db():
-                await chat_service.save_message(
+                user_message = await chat_service.save_message(
                     db=db,
                     conversation_id=conversation_id,
-                    content=message_data["content"],
+                    content=message_content,
                     sender="user",
-                    message_type="text"
+                    message_type="text",
+                    thread_id=thread_id
                 )
+                user_message_id = str(user_message.id)
                 break
 
-            # Create context
+            # Create context with message and thread IDs
             context = {
                 "conversation_id": conversation_id,
                 "farm_siret": conversation.farm_siret,
                 "agent_type": conversation.agent_type,
-                "user_id": user.id
+                "user_id": user.id,
+                "message_id": user_message_id,
+                "thread_id": thread_id
             }
 
             # Stream response through WebSocket
             final_response = ""
             async for chunk in streaming_service.stream_response(
-                query=message_data["content"],
+                query=message_content,
                 context=context,
                 connection_id=connection_id,
                 use_workflow=True

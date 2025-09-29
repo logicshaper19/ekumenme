@@ -47,27 +47,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         const token = localStorage.getItem('auth_token')
         if (token) {
-          // TODO: Validate token with backend
-          // For now, simulate a user - check if we have stored user data
-          const storedUser = localStorage.getItem('user_data')
-          if (storedUser) {
-            setUser(JSON.parse(storedUser))
+          // Validate token with backend
+          const response = await fetch('http://localhost:8000/api/v1/auth/me', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          })
+
+          if (response.ok) {
+            const userData = await response.json()
+            setUser(userData)
+            localStorage.setItem('user_data', JSON.stringify(userData))
           } else {
-            // Fallback to default user
-            setUser({
-              id: '1',
-              email: 'farmer@example.com',
-              full_name: 'Jean Dupont',
-              role: 'farmer',
-              status: 'active',
-              language_preference: 'fr',
-              region_code: '75'
-            })
+            // Token is invalid, clear storage
+            localStorage.removeItem('auth_token')
+            localStorage.removeItem('user_data')
           }
         }
       } catch (error) {
         console.error('Auth check failed:', error)
         localStorage.removeItem('auth_token')
+        localStorage.removeItem('user_data')
       } finally {
         setIsLoading(false)
       }
@@ -79,27 +79,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, password: string) => {
     setIsLoading(true)
     try {
-      // TODO: Implement actual API call
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // Extract name from email for demo purposes
-      const emailName = email.split('@')[0]
-      const displayName = emailName.charAt(0).toUpperCase() + emailName.slice(1)
-      
-      const mockUser: User = {
-        id: '1',
-        email,
-        full_name: displayName,
-        role: 'farmer',
-        status: 'active',
-        language_preference: 'fr',
-        region_code: '75'
+      // Make actual API call to backend
+      const response = await fetch('http://localhost:8000/api/v1/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          username: email,
+          password: password,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Login failed')
       }
-      
-      setUser(mockUser)
-      localStorage.setItem('auth_token', 'mock_token')
-      localStorage.setItem('user_data', JSON.stringify(mockUser))
+
+      const tokenData = await response.json()
+
+      // Get user info with the token
+      const userResponse = await fetch('http://localhost:8000/api/v1/auth/me', {
+        headers: {
+          'Authorization': `Bearer ${tokenData.access_token}`,
+        },
+      })
+
+      if (!userResponse.ok) {
+        throw new Error('Failed to get user information')
+      }
+
+      const userData = await userResponse.json()
+
+      setUser(userData)
+      localStorage.setItem('auth_token', tokenData.access_token)
+      localStorage.setItem('user_data', JSON.stringify(userData))
     } catch (error) {
       console.error('Login failed:', error)
       throw error
@@ -117,22 +131,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const register = async (userData: RegisterData) => {
     setIsLoading(true)
     try {
-      // TODO: Implement actual API call
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      const mockUser: User = {
-        id: '1',
-        email: userData.email,
-        full_name: userData.full_name,
-        role: userData.role,
-        status: 'pending_verification',
-        language_preference: 'fr',
-        region_code: userData.region_code
+      // Make actual API call to backend
+      const response = await fetch('http://localhost:8000/api/v1/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: userData.email,
+          password: userData.password,
+          full_name: userData.full_name,
+          role: userData.role,
+          region_code: userData.region_code,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Registration failed')
       }
-      
-      setUser(mockUser)
-      localStorage.setItem('auth_token', 'mock_token')
+
+      const registeredUser = await response.json()
+
+      // After registration, automatically log in
+      await login(userData.email, userData.password)
     } catch (error) {
       console.error('Registration failed:', error)
       throw error

@@ -116,3 +116,143 @@ class AgentManager:
         """Estimate cost for agent requests."""
         profile = self.get_agent_profile(agent_type)
         return profile.cost_per_request * request_count if profile else 0.0
+
+    def execute_agent(self, agent_type: str, message: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
+        """
+        Execute an agent with a message.
+
+        Args:
+            agent_type: Type of agent to execute
+            message: Message to process
+            context: Additional context for processing
+
+        Returns:
+            Dict containing the agent response
+        """
+        try:
+            # Convert string agent_type to AgentType enum
+            if isinstance(agent_type, str):
+                agent_type_map = {
+                    "farm_data": AgentType.FARM_DATA,
+                    "weather": AgentType.WEATHER,
+                    "crop_health": AgentType.CROP_HEALTH,
+                    "planning": AgentType.PLANNING,
+                    "regulatory": AgentType.REGULATORY,
+                    "sustainability": AgentType.SUSTAINABILITY
+                }
+                agent_enum = agent_type_map.get(agent_type)
+                if not agent_enum:
+                    return {
+                        "response": f"Type d'agent '{agent_type}' non reconnu",
+                        "error": "Unknown agent type"
+                    }
+            else:
+                agent_enum = agent_type
+
+            # Get agent profile
+            profile = self.get_agent_profile(agent_enum)
+            if not profile:
+                return {
+                    "response": f"Agent {agent_type} non disponible",
+                    "error": "Agent not found"
+                }
+
+            # Generate response based on agent type
+            response = self._generate_agent_response(profile, message, context or {})
+
+            return {
+                "response": response,
+                "agent_type": profile.agent_type.value,
+                "agent_name": profile.name,
+                "capabilities": profile.capabilities,
+                "metadata": {
+                    "cost": profile.cost_per_request,
+                    "message_length": len(message),
+                    "context_provided": bool(context)
+                }
+            }
+
+        except Exception as e:
+            logger.error(f"Agent execution error: {e}")
+            return {
+                "response": f"Désolé, une erreur s'est produite lors du traitement de votre demande: {str(e)}",
+                "error": str(e)
+            }
+
+    def _generate_agent_response(self, profile: AgentProfile, message: str, context: Dict[str, Any]) -> str:
+        """Generate a response based on agent profile and message."""
+        agent_responses = {
+            AgentType.FARM_DATA: f"""🌾 **{profile.name}** - Analyse de vos données d'exploitation
+
+Votre demande : "{message}"
+
+Je suis spécialisé dans l'analyse des données agricoles françaises. Je peux vous aider avec :
+- Analyse des performances de vos parcelles
+- Suivi des interventions et leur efficacité
+- Métriques de rendement et optimisation
+- Contexte régional et comparaisons
+
+Pour une analyse complète, j'aurais besoin d'accéder à vos données MesParcelles ou de connaître votre SIRET d'exploitation.""",
+
+            AgentType.WEATHER: f"""🌤️ **{profile.name}** - Intelligence météorologique
+
+Votre demande : "{message}"
+
+Je suis votre conseiller météo agricole. Je peux vous fournir :
+- Conditions météo actuelles et prévisions
+- Alertes météo spécifiques à l'agriculture
+- Fenêtres d'intervention optimales
+- Analyse des risques climatiques
+
+Pour des prévisions précises, indiquez-moi votre localisation ou vos parcelles.""",
+
+            AgentType.CROP_HEALTH: f"""🌱 **{profile.name}** - Diagnostic phytosanitaire
+
+Votre demande : "{message}"
+
+Je suis expert en santé des cultures. Je peux vous aider avec :
+- Diagnostic de maladies et ravageurs
+- Identification des carences nutritionnelles
+- Recommandations de traitement
+- Stratégies de prévention
+
+Pour un diagnostic précis, décrivez les symptômes observés et le type de culture.""",
+
+            AgentType.PLANNING: f"""📅 **{profile.name}** - Optimisation opérationnelle
+
+Votre demande : "{message}"
+
+Je coordonne vos activités agricoles. Mes services incluent :
+- Planification des interventions
+- Optimisation des ressources
+- Coordination des équipes
+- Gestion des priorités
+
+Partagez vos objectifs et contraintes pour une planification personnalisée.""",
+
+            AgentType.REGULATORY: f"""⚖️ **{profile.name}** - Conformité réglementaire
+
+Votre demande : "{message}"
+
+Je vous guide dans la réglementation phytosanitaire française :
+- Recherche de produits AMM
+- Conditions d'usage autorisées
+- Classifications de sécurité
+- Vérification de conformité
+
+Précisez le produit ou la situation réglementaire qui vous préoccupe.""",
+
+            AgentType.SUSTAINABILITY: f"""🌍 **{profile.name}** - Durabilité agricole
+
+Votre demande : "{message}"
+
+Je vous accompagne vers une agriculture durable :
+- Métriques environnementales
+- Analyse d'impact carbone
+- Optimisation des ressources
+- Reporting de durabilité
+
+Décrivez vos pratiques actuelles pour des recommandations personnalisées."""
+        }
+
+        return agent_responses.get(profile.agent_type, f"Réponse de {profile.name} pour: {message}")

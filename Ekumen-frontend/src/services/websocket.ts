@@ -27,15 +27,22 @@ class WebSocketService {
 
   private connect(conversationId: string) {
     try {
-      const token = localStorage.getItem('auth_token')
-      const wsUrl = process.env.REACT_APP_WS_URL || 'ws://localhost:8000'
-      const url = `${wsUrl}/api/v1/chat/ws/${conversationId}?token=${token}`
+      // Get auth token from localStorage
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        throw new Error('No authentication token found. Please log in.')
+      }
 
+      const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000'
+      const url = `${wsUrl}/api/v1/chat/ws/${conversationId}?token=${authToken}`
+
+      console.log('Connecting to WebSocket:', url)
       this.socket = new WebSocket(url)
       this.conversationId = conversationId
       this.setupEventListeners()
     } catch (error) {
       console.error('Failed to connect to WebSocket:', error)
+      throw error
     }
   }
 
@@ -73,6 +80,47 @@ class WebSocketService {
     switch (data.type) {
       case 'connection':
         this.emit('connect', data)
+        break
+      case 'start':
+        // Handle workflow start message
+        this.emit('chat:workflow_start', {
+          message_id: data.message_id || 'current',
+          message: data.message,
+          query: data.query
+        })
+        break
+      case 'workflow_start':
+        // Handle workflow initialization
+        this.emit('chat:workflow_init', {
+          message_id: data.message_id || 'current',
+          message: data.message
+        })
+        break
+      case 'workflow_step':
+        // Handle workflow step updates
+        this.emit('chat:workflow_step', {
+          message_id: data.message_id || 'current',
+          step: data.step,
+          message: data.message
+        })
+        break
+      case 'workflow_result':
+        // Handle final workflow result - this contains the actual AI response
+        console.log('Received workflow_result:', data)
+        this.emit('chat:streaming_complete', {
+          message_id: data.message_id || 'current',
+          message: data.response,
+          agent_type: data.agent_type,
+          confidence: data.confidence,
+          recommendations: data.recommendations || [],
+          metadata: data.metadata,
+          is_complete: true
+        })
+        break
+      case 'llm_start':
+        this.emit('chat:streaming_start', {
+          message_id: data.message_id || 'current'
+        })
         break
       case 'token':
         this.emit('chat:streaming_chunk', {
@@ -128,19 +176,25 @@ class WebSocketService {
   }
 
   // Chat methods
-  sendMessage(message: string, agentType?: string) {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-      throw new Error('WebSocket not connected')
+  async sendMessage(message: string, agentType?: string, messageId?: string, threadId?: string) {
+    // Wait for connection to be established
+    const isConnected = await this.waitForConnection()
+    if (!isConnected) {
+      throw new Error('WebSocket connection timeout')
     }
 
     const messageData = {
       type: 'chat_message',
       message,
+      content: message, // Backend might expect 'content' instead of 'message'
       agent_type: agentType,
+      message_id: messageId || `msg-${Date.now()}`,
+      thread_id: threadId || `thread-${Date.now()}`,
       timestamp: new Date().toISOString()
     }
 
-    this.socket.send(JSON.stringify(messageData))
+    console.log('Sending WebSocket message:', messageData)
+    this.socket!.send(JSON.stringify(messageData))
   }
 
   joinConversation(conversationId: string) {
@@ -150,6 +204,32 @@ class WebSocketService {
       this.disconnect()
       this.connect(conversationId)
     }
+  }
+
+  // Check if WebSocket is connected and ready
+  isConnected(): boolean {
+    return this.socket !== null && this.socket.readyState === WebSocket.OPEN
+  }
+
+  // Wait for WebSocket to be connected
+  async waitForConnection(timeout: number = 5000): Promise<boolean> {
+    if (this.isConnected()) {
+      return true
+    }
+
+    return new Promise((resolve) => {
+      const startTime = Date.now()
+      const checkConnection = () => {
+        if (this.isConnected()) {
+          resolve(true)
+        } else if (Date.now() - startTime > timeout) {
+          resolve(false)
+        } else {
+          setTimeout(checkConnection, 100)
+        }
+      }
+      checkConnection()
+    })
   }
 
   // Voice methods
@@ -238,10 +318,49 @@ class WebSocketService {
     this.addEventListener('error', callback)
   }
 
-  // Utility methods
-  isConnected(): boolean {
-    return this.socket?.readyState === WebSocket.OPEN
+  // New workflow event handlers
+  onStreamingComplete(callback: (data: {
+    message_id: string
+    message: string
+    agent_type?: string
+    confidence?: number
+    recommendations?: any[]
+    metadata?: any
+    thread_id?: string
+    is_complete: boolean
+  }) => void) {
+    this.addEventListener('chat:streaming_complete', callback)
   }
+
+  onWorkflowStart(callback: (data: {
+    message_id: string
+    message: string
+    query?: string
+  }) => void) {
+    this.addEventListener('chat:workflow_start', callback)
+  }
+
+  onWorkflowInit(callback: (data: {
+    message_id: string
+    message: string
+  }) => void) {
+    this.addEventListener('chat:workflow_init', callback)
+  }
+
+  onWorkflowStep(callback: (data: {
+    message_id: string
+    step: string
+    message: string
+  }) => void) {
+    this.addEventListener('chat:workflow_step', callback)
+  }
+
+  // Generic event listener for any event type
+  on(event: string, callback: Function) {
+    this.addEventListener(event, callback)
+  }
+
+  // Utility methods
 
   disconnect() {
     if (this.socket) {

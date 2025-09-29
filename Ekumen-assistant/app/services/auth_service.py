@@ -5,8 +5,9 @@ Handles user authentication, JWT tokens, and security
 
 from datetime import datetime, timedelta
 from typing import Optional, Union
+from uuid import UUID
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,8 +18,7 @@ from app.core.database import get_async_db
 from app.models.user import User
 from app.schemas.auth import UserCreate, TokenData
 
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Password hashing using bcrypt directly
 
 # OAuth2 scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -34,19 +34,27 @@ class AuthService:
     
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         """Verify a password against its hash"""
-        return pwd_context.verify(plain_password, hashed_password)
-    
+        # Truncate password to 72 bytes if needed (bcrypt limitation)
+        password_bytes = plain_password.encode('utf-8')[:72]
+        return bcrypt.checkpw(password_bytes, hashed_password.encode('utf-8'))
+
     def get_password_hash(self, password: str) -> str:
         """Hash a password"""
-        return pwd_context.hash(password)
+        # Truncate password to 72 bytes if needed (bcrypt limitation)
+        password_bytes = password.encode('utf-8')[:72]
+        salt = bcrypt.gensalt()
+        hashed = bcrypt.hashpw(password_bytes, salt)
+        return hashed.decode('utf-8')
     
     async def get_user_by_email(self, db: AsyncSession, email: str) -> Optional[User]:
         """Get user by email address"""
         result = await db.execute(select(User).where(User.email == email))
         return result.scalar_one_or_none()
     
-    async def get_user_by_id(self, db: AsyncSession, user_id: str) -> Optional[User]:
+    async def get_user_by_id(self, db: AsyncSession, user_id: Union[str, UUID]) -> Optional[User]:
         """Get user by ID"""
+        if isinstance(user_id, str):
+            user_id = UUID(user_id)
         result = await db.execute(select(User).where(User.id == user_id))
         return result.scalar_one_or_none()
     
@@ -100,14 +108,16 @@ class AuthService:
         """Verify JWT token and return token data"""
         try:
             payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
-            user_id: str = payload.get("sub")
+            user_id_str: str = payload.get("sub")
             email: str = payload.get("email")
-            
-            if user_id is None or email is None:
+
+            if user_id_str is None or email is None:
                 return None
-            
+
+            # Convert string UUID to UUID object
+            user_id = UUID(user_id_str)
             return TokenData(user_id=user_id, email=email)
-        except JWTError:
+        except (JWTError, ValueError):
             return None
     
     async def get_current_user(
@@ -147,19 +157,19 @@ class AuthService:
             # Remove "Bearer " prefix if present
             if token.startswith("Bearer "):
                 token = token[7:]
-            
+
             # Verify token
             token_data = self.verify_token(token)
             if token_data is None:
                 return None
-            
+
             # Get database session
             async for db in get_async_db():
                 user = await self.get_user_by_id(db, token_data.user_id)
                 if user and user.is_active:
                     return user
                 return None
-                
+
         except Exception:
             return None
     

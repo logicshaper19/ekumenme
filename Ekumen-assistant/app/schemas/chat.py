@@ -3,7 +3,7 @@ Chat schemas for agricultural chatbot
 Pydantic models for chat and conversation management
 """
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, ConfigDict
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from app.models.conversation import AgentType
@@ -24,15 +24,14 @@ class ConversationCreate(BaseModel):
 
 class ConversationResponse(BaseModel):
     """Schema for conversation response"""
-    id: str
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str  # Pydantic will auto-convert UUID to str
     title: str
     agent_type: AgentType
     farm_siret: Optional[str]
     created_at: datetime
     updated_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 class ChatMessage(BaseModel):
@@ -40,7 +39,9 @@ class ChatMessage(BaseModel):
     content: str = Field(..., min_length=1, max_length=10000)
     sender: str = Field(..., pattern="^(user|agent)$")
     timestamp: Optional[datetime] = None
-    
+    thread_id: Optional[str] = Field(None, max_length=100)
+  # For tracking message threads
+
     @validator('content')
     def validate_content(cls, v):
         if not v.strip():
@@ -50,13 +51,12 @@ class ChatMessage(BaseModel):
 
 class ChatResponse(BaseModel):
     """Schema for chat response from agent"""
+    model_config = ConfigDict(from_attributes=True)
+
     content: str
     agent_type: AgentType
     timestamp: datetime
     metadata: Optional[Dict[str, Any]] = None
-    
-    class Config:
-        from_attributes = True
 
 
 class MessageCreate(BaseModel):
@@ -84,15 +84,14 @@ class ConversationUpdate(BaseModel):
 
 class ConversationSummary(BaseModel):
     """Schema for conversation summary"""
-    id: str
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str  # Pydantic will auto-convert UUID to str
     title: str
     agent_type: AgentType
     message_count: int
     last_message_at: Optional[datetime]
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 class AgentCapabilities(BaseModel):
