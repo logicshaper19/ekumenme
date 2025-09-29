@@ -21,7 +21,7 @@ from typing import Dict, Any, Optional, AsyncGenerator
 from dataclasses import dataclass
 from fastapi import WebSocket
 
-from app.services.unified_router_service import UnifiedRouterService, ExecutionPath
+from app.services.unified_router_service import UnifiedRouterService, ExecutionPath, QueryComplexity
 from app.services.parallel_executor_service import ParallelExecutorService
 from app.services.smart_tool_selector_service import SmartToolSelectorService
 from app.services.optimized_llm_service import OptimizedLLMService, LLMComplexity, LLMTask
@@ -68,7 +68,17 @@ class OptimizedStreamingService:
         self.total_time_saved = 0.0
 
         logger.info("✅ Initialized Optimized Streaming Service")
-    
+
+    def _map_query_complexity_to_llm(self, query_complexity: QueryComplexity) -> LLMComplexity:
+        """Map QueryComplexity to LLMComplexity"""
+        mapping = {
+            QueryComplexity.SIMPLE: LLMComplexity.SIMPLE,
+            QueryComplexity.FAST: LLMComplexity.SIMPLE,
+            QueryComplexity.MEDIUM: LLMComplexity.MEDIUM,
+            QueryComplexity.COMPLEX: LLMComplexity.COMPLEX
+        }
+        return mapping.get(query_complexity, LLMComplexity.MEDIUM)
+
     async def _handle_direct_answer(
         self,
         query: str,
@@ -366,12 +376,23 @@ class OptimizedStreamingService:
             synthesis_start = time.time()
 
             try:
+                # Map QueryComplexity to LLMComplexity
+                llm_complexity = self._map_query_complexity_to_llm(routing_decision.complexity)
+
+                # Determine max_tokens based on complexity
+                if routing_decision.complexity == QueryComplexity.COMPLEX:
+                    max_tokens = 2000  # Detailed analytical responses
+                elif routing_decision.complexity == QueryComplexity.SIMPLE:
+                    max_tokens = 300   # Concise responses
+                else:
+                    max_tokens = 800   # Medium responses
+
                 # Use the LLM service to generate actual response
                 response = await self.llm_service.synthesize_response(
                     query=query,
                     tool_results=tool_results,
-                    complexity=routing_decision.complexity,
-                    max_tokens=800 if routing_decision.complexity == LLMComplexity.SIMPLE else 1500
+                    complexity=llm_complexity,
+                    max_tokens=max_tokens
                 )
 
                 if websocket:

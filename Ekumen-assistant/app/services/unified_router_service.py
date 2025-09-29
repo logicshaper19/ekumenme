@@ -86,32 +86,47 @@ class UnifiedRouterService:
     
     def _initialize_routing_patterns(self):
         """Initialize fast pattern-based routing rules"""
-        
+
         # Simple queries - Direct answer, no tools
         self.simple_patterns = [
             "bonjour", "salut", "merci", "au revoir",
             "qui es-tu", "comment ça va", "aide",
             "qu'est-ce que tu peux faire"
         ]
-        
-        # Fast path - Single tool queries
+
+        # Fast path - Single tool queries (simple lookups)
         self.fast_patterns = {
             "weather": ["météo", "temps", "pluie", "température", "prévision"],
-            "regulatory": ["amm", "réglementation", "autorisation", "produit phyto"],
-            "farm_data": ["parcelle", "exploitation", "surface", "culture"]
+            "regulatory": ["amm code", "numéro amm", "autorisation produit"]
         }
-        
+
         # Medium path - Multiple tools but simple
         self.medium_keywords = [
-            "traitement", "maladie", "ravageur", "fertilisation",
-            "intervention", "planification", "coût"
+            "planification", "coût", "prix"
         ]
-        
-        # Complex path - Multi-agent workflow
+
+        # Complex path - Analytical queries requiring deep investigation
         self.complex_keywords = [
+            # Explicit complexity markers
             "analyse complète", "plan détaillé", "stratégie",
-            "optimisation", "comparaison", "étude de faisabilité",
-            "rapport complet", "diagnostic approfondi"
+            "optimisation", "étude de faisabilité",
+            "rapport complet", "diagnostic approfondi",
+
+            # Comparison and calculation indicators
+            "comparaison", "comparer", "différence", "pourquoi",
+            "quelle est la dose", "dose moyenne", "calcul",
+
+            # Multi-intervention analysis
+            "interventions", "traitements", "plusieurs",
+            "les deux", "ces deux", "lors de ces",
+
+            # Surface/area analysis
+            "surface de", "hectares", "n'ont-elles été réalisées que sur",
+            "totalité de la parcelle", "une partie de",
+
+            # Investigation keywords
+            "sont-ils le même", "est-ce que", "comment se fait-il",
+            "quelle est la raison", "pourquoi les"
         ]
     
     async def route_query(
@@ -194,11 +209,13 @@ class UnifiedRouterService:
     ) -> RoutingDecision:
         """
         Fast pattern-based routing (no LLM needed).
-        
+
         Returns routing decision with confidence score.
+
+        IMPORTANT: Check complex patterns FIRST to avoid misclassification!
         """
         query_lower = query.lower()
-        
+
         # Check for simple queries
         if any(pattern in query_lower for pattern in self.simple_patterns):
             return RoutingDecision(
@@ -211,8 +228,23 @@ class UnifiedRouterService:
                 confidence=0.95,
                 reasoning="Simple conversational query, no tools needed"
             )
-        
-        # Check for fast path (single tool)
+
+        # Check for COMPLEX queries FIRST (before fast path!)
+        # This prevents analytical queries from being misclassified as simple lookups
+        complex_matches = [kw for kw in self.complex_keywords if kw in query_lower]
+        if complex_matches:
+            return RoutingDecision(
+                complexity=QueryComplexity.COMPLEX,
+                execution_path=ExecutionPath.WORKFLOW_PATH,
+                required_tools=["weather", "regulatory", "farm_data", "planning"],
+                required_agents=["weather", "regulatory", "farm_data", "planning"],
+                use_gpt4=True,
+                estimated_time=30.0,
+                confidence=0.9,
+                reasoning=f"Complex analytical query detected: {complex_matches[:3]}"
+            )
+
+        # Check for fast path (single tool) - only simple lookups
         for tool_type, patterns in self.fast_patterns.items():
             if any(pattern in query_lower for pattern in patterns):
                 return RoutingDecision(
@@ -225,20 +257,7 @@ class UnifiedRouterService:
                     confidence=0.9,
                     reasoning=f"Single tool query: {tool_type}"
                 )
-        
-        # Check for complex queries
-        if any(keyword in query_lower for keyword in self.complex_keywords):
-            return RoutingDecision(
-                complexity=QueryComplexity.COMPLEX,
-                execution_path=ExecutionPath.WORKFLOW_PATH,
-                required_tools=["weather", "regulatory", "farm_data", "planning"],
-                required_agents=["weather", "regulatory", "farm_data", "planning"],
-                use_gpt4=True,
-                estimated_time=30.0,
-                confidence=0.85,
-                reasoning="Complex multi-agent query requiring full workflow"
-            )
-        
+
         # Check for medium queries
         if any(keyword in query_lower for keyword in self.medium_keywords):
             return RoutingDecision(
@@ -251,7 +270,7 @@ class UnifiedRouterService:
                 confidence=0.8,
                 reasoning="Medium complexity query with multiple tools"
             )
-        
+
         # Default: medium path with lower confidence
         return RoutingDecision(
             complexity=QueryComplexity.MEDIUM,
