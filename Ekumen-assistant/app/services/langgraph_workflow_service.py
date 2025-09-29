@@ -75,6 +75,7 @@ class LangGraphWorkflowService:
         # Add nodes
         workflow.add_node("analyze_query", self._analyze_query_node)
         workflow.add_node("weather_analysis", self._weather_analysis_node)
+        workflow.add_node("crop_feasibility", self._crop_feasibility_node)
         workflow.add_node("regulatory_check", self._regulatory_check_node)
         workflow.add_node("farm_data_analysis", self._farm_data_analysis_node)
         workflow.add_node("synthesis", self._synthesis_node)
@@ -100,7 +101,18 @@ class LangGraphWorkflowService:
             "weather_analysis",
             self._route_after_weather,
             {
+                "crop_feasibility": "crop_feasibility",
                 "regulatory": "regulatory_check",
+                "farm_data": "farm_data_analysis",
+                "synthesis": "synthesis",
+                "error": "error_handler"
+            }
+        )
+
+        workflow.add_conditional_edges(
+            "crop_feasibility",
+            self._route_after_feasibility,
+            {
                 "farm_data": "farm_data_analysis",
                 "synthesis": "synthesis",
                 "error": "error_handler"
@@ -257,7 +269,50 @@ class LangGraphWorkflowService:
             logger.error(f"Weather analysis failed: {e}")
             state["errors"].append(f"Weather analysis failed: {str(e)}")
             return state
-    
+
+    async def _crop_feasibility_node(self, state: AgriculturalWorkflowState) -> AgriculturalWorkflowState:
+        """Check crop feasibility for location"""
+        try:
+            processing_steps = state["processing_steps"] + ["crop_feasibility"]
+
+            # Import the crop feasibility tool
+            from app.tools.planning_agent.check_crop_feasibility_tool import CheckCropFeasibilityTool
+            feasibility_tool = CheckCropFeasibilityTool()
+
+            # Extract crop and location from query or context
+            crop = state["context"].get("crop", self._extract_crop_from_query(state["query"]))
+            location = state["context"].get("location", self._extract_location_from_query(state["query"]))
+
+            if not crop:
+                logger.warning("No crop detected in query, skipping feasibility check")
+                state["processing_steps"] = processing_steps
+                return state
+
+            # Run feasibility check
+            feasibility_result = feasibility_tool._run(
+                crop=crop,
+                location=location,
+                include_alternatives=True
+            )
+
+            # Parse result
+            try:
+                feasibility_data = json.loads(feasibility_result)
+            except:
+                feasibility_data = {"raw_result": feasibility_result}
+
+            state["feasibility_data"] = feasibility_data
+            state["processing_steps"] = processing_steps
+
+            logger.info(f"Crop feasibility check completed for {crop} at {location}")
+
+            return state
+
+        except Exception as e:
+            logger.error(f"Crop feasibility check failed: {e}")
+            state["errors"].append(f"Crop feasibility check failed: {str(e)}")
+            return state
+
     async def _regulatory_check_node(self, state: AgriculturalWorkflowState) -> AgriculturalWorkflowState:
         """Perform regulatory compliance check"""
         try:
@@ -308,7 +363,8 @@ class LangGraphWorkflowService:
             
             farm_data = {}
             siret = state["context"].get("farm_siret")
-            
+            location = state["context"].get("location", self._extract_location_from_query(state["query"]))
+
             async with AsyncSessionLocal() as session:
                 if siret:
                     # Get specific farm data
@@ -321,7 +377,7 @@ class LangGraphWorkflowService:
                         WHERE e.siret = :siret
                         GROUP BY e.siret, e.nom
                     """), {"siret": siret})
-                    
+
                     data = result.fetchone()
                     if data:
                         farm_data = {
@@ -339,13 +395,40 @@ class LangGraphWorkflowService:
                         LEFT JOIN farm_operations.parcelles p ON e.siret = p.siret_exploitation
                         LEFT JOIN farm_operations.interventions i ON p.id = i.id_parcelle
                     """))
-                    
+
                     data = result.fetchone()
                     farm_data = {
                         "total_exploitations": data[0],
                         "total_parcelles": data[1],
                         "total_interventions": data[2]
                     }
+
+                # Get regional crop data if location is specified
+                if location and location.lower() != "france":
+                    try:
+                        # Query regional crops (simplified - would need proper commune/department mapping)
+                        regional_result = await session.execute(text("""
+                            SELECT DISTINCT p.nom_culture, COUNT(*) as frequency
+                            FROM farm_operations.parcelles p
+                            WHERE p.commune ILIKE :location OR p.code_postal LIKE :postal_prefix
+                            GROUP BY p.nom_culture
+                            ORDER BY frequency DESC
+                            LIMIT 10
+                        """), {"location": f"%{location}%", "postal_prefix": f"{location[:2]}%"})
+
+                        regional_crops = []
+                        for row in regional_result.fetchall():
+                            if row[0]:  # Only if crop name exists
+                                regional_crops.append({
+                                    "crop": row[0],
+                                    "frequency": row[1]
+                                })
+
+                        if regional_crops:
+                            farm_data["regional_crops"] = regional_crops
+                            logger.info(f"Found {len(regional_crops)} regional crops for {location}")
+                    except Exception as e:
+                        logger.warning(f"Could not fetch regional crops: {e}")
             
             state["farm_data"] = farm_data
             state["processing_steps"] = processing_steps
@@ -364,24 +447,83 @@ class LangGraphWorkflowService:
         try:
             processing_steps = state["processing_steps"] + ["synthesis"]
 
-            # Create synthesis prompt
-            synthesis_prompt = f"""
-            En tant qu'expert agricole français, synthétise une réponse complète basée sur:
+            # Import enhanced prompts
+            from app.prompts.base_prompts import BASE_AGRICULTURAL_SYSTEM_PROMPT, RESPONSE_FORMAT_TEMPLATE
 
-            Demande: {state["query"]}
+            # Format collected data for better readability
+            weather_summary = self._format_weather_data(state.get("weather_data"))
+            regulatory_summary = self._format_regulatory_data(state.get("regulatory_status"))
+            farm_summary = self._format_farm_data(state.get("farm_data"))
+            feasibility_summary = self._format_feasibility_data(state.get("feasibility_data"))
 
-            Données collectées:
-            - Type d'agent: {state["agent_type"]}
-            - Données météo: {json.dumps(state["weather_data"], ensure_ascii=False) if state["weather_data"] else "Non disponibles"}
-            - Statut réglementaire: {json.dumps(state["regulatory_status"], ensure_ascii=False) if state["regulatory_status"] else "Non vérifié"}
-            - Données d'exploitation: {json.dumps(state["farm_data"], ensure_ascii=False) if state["farm_data"] else "Non disponibles"}
+            # Extract location and crop from query
+            location = state["context"].get("location", self._extract_location_from_query(state["query"]))
+            crop = state["context"].get("crop", self._extract_crop_from_query(state["query"]))
 
-            Fournis une réponse structurée avec:
-            1. Réponse directe à la question
-            2. Recommandations pratiques
-            3. Points de vigilance réglementaire
-            4. Considérations météorologiques (si applicable)
-            """
+            # Create enhanced synthesis prompt with structure
+            synthesis_prompt = f"""{BASE_AGRICULTURAL_SYSTEM_PROMPT}
+
+QUESTION DE L'UTILISATEUR:
+{state["query"]}
+
+DONNÉES COLLECTÉES POUR RÉPONDRE:
+
+{weather_summary}
+
+{feasibility_summary}
+
+{regulatory_summary}
+
+{farm_summary}
+
+INSTRUCTIONS DE RÉPONSE STRUCTURÉE:
+
+Génère une réponse en suivant EXACTEMENT cette structure markdown:
+
+## 🌱 [Titre engageant qui reconnaît la demande]
+[1-2 phrases personnelles montrant que tu comprends l'objectif]
+
+### ❄️ La Réalité Climatique
+[Utilise les données météo avec chiffres précis: températures min/max, jours de gel, saison de croissance]
+[Compare avec les exigences de la culture demandée]
+[Conclusion claire: faisable ou non en pleine terre]
+
+### 🏠 Solutions Concrètes
+[Si faisable: étapes numérotées pour réussir]
+[Si infaisable en pleine terre: solution alternative (serre, pot, intérieur)]
+**Étape 1: [Action]**
+- Détail avec chiffres (coût, quantité, timing)
+
+**Étape 2: [Action]**
+- Détail avec chiffres
+
+[Continue pour 4-6 étapes]
+
+### ⏱️ Attentes Réalistes
+- **Première récolte/floraison**: [timeline précis en mois/années]
+- **Rendement attendu**: [chiffres concrets avec unités]
+- **Effort requis**: [description honnête du travail]
+- **Taux de réussite**: [estimation réaliste]
+
+### 🌳 Alternatives Viables pour {location}
+[Si la culture demandée est difficile, propose 3-4 alternatives qui RÉUSSIRONT]
+- **[Culture 1]**: [Description courte + zone de rusticité + avantages]
+- **[Culture 2]**: [Description courte + zone de rusticité + avantages]
+- **[Culture 3]**: [Description courte + zone de rusticité + avantages]
+
+### 💪 Mon Conseil
+[Encouragement personnalisé basé sur la situation]
+[Recommandation finale claire et motivante]
+
+{RESPONSE_FORMAT_TEMPLATE}
+
+RAPPELS IMPORTANTS:
+- Utilise les émojis appropriés (🌱 🌾 ⚠️ ✅ ❌ 🌡️ 💧 ⏱️ 💰 🌳)
+- Tous les chiffres doivent être précis (pas "environ" mais "entre X et Y")
+- Utilise **gras** pour les points clés
+- Crée des sections visuellement distinctes
+- Termine toujours sur une note encourageante
+"""
 
             # Generate response using LLM
             response = await self.llm.ainvoke([HumanMessage(content=synthesis_prompt)])
@@ -394,7 +536,7 @@ class LangGraphWorkflowService:
             state["recommendations"] = recommendations
             state["processing_steps"] = processing_steps
 
-            logger.info("Synthesis completed")
+            logger.info("Synthesis completed with enhanced structure")
 
             return state
 
@@ -449,13 +591,31 @@ class LangGraphWorkflowService:
         if state["errors"]:
             return "error"
 
-        # Check if we need regulatory analysis
         query_lower = state["query"].lower()
+
+        # Check if this is a crop feasibility question
+        if any(word in query_lower for word in ["planter", "cultiver", "culture de", "peut-on", "possible"]):
+            return "crop_feasibility"
+
+        # Check if we need regulatory analysis
         if any(word in query_lower for word in ["produit", "traitement", "conformité"]):
             return "regulatory"
 
         # Check if we need farm data
         if any(word in query_lower for word in ["parcelle", "exploitation"]):
+            return "farm_data"
+
+        return "synthesis"
+
+    def _route_after_feasibility(self, state: AgriculturalWorkflowState) -> str:
+        """Route after crop feasibility check"""
+        if state["errors"]:
+            return "error"
+
+        query_lower = state["query"].lower()
+
+        # Check if we need farm data for regional alternatives
+        if any(word in query_lower for word in ["région", "local", "alternative"]):
             return "farm_data"
 
         return "synthesis"
@@ -548,3 +708,124 @@ class LangGraphWorkflowService:
             ],
             "supported_agent_types": ["weather", "regulatory", "farm_data", "general"]
         }
+
+    def _format_weather_data(self, weather_data: Optional[Dict[str, Any]]) -> str:
+        """Format weather data for synthesis prompt"""
+        if not weather_data:
+            return "**Données météo**: Non disponibles"
+
+        try:
+            formatted = "**DONNÉES MÉTÉOROLOGIQUES:**\n"
+            if isinstance(weather_data, dict):
+                if "location" in weather_data:
+                    formatted += f"- Localisation: {weather_data['location']}\n"
+                if "temperature" in weather_data:
+                    formatted += f"- Température actuelle: {weather_data['temperature']}°C\n"
+                if "forecast" in weather_data and isinstance(weather_data["forecast"], list):
+                    temps = [f["temperature"] for f in weather_data["forecast"] if "temperature" in f]
+                    if temps:
+                        formatted += f"- Température min/max prévue: {min(temps)}°C / {max(temps)}°C\n"
+                if "conditions" in weather_data:
+                    formatted += f"- Conditions: {weather_data['conditions']}\n"
+            return formatted
+        except Exception as e:
+            return f"**Données météo**: Disponibles mais erreur de formatage ({str(e)})"
+
+    def _format_regulatory_data(self, regulatory_status: Optional[Dict[str, Any]]) -> str:
+        """Format regulatory data for synthesis prompt"""
+        if not regulatory_status:
+            return "**Statut réglementaire**: Non vérifié"
+
+        try:
+            formatted = "**STATUT RÉGLEMENTAIRE:**\n"
+            if isinstance(regulatory_status, dict):
+                if "products_checked" in regulatory_status:
+                    formatted += f"- Produits vérifiés: {', '.join(regulatory_status['products_checked'])}\n"
+                if "compliant" in regulatory_status:
+                    status = "✅ Conforme" if regulatory_status["compliant"] else "❌ Non conforme"
+                    formatted += f"- Conformité: {status}\n"
+            return formatted
+        except Exception as e:
+            return f"**Statut réglementaire**: Erreur de formatage ({str(e)})"
+
+    def _format_farm_data(self, farm_data: Optional[Dict[str, Any]]) -> str:
+        """Format farm data for synthesis prompt"""
+        if not farm_data:
+            return "**Données d'exploitation**: Non disponibles"
+
+        try:
+            formatted = "**DONNÉES D'EXPLOITATION:**\n"
+            if isinstance(farm_data, dict):
+                if "exploitation_name" in farm_data:
+                    formatted += f"- Exploitation: {farm_data['exploitation_name']}\n"
+                if "parcelles_count" in farm_data:
+                    formatted += f"- Nombre de parcelles: {farm_data['parcelles_count']}\n"
+                if "interventions_count" in farm_data:
+                    formatted += f"- Interventions enregistrées: {farm_data['interventions_count']}\n"
+                if "regional_crops" in farm_data:
+                    crops = [c["crop"] for c in farm_data["regional_crops"][:5]]
+                    formatted += f"- Cultures régionales courantes: {', '.join(crops)}\n"
+            return formatted
+        except Exception as e:
+            return f"**Données d'exploitation**: Erreur de formatage ({str(e)})"
+
+    def _format_feasibility_data(self, feasibility_data: Optional[Dict[str, Any]]) -> str:
+        """Format crop feasibility data for synthesis prompt"""
+        if not feasibility_data:
+            return "**Analyse de faisabilité**: Non effectuée"
+
+        try:
+            formatted = "**ANALYSE DE FAISABILITÉ:**\n"
+            if isinstance(feasibility_data, dict):
+                if "crop" in feasibility_data:
+                    formatted += f"- Culture: {feasibility_data['crop']}\n"
+                if "location" in feasibility_data:
+                    formatted += f"- Localisation: {feasibility_data['location']}\n"
+                if "is_feasible" in feasibility_data:
+                    status = "✅ Faisable" if feasibility_data["is_feasible"] else "❌ Difficile/Impossible en pleine terre"
+                    formatted += f"- Faisabilité: {status}\n"
+                if "feasibility_score" in feasibility_data:
+                    formatted += f"- Score de faisabilité: {feasibility_data['feasibility_score']}/10\n"
+                if "limiting_factors" in feasibility_data and feasibility_data["limiting_factors"]:
+                    formatted += f"- Facteurs limitants: {', '.join(feasibility_data['limiting_factors'])}\n"
+                if "climate_data" in feasibility_data:
+                    climate = feasibility_data["climate_data"]
+                    if "temp_min_annual" in climate:
+                        formatted += f"- Température minimale annuelle: {climate['temp_min_annual']}°C\n"
+                    if "frost_days" in climate:
+                        formatted += f"- Jours de gel par an: {climate['frost_days']}\n"
+                if "alternatives" in feasibility_data and feasibility_data["alternatives"]:
+                    alt_names = [a.get("name", a) if isinstance(a, dict) else a for a in feasibility_data["alternatives"][:3]]
+                    formatted += f"- Alternatives recommandées: {', '.join(alt_names)}\n"
+            return formatted
+        except Exception as e:
+            return f"**Analyse de faisabilité**: Erreur de formatage ({str(e)})"
+
+    def _extract_location_from_query(self, query: str) -> str:
+        """Extract location from query text"""
+        import re
+        # Look for "à [location]" or "en [location]" patterns
+        patterns = [
+            r'à\s+([A-Z][a-zéèêàâôûù]+(?:\s+[A-Z][a-zéèêàâôûù]+)?)',
+            r'en\s+([A-Z][a-zéèêàâôûù]+)',
+            r'dans\s+(?:le|la|les)\s+([A-Z][a-zéèêàâôûù]+)'
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, query)
+            if match:
+                return match.group(1)
+        return "France"
+
+    def _extract_crop_from_query(self, query: str) -> str:
+        """Extract crop name from query text"""
+        import re
+        # Look for "planter/cultiver [crop]" patterns
+        patterns = [
+            r'(?:planter|cultiver|culture\s+de|culture\s+du)\s+([a-zéèêàâôûù]+)',
+            r'(?:du|de\s+la|des)\s+([a-zéèêàâôûù]+)'
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, query.lower())
+            if match:
+                return match.group(1)
+        return ""

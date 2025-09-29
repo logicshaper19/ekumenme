@@ -346,16 +346,26 @@ class AdvancedLangChainService:
     def _initialize_agent_executor(self):
         """Initialize agent executor with tools"""
         try:
-            # Create agent prompt
+            # Import enhanced prompts
+            from app.prompts.base_prompts import BASE_AGRICULTURAL_SYSTEM_PROMPT, RESPONSE_FORMAT_TEMPLATE
+
+            # Create agent prompt with enhanced personality and structure
             prompt = ChatPromptTemplate.from_messages([
-                ("system", """Tu es un expert agricole français spécialisé dans:
-                - La conformité réglementaire (EPHY, AMM, ZNT)
-                - L'analyse météorologique pour l'agriculture
-                - La gestion des données d'exploitation (MesParcelles)
-                - Les recommandations de traitement et d'intervention
-                
-                Utilise les outils disponibles pour fournir des réponses précises et conformes.
-                Toujours vérifier la conformité réglementaire avant de recommander des produits.
+                ("system", f"""{BASE_AGRICULTURAL_SYSTEM_PROMPT}
+
+OUTILS DISPONIBLES:
+Tu as accès à des outils spécialisés pour:
+- Données météorologiques (get_weather_data)
+- Conformité réglementaire (check_regulatory_compliance, lookup_amm_database)
+- Données d'exploitation (get_farm_data, calculate_performance_metrics)
+- Diagnostic phytosanitaire (diagnose_crop_disease, identify_pest, analyze_nutrient_deficiency)
+- Planification (generate_planning_tasks)
+- Analyse des risques (analyze_weather_risks)
+- Durabilité (calculate_carbon_footprint)
+
+UTILISE CES OUTILS de manière proactive pour enrichir tes réponses avec des données réelles.
+
+{RESPONSE_FORMAT_TEMPLATE}
                 """),
                 ("user", "{input}"),
                 MessagesPlaceholder(variable_name="agent_scratchpad"),

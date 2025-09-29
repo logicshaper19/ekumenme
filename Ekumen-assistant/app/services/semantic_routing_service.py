@@ -146,6 +146,23 @@ class SemanticRoutingService:
                     r"suivi.*intervention"
                 ],
                 "confidence_boost": 0.15
+            },
+            "crop_feasibility": {
+                "keywords": [
+                    "planter", "cultiver", "culture", "peut-on", "possible", "faisable",
+                    "adapter", "convient", "réussir", "climat", "zone", "rusticité",
+                    "plant", "grow", "cultivation", "feasible", "suitable", "climate"
+                ],
+                "patterns": [
+                    r"(planter|cultiver).*à.*",
+                    r"peut-on.*(planter|cultiver)",
+                    r"est-il possible.*culture",
+                    r"(culture|plantation).*dans.*",
+                    r"adapter.*climat",
+                    r"zone.*rusticité"
+                ],
+                "confidence_boost": 0.3,
+                "mandatory_tools": ["get_weather_data", "check_crop_feasibility"]
             }
         }
     
