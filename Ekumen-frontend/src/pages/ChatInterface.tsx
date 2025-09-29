@@ -97,6 +97,8 @@ const ChatInterface: React.FC = () => {
 
   // Initialize conversation only once when component mounts and user is authenticated
   useEffect(() => {
+    let mounted = true
+
     if (!isAuthenticated) {
       return
     }
@@ -104,25 +106,35 @@ const ChatInterface: React.FC = () => {
     // Only create conversation if we don't have one and aren't already creating one
     if (!conversationId && !isCreatingConversation) {
       const initializeChat = async () => {
+        if (!mounted) return
+
         console.log('Initializing chat conversation...')
         const newConversationId = await createConversation()
-        if (!newConversationId) {
+        if (!newConversationId || !mounted) {
           console.error('Failed to create conversation')
           return
         }
 
-        setConversationId(newConversationId)
-        console.log('Connecting to conversation:', newConversationId)
+        if (mounted) {
+          setConversationId(newConversationId)
+          console.log('Connecting to conversation:', newConversationId)
 
-        // Wait a bit for the conversation to be fully created before connecting
-        setTimeout(() => {
-          webSocket.joinConversation(newConversationId)
-        }, 100)
+          // Wait a bit for the conversation to be fully created before connecting
+          setTimeout(() => {
+            if (mounted) {
+              webSocket.joinConversation(newConversationId)
+            }
+          }, 100)
+        }
       }
 
       initializeChat()
     }
-  }, [isAuthenticated, conversationId, isCreatingConversation])
+
+    return () => {
+      mounted = false
+    }
+  }, []) // Empty dependency array - run once only
 
   // Set up WebSocket event listeners (separate effect)
   useEffect(() => {

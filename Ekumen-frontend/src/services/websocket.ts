@@ -198,10 +198,22 @@ class WebSocketService {
   }
 
   joinConversation(conversationId: string) {
-    if (!this.conversationId) {
-      this.connect(conversationId)
-    } else if (this.conversationId !== conversationId) {
+    // If already connected to this conversation, do nothing
+    if (this.conversationId === conversationId && this.isConnected()) {
+      console.log('Already connected to this conversation:', conversationId)
+      return
+    }
+
+    // Disconnect existing connection if different conversation
+    if (this.conversationId && this.conversationId !== conversationId) {
+      console.log('Switching conversations, disconnecting from:', this.conversationId)
       this.disconnect()
+      // Add a small delay before reconnecting
+      setTimeout(() => {
+        this.connect(conversationId)
+      }, 200)
+    } else {
+      // First connection or reconnection to same conversation
       this.connect(conversationId)
     }
   }
@@ -364,6 +376,10 @@ class WebSocketService {
 
   disconnect() {
     if (this.socket) {
+      // Prevent reconnection attempts
+      this.reconnectAttempts = this.maxReconnectAttempts
+
+      console.log('Disconnecting WebSocket')
       this.socket.close()
       this.socket = null
       this.conversationId = null
