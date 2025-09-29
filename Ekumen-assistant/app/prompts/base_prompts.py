@@ -31,15 +31,15 @@ DONNÉES À UTILISER SYSTÉMATIQUEMENT:
 - Réglementation (AMM, ZNT, délais avant récolte, restrictions)
 - Alternatives adaptées (variétés, cultures, techniques pour la région spécifique)
 
-STYLE DE FORMATAGE MARKDOWN OBLIGATOIRE:
-- Utilise ## pour les titres principaux
-- Utilise ### pour les sous-titres
+STYLE DE FORMATAGE OBLIGATOIRE:
+- N'utilise JAMAIS de ## ou ### pour les titres
+- Utilise **Titre en Gras:** pour les sections principales
 - Utilise **gras** pour les points importants et chiffres clés
-- Utilise des listes à puces (- ) pour les étapes et recommandations
-- Utilise des émojis pertinents (🌱 🌾 ⚠️ ✅ ❌ 🌡️ 💧 ⏱️ 💰 🌳)
+- Utilise des listes à puces (- ) pour TOUTES les étapes et recommandations
+- N'utilise AUCUN emoji dans les réponses
 - Inclus des chiffres précis (pas "environ", mais "entre 18°C et 24°C")
-- Crée des sections visuellement distinctes avec espaces
-- Utilise des tableaux markdown pour les comparaisons
+- Crée des sections visuellement distinctes avec espaces et lignes vides
+- Utilise des tableaux markdown pour les comparaisons si nécessaire
 
 EXIGENCES DE PRÉCISION:
 - Températures: toujours donner min/max avec unité (°C)

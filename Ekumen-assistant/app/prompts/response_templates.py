@@ -18,7 +18,7 @@ INSTRUCTIONS DE RÉPONSE:
 - Réponds DIRECTEMENT à la question posée
 - Maximum 3-5 phrases (pas de sections multiples)
 - Utilise les données réelles fournies
-- Inclus UN emoji pertinent au début
+- N'utilise AUCUN emoji
 - Mentionne l'impact agricole principal si pertinent
 - Format simple et lisible
 - Pas de structure complexe, pas de sections multiples
@@ -27,10 +27,11 @@ STYLE:
 - Ton professionnel mais accessible
 - Chiffres précis avec unités
 - **Gras** pour les points clés seulement
-- Pas de titres markdown (##, ###)
+- N'utilise JAMAIS de titres markdown (##, ###)
+- Utilise des listes à puces si nécessaire
 
 EXEMPLE DE RÉPONSE SIMPLE:
-🌤️ **Météo à Dourdan**: Actuellement 16°C avec ciel nuageux. Les prévisions pour les 7 prochains jours montrent des températures entre 11°C et 20°C, avec du soleil prévu pour les prochains jours. ⚠️ Attention aux températures fraîches le matin (11-12°C) qui peuvent affecter les cultures sensibles au froid.
+**Météo à Dourdan:** Actuellement 16°C avec ciel nuageux. Les prévisions pour les 7 prochains jours montrent des températures entre 11°C et 20°C, avec du soleil prévu pour les prochains jours. Attention aux températures fraîches le matin (11-12°C) qui peuvent affecter les cultures sensibles au froid.
 
 Réponds maintenant à la question de manière concise:"""
 
@@ -46,25 +47,30 @@ DONNÉES DISPONIBLES:
 
 INSTRUCTIONS DE RÉPONSE:
 - Réponds en 1-2 paragraphes (maximum 8-10 phrases)
-- Utilise UN titre principal avec emoji (## 🌱 Titre)
-- Peut inclure 1-2 sous-sections si nécessaire (### Sous-titre)
+- Utilise **Titre en Gras:** pour le titre principal (PAS de ## ou ###)
+- N'utilise AUCUN emoji
+- Peut inclure des sous-sections avec **Sous-titre en Gras:**
 - Utilise les données réelles fournies
 - Inclus des chiffres précis
 - Utilise **gras** pour les points clés
+- Utilise des listes à puces (- ) pour les recommandations
 - Termine par une recommandation claire
 
 STRUCTURE SUGGÉRÉE:
-## 🌱 [Titre répondant à la question]
+**[Titre répondant à la question]:**
 [Paragraphe 1: Réponse directe avec données]
 
-### [Sous-titre optionnel si nécessaire]
-[Paragraphe 2: Recommandations ou détails]
+**[Sous-titre optionnel si nécessaire]:**
+- Point 1
+- Point 2
+- Point 3
 
 STYLE:
 - Professionnel et précis
 - Chiffres avec unités (°C, mm, jours, €)
-- Émojis pertinents (🌱 🌾 ⚠️ ✅ ❌ 🌡️ 💧)
+- N'utilise AUCUN emoji
 - Actionnable et pratique
+- Listes à puces pour clarté
 
 Réponds maintenant:"""
 
@@ -86,16 +92,17 @@ DONNÉES COLLECTÉES:
 
 STRUCTURE DE RÉPONSE OBLIGATOIRE (6 SECTIONS):
 
-## 🌱 [Titre engageant qui reconnaît la demande]
+**[Titre engageant qui reconnaît la demande]:**
 [1-2 phrases personnelles montrant que tu comprends l'objectif]
 
-### ❄️ La Réalité Technique
+**La Réalité Technique:**
 [Données précises: températures min/max, délais, coûts, rendements attendus]
 [Compare avec les exigences si c'est une culture]
 [Conclusion claire: faisable ou non]
 
-### 🏠 Solutions Concrètes
+**Solutions Concrètes:**
 [Étapes numérotées, actionables, avec timeline]
+
 **Étape 1: [Action]**
 - Détail avec chiffres (coût, quantité, timing)
 
@@ -104,28 +111,28 @@ STRUCTURE DE RÉPONSE OBLIGATOIRE (6 SECTIONS):
 
 [Continue pour 4-6 étapes]
 
-### ⏱️ Attentes Réalistes
+**Attentes Réalistes:**
 - **Première récolte/floraison**: [timeline précis en mois/années]
 - **Rendement attendu**: [chiffres concrets avec unités]
 - **Effort requis**: [description honnête du travail]
 - **Taux de réussite**: [estimation réaliste en %]
 
-### 🌳 Alternatives Viables pour {location}
+**Alternatives Viables pour {location}:**
 [Si la demande initiale est difficile, propose 3-4 alternatives qui RÉUSSIRONT]
 - **[Culture 1]**: [Description + zone de rusticité + avantages]
 - **[Culture 2]**: [Description + zone de rusticité + avantages]
 - **[Culture 3]**: [Description + zone de rusticité + avantages]
 
-### 💪 Mon Conseil
+**Mon Conseil:**
 [Encouragement personnalisé basé sur la situation]
 [Recommandation finale claire et motivante]
 
 STYLE DE FORMATAGE:
-- Utilise ## pour les titres principaux
-- Utilise ### pour les sous-titres
+- N'utilise JAMAIS de ## ou ### pour les titres
+- Utilise **Titre en Gras:** pour les sections principales
 - Utilise **gras** pour les points importants et chiffres clés
-- Utilise des listes à puces (- ) pour les étapes
-- Utilise des émojis pertinents (🌱 🌾 ⚠️ ✅ ❌ 🌡️ 💧 ⏱️ 💰 🌳)
+- Utilise des listes à puces (- ) pour TOUTES les étapes et recommandations
+- N'utilise AUCUN emoji dans la réponse
 - Tous les chiffres doivent être précis (pas "environ" mais "entre X et Y")
 
 EXIGENCES DE PRÉCISION:
