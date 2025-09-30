@@ -191,13 +191,40 @@ class EnhancedPestService:
                 input_data.bbch_stage
             )
             
-            # Step 5: Calculate overall confidence
+            # Step 5: Check if we have high-confidence identifications
+            if not enhanced_identifications:
+                # No high-confidence results - return failure with guidance
+                logger.warning(f"No high-confidence pest identifications for {crop.name_fr}")
+                return PestIdentificationOutput(
+                    success=False,
+                    crop_type=crop.name_fr,
+                    crop_eppo_code=crop.eppo_code,
+                    crop_category=crop.category,
+                    damage_symptoms=input_data.damage_symptoms,
+                    pest_indicators=input_data.pest_indicators,
+                    bbch_stage=input_data.bbch_stage,
+                    pest_identifications=[],
+                    identification_confidence=ConfidenceLevel.LOW,
+                    treatment_recommendations=[
+                        "⚠️ Confiance insuffisante pour identification spécifique",
+                        f"Ravageurs communs pour {crop.category}: {', '.join(risk_profile.common_pests[:3]) if risk_profile else 'non disponible'}",
+                        "Recommandation: Consultation avec expert phytosanitaire",
+                        "Surveillance accrue et collecte d'échantillons recommandée"
+                    ],
+                    total_identifications=0,
+                    data_source="insufficient_confidence",
+                    timestamp=datetime.now(),
+                    error="Confiance insuffisante pour identification spécifique (< 50%)",
+                    error_type="low_confidence"
+                )
+
+            # Step 6: Calculate overall confidence
             overall_confidence = self._calculate_overall_confidence(enhanced_identifications)
-            
-            # Step 6: Consolidate treatment recommendations
-            treatment_recommendations = self._consolidate_treatments(enhanced_identifications)
-            
-            # Step 7: Build output
+
+            # Step 7: Consolidate treatment recommendations with context
+            treatment_recommendations = self._consolidate_treatments_with_context(enhanced_identifications)
+
+            # Step 8: Build success output
             output = PestIdentificationOutput(
                 success=True,
                 crop_type=crop.name_fr,
@@ -344,26 +371,6 @@ class EnhancedPestService:
         # Filter by minimum confidence threshold
         identifications = [p for p in identifications if p.confidence >= MIN_CONFIDENCE_THRESHOLD]
 
-        # Add category-based insights if no high-confidence results
-        if not identifications and risk_profile:
-            logger.warning("No high-confidence pest identifications - providing category-based guidance")
-            identifications.append(
-                PestIdentification(
-                    pest_name=f"Analyse incertaine - Ravageurs communs ({risk_profile.category})",
-                    scientific_name=None,
-                    pest_type=PestType.UNKNOWN,
-                    confidence=0.3,  # Below threshold - informational only
-                    severity=PestSeverity.MODERATE,
-                    damage_patterns=[],
-                    treatment_recommendations=[
-                        "⚠️ Confiance insuffisante pour recommandations spécifiques",
-                        f"Surveiller: {', '.join(risk_profile.common_pests[:3])}",
-                        "Recommandation: Consultation avec expert phytosanitaire"
-                    ],
-                    prevention_measures=risk_profile.prevention_strategies or []
-                )
-            )
-
         return identifications
     
     def _calculate_overall_confidence(self, identifications: List[PestIdentification]) -> ConfidenceLevel:
@@ -383,11 +390,74 @@ class EnhancedPestService:
             return ConfidenceLevel.LOW
     
     def _consolidate_treatments(self, identifications: List[PestIdentification]) -> List[str]:
-        """Consolidate treatment recommendations"""
+        """Consolidate treatment recommendations (legacy - use _consolidate_treatments_with_context)"""
         treatments = set()
         for identification in identifications:
             treatments.update(identification.treatment_recommendations)
         return list(treatments)
+
+    def _consolidate_treatments_with_context(self, identifications: List[PestIdentification]) -> List[str]:
+        """Consolidate treatments with context preservation and prioritization"""
+        treatments = []
+
+        # Group by severity and confidence
+        critical_pests = [p for p in identifications if p.severity == PestSeverity.CRITICAL]
+        high_severity = [p for p in identifications if p.severity == PestSeverity.HIGH]
+        high_confidence = [p for p in identifications if p.confidence >= 0.7]
+
+        # 1. Critical pests first
+        if critical_pests:
+            pest = critical_pests[0]
+            treatments.append(f"🚨 PRIORITÉ CRITIQUE: {pest.pest_name} (confiance: {pest.confidence:.0%})")
+            if pest.treatment_recommendations:
+                treatments.extend(pest.treatment_recommendations[:2])
+
+            # Economic threshold warning
+            if pest.economic_threshold:
+                treatments.append(f"⚠️ Seuil d'intervention: {pest.economic_threshold}")
+                treatments.append("Vérifier si seuil dépassé avant traitement")
+
+        # 2. High severity pests
+        elif high_severity:
+            for pest in high_severity[:2]:  # Top 2
+                treatments.append(f"• {pest.pest_name} (confiance: {pest.confidence:.0%})")
+                if pest.treatment_recommendations:
+                    treatments.append(f"  → {pest.treatment_recommendations[0]}")
+
+                # Economic threshold
+                if pest.economic_threshold:
+                    treatments.append(f"  → Seuil: {pest.economic_threshold}")
+
+        # 3. High confidence pests
+        elif high_confidence:
+            for pest in high_confidence[:2]:  # Top 2
+                treatments.append(f"• {pest.pest_name} (confiance: {pest.confidence:.0%})")
+                if pest.treatment_recommendations:
+                    treatments.append(f"  → {pest.treatment_recommendations[0]}")
+
+        # 4. Natural enemies warning (check all pests)
+        natural_enemies_found = []
+        for pest in identifications:
+            if pest.natural_enemies:
+                natural_enemies_found.extend(pest.natural_enemies)
+
+        if natural_enemies_found:
+            unique_enemies = list(set(natural_enemies_found))[:3]
+            treatments.append(f"🐞 Auxiliaires présents: {', '.join(unique_enemies)}")
+            treatments.append("⚠️ Favoriser lutte biologique - éviter insecticides à large spectre")
+
+        # 5. Monitoring methods
+        monitoring_methods = []
+        for pest in identifications[:2]:  # Top 2 pests
+            if pest.monitoring_methods:
+                monitoring_methods.extend(pest.monitoring_methods)
+
+        if monitoring_methods:
+            unique_methods = list(set(monitoring_methods))[:2]
+            treatments.append(f"📊 Surveillance: {', '.join(unique_methods)}")
+
+        # Limit to 10 recommendations
+        return treatments[:10]
 
 
 
