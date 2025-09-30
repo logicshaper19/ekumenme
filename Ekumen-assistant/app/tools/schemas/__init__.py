@@ -84,7 +84,14 @@ from app.tools.schemas.environmental_schemas import (
     ZNTCompliance,
     EnvironmentalImpactData,
     EnvironmentalImpactLevel,
-    RiskLevel as EnvironmentalRiskLevel
+    RiskLevel as EnvironmentalRiskLevel,
+    ProductEnvironmentalData,
+    CumulativeImpactAssessment,
+    GroundwaterRiskAssessment,
+    WaterBodyClassification,
+    WaterBodyType,
+    EquipmentDriftClass,
+    GroundwaterVulnerability
 )
 
 __all__ = [
@@ -155,5 +162,12 @@ __all__ = [
     "EnvironmentalImpactData",
     "EnvironmentalImpactLevel",
     "EnvironmentalRiskLevel",
+    "ProductEnvironmentalData",
+    "CumulativeImpactAssessment",
+    "GroundwaterRiskAssessment",
+    "WaterBodyClassification",
+    "WaterBodyType",
+    "EquipmentDriftClass",
+    "GroundwaterVulnerability",
 ]
 

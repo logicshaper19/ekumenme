@@ -59,28 +59,81 @@ class RegulationType(str, Enum):
     NATURA_2000 = "natura_2000"
 
 
+class WaterBodyType(str, Enum):
+    """Type of water body"""
+    DRINKING_WATER_SOURCE = "drinking_water_source"
+    PERMANENT_STREAM = "permanent_stream"
+    INTERMITTENT_STREAM = "intermittent_stream"
+    DRAINAGE_DITCH = "drainage_ditch"
+    LAKE_POND = "lake_pond"
+    WETLAND = "wetland"
+    UNKNOWN = "unknown"
+
+
+class EquipmentDriftClass(str, Enum):
+    """Anti-drift equipment classification"""
+    NO_EQUIPMENT = "no_equipment"
+    ONE_STAR = "1_star"
+    THREE_STAR = "3_star"
+    FIVE_STAR = "5_star"
+
+
+class GroundwaterVulnerability(str, Enum):
+    """Groundwater vulnerability level"""
+    LOW = "low"
+    MODERATE = "moderate"
+    HIGH = "high"
+    VERY_HIGH = "very_high"
+
+
 # ============================================================================
 # INPUT SCHEMAS
 # ============================================================================
 
 class EnvironmentalImpactData(BaseModel):
-    """Environmental impact assessment data"""
+    """Environmental impact assessment data - ENHANCED"""
     impact_level: EnvironmentalImpactLevel = Field(
         default=EnvironmentalImpactLevel.MODERATE,
         description="Overall environmental impact level"
     )
+
+    # Water proximity - ENHANCED
     water_proximity_m: Optional[float] = Field(
         default=None,
         description="Distance to nearest water body in meters"
     )
+    water_body_type: WaterBodyType = Field(
+        default=WaterBodyType.UNKNOWN,
+        description="Type of water body (permanent stream, drinking water, etc.)"
+    )
+    water_body_width_m: Optional[float] = Field(
+        default=None,
+        description="Width of water body in meters"
+    )
+
+    # Sensitive areas
     sensitive_area: bool = Field(
         default=False,
         description="Whether the area is environmentally sensitive (Natura 2000, etc.)"
     )
+    natura_2000_site_code: Optional[str] = Field(
+        default=None,
+        description="Natura 2000 site code if applicable"
+    )
+
+    # Phenology
     flowering_period: bool = Field(
         default=False,
         description="Whether crops/plants are in flowering period"
     )
+    bbch_stage: Optional[int] = Field(
+        default=None,
+        ge=0,
+        le=99,
+        description="BBCH growth stage (0-99)"
+    )
+
+    # Weather - ENHANCED
     wind_speed_kmh: Optional[float] = Field(
         default=None,
         description="Wind speed in km/h"
@@ -89,9 +142,57 @@ class EnvironmentalImpactData(BaseModel):
         default=None,
         description="Temperature in Celsius"
     )
+    humidity_percent: Optional[float] = Field(
+        default=None,
+        ge=0,
+        le=100,
+        description="Relative humidity percentage"
+    )
+    rain_forecast_48h: bool = Field(
+        default=False,
+        description="Rain forecast within 48 hours"
+    )
+    temperature_inversion: bool = Field(
+        default=False,
+        description="Temperature inversion conditions (early morning risk)"
+    )
+
+    # Soil - ENHANCED
     soil_type: Optional[str] = Field(
         default=None,
         description="Soil type (sandy, clay, loam, etc.)"
+    )
+    soil_moisture_level: Optional[str] = Field(
+        default=None,
+        description="Soil moisture level (dry, moist, saturated)"
+    )
+    depth_to_groundwater_m: Optional[float] = Field(
+        default=None,
+        description="Depth to groundwater table in meters"
+    )
+
+    # Equipment
+    drift_reduction_equipment: EquipmentDriftClass = Field(
+        default=EquipmentDriftClass.NO_EQUIPMENT,
+        description="Anti-drift equipment class (1-star, 3-star, 5-star)"
+    )
+    has_vegetation_buffer: bool = Field(
+        default=False,
+        description="Presence of vegetation buffer strip"
+    )
+
+    # Neighbors
+    organic_farm_nearby: bool = Field(
+        default=False,
+        description="Organic farm within 50m"
+    )
+    beehives_nearby: bool = Field(
+        default=False,
+        description="Beehives within 200m"
+    )
+    habitation_distance_m: Optional[float] = Field(
+        default=None,
+        description="Distance to nearest habitation in meters"
     )
 
 
@@ -189,8 +290,68 @@ class EnvironmentalRisk(BaseModel):
     )
 
 
+class ProductEnvironmentalData(BaseModel):
+    """Product environmental fate and ecotoxicology data"""
+    amm_code: str = Field(description="AMM code")
+    product_name: str = Field(description="Product name")
+
+    # Active substances
+    active_substances: List[str] = Field(
+        default_factory=list,
+        description="List of active substance names"
+    )
+
+    # Persistence (not in current EPHY but should be)
+    soil_half_life_days: Optional[float] = Field(
+        default=None,
+        description="Soil degradation half-life in days (DT50)"
+    )
+    water_half_life_days: Optional[float] = Field(
+        default=None,
+        description="Water degradation half-life in days"
+    )
+
+    # Mobility
+    koc_value: Optional[float] = Field(
+        default=None,
+        description="Soil organic carbon partition coefficient (Koc)"
+    )
+    gus_index: Optional[float] = Field(
+        default=None,
+        description="Groundwater Ubiquity Score (GUS index)"
+    )
+    leaching_potential: Optional[str] = Field(
+        default=None,
+        description="Leaching potential (low, moderate, high)"
+    )
+
+    # Toxicity
+    aquatic_toxicity_level: Optional[str] = Field(
+        default=None,
+        description="Aquatic toxicity level (low, moderate, high, very high)"
+    )
+    bee_toxicity: Optional[str] = Field(
+        default=None,
+        description="Bee toxicity (not toxic, toxic, highly toxic)"
+    )
+
+    # Classification
+    is_cmr: bool = Field(
+        default=False,
+        description="Carcinogenic, Mutagenic, or Reprotoxic"
+    )
+    is_pbt: bool = Field(
+        default=False,
+        description="Persistent, Bioaccumulative, and Toxic"
+    )
+    is_vpvb: bool = Field(
+        default=False,
+        description="Very Persistent and Very Bioaccumulative"
+    )
+
+
 class ZNTCompliance(BaseModel):
-    """ZNT compliance details"""
+    """ZNT compliance details - ENHANCED"""
     required_znt_m: float = Field(description="Required ZNT distance in meters")
     actual_distance_m: Optional[float] = Field(
         default=None,
@@ -198,6 +359,8 @@ class ZNTCompliance(BaseModel):
     )
     is_compliant: bool = Field(description="Whether ZNT is respected")
     znt_type: str = Field(description="Type of ZNT (aquatic, arthropods, plants)")
+
+    # Enhanced reduction logic
     reduction_possible: bool = Field(
         default=False,
         description="Whether ZNT reduction is possible with equipment"
@@ -206,35 +369,157 @@ class ZNTCompliance(BaseModel):
         default=None,
         description="Conditions for ZNT reduction"
     )
+    equipment_class_required: Optional[EquipmentDriftClass] = Field(
+        default=None,
+        description="Minimum equipment class required for reduction"
+    )
+    max_reduction_percent: Optional[float] = Field(
+        default=None,
+        description="Maximum reduction percentage allowed"
+    )
+    minimum_absolute_znt_m: float = Field(
+        default=5.0,
+        description="Minimum absolute ZNT (cannot be reduced below this)"
+    )
+    reduced_znt_m: Optional[float] = Field(
+        default=None,
+        description="Reduced ZNT with equipment (if applicable)"
+    )
+    water_body_type: WaterBodyType = Field(
+        default=WaterBodyType.UNKNOWN,
+        description="Type of water body affecting ZNT requirements"
+    )
+
+
+class CumulativeImpactAssessment(BaseModel):
+    """Cumulative environmental impact assessment"""
+    total_applications_30days: int = Field(
+        default=0,
+        description="Number of applications in last 30 days"
+    )
+    total_active_substance_kg: float = Field(
+        default=0.0,
+        description="Total active substance applied (kg)"
+    )
+    soil_residue_risk: RiskLevel = Field(
+        description="Risk of soil residue accumulation"
+    )
+    water_contamination_risk: RiskLevel = Field(
+        description="Risk of water contamination"
+    )
+    cumulative_warnings: List[str] = Field(
+        default_factory=list,
+        description="Warnings about cumulative impacts"
+    )
+    recommended_waiting_period_days: Optional[int] = Field(
+        default=None,
+        description="Recommended waiting period before next application"
+    )
+
+
+class GroundwaterRiskAssessment(BaseModel):
+    """Groundwater vulnerability and contamination risk assessment"""
+    vulnerability_level: GroundwaterVulnerability = Field(
+        description="Groundwater vulnerability level"
+    )
+    contamination_risk: RiskLevel = Field(
+        description="Contamination risk level"
+    )
+    risk_factors: List[str] = Field(
+        default_factory=list,
+        description="Factors contributing to groundwater risk"
+    )
+    is_recharge_zone: bool = Field(
+        default=False,
+        description="Whether location is in aquifer recharge zone"
+    )
+    is_karst_area: bool = Field(
+        default=False,
+        description="Whether location is in karst area (direct infiltration)"
+    )
+    nearby_wells_springs: bool = Field(
+        default=False,
+        description="Presence of wells or springs nearby"
+    )
+    protective_measures: List[str] = Field(
+        default_factory=list,
+        description="Recommended protective measures"
+    )
+
+
+class WaterBodyClassification(BaseModel):
+    """Water body classification and protection requirements"""
+    water_body_type: WaterBodyType = Field(description="Type of water body")
+    base_znt_m: float = Field(description="Base ZNT requirement in meters")
+    reduction_allowed: bool = Field(
+        default=True,
+        description="Whether ZNT reduction is allowed"
+    )
+    special_protections: List[str] = Field(
+        default_factory=list,
+        description="Special protection requirements"
+    )
+    is_drinking_water_source: bool = Field(
+        default=False,
+        description="Whether it's a drinking water source"
+    )
+    is_fish_bearing: bool = Field(
+        default=False,
+        description="Whether it contains fish populations"
+    )
 
 
 class EnvironmentalRegulationsOutput(BaseModel):
-    """Output schema for environmental regulations check"""
-    
+    """Output schema for environmental regulations check - ENHANCED"""
+
     success: bool = Field(description="Whether the request was successful")
     practice_type: str = Field(description="Practice type checked")
     location: Optional[str] = Field(
         default=None,
         description="Location checked"
     )
-    
+
     # Regulations
     environmental_regulations: List[EnvironmentalRegulation] = Field(
         default_factory=list,
         description="Environmental regulations applicable"
     )
-    
+
     # Risk assessment
     environmental_risk: EnvironmentalRisk = Field(
         description="Environmental risk assessment"
     )
-    
-    # ZNT compliance (from database)
+
+    # ZNT compliance (from database) - ENHANCED
     znt_compliance: Optional[List[ZNTCompliance]] = Field(
         default=None,
         description="ZNT compliance details from EPHY database"
     )
-    
+
+    # NEW: Product environmental data
+    product_environmental_data: Optional[List[ProductEnvironmentalData]] = Field(
+        default=None,
+        description="Environmental fate and ecotoxicology data for products"
+    )
+
+    # NEW: Cumulative impact
+    cumulative_impact: Optional[CumulativeImpactAssessment] = Field(
+        default=None,
+        description="Cumulative environmental impact assessment"
+    )
+
+    # NEW: Groundwater risk
+    groundwater_risk: Optional[GroundwaterRiskAssessment] = Field(
+        default=None,
+        description="Groundwater vulnerability and contamination risk"
+    )
+
+    # NEW: Water body classification
+    water_body_classification: Optional[WaterBodyClassification] = Field(
+        default=None,
+        description="Water body classification and protection requirements"
+    )
+
     # Recommendations
     environmental_recommendations: List[str] = Field(
         default_factory=list,
@@ -244,7 +529,7 @@ class EnvironmentalRegulationsOutput(BaseModel):
         default_factory=list,
         description="Critical environmental warnings"
     )
-    
+
     # Summary
     total_regulations: int = Field(description="Total number of regulations checked")
     compliant_count: int = Field(
@@ -255,17 +540,29 @@ class EnvironmentalRegulationsOutput(BaseModel):
         default=0,
         description="Number of non-compliant regulations"
     )
-    
+
     # Seasonal restrictions
     seasonal_restrictions: Optional[List[str]] = Field(
         default=None,
         description="Seasonal restrictions based on application date"
     )
-    
+
+    # NEW: Weather-based restrictions
+    weather_restrictions: Optional[List[str]] = Field(
+        default=None,
+        description="Weather-based restrictions (temperature, humidity, rain forecast)"
+    )
+
+    # NEW: Neighbor considerations
+    neighbor_warnings: Optional[List[str]] = Field(
+        default=None,
+        description="Warnings about nearby organic farms, beehives, etc."
+    )
+
     # Error handling
     error: Optional[str] = Field(default=None, description="Error message if failed")
     error_type: Optional[str] = Field(default=None, description="Error type")
-    
+
     # Metadata
     timestamp: datetime = Field(
         default_factory=datetime.utcnow,
