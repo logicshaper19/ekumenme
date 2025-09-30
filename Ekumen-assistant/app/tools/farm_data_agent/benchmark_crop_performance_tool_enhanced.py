@@ -87,11 +87,28 @@ class EnhancedBenchmarkService:
                     error=f"Aucune donnée disponible pour la culture '{input_data.crop}'",
                     error_type="no_crop_data"
                 )
-            
+
+            # Check if we have real data to benchmark
+            warnings = []
+            if crop_metrics.average_yield is None:
+                warnings.append("⚠️ Aucune donnée de rendement réelle - Benchmark impossible")
+            if crop_metrics.average_quality is None:
+                warnings.append("⚠️ Aucune donnée de qualité disponible")
+
+            # Cannot benchmark without yield data
+            if crop_metrics.average_yield is None:
+                return BenchmarkOutput(
+                    success=False,
+                    crop=input_data.crop,
+                    error="Impossible de comparer sans données de rendement réelles",
+                    error_type="insufficient_data",
+                    warnings=warnings
+                )
+
             # Get industry benchmark
             industry_benchmark = self._get_industry_benchmark(input_data.crop)
-            
-            # Calculate performance metrics
+
+            # Calculate performance metrics (with None handling)
             performance_metrics = self._calculate_performance_metrics(
                 farm_yield=crop_metrics.average_yield,
                 farm_quality=crop_metrics.average_quality,
@@ -109,7 +126,7 @@ class EnhancedBenchmarkService:
             )
             
             logger.info(f"✅ Benchmarked {input_data.crop}: {performance_rank.value}")
-            
+
             return BenchmarkOutput(
                 success=True,
                 crop=input_data.crop,
@@ -120,7 +137,8 @@ class EnhancedBenchmarkService:
                 industry_benchmark=industry_benchmark,
                 performance_metrics=performance_metrics,
                 performance_rank=performance_rank,
-                benchmark_insights=benchmark_insights
+                benchmark_insights=benchmark_insights,
+                warnings=warnings
             )
             
         except Exception as e:
@@ -142,18 +160,35 @@ class EnhancedBenchmarkService:
 
     def _calculate_performance_metrics(
         self,
-        farm_yield: float,
-        farm_quality: float,
+        farm_yield: Optional[float],
+        farm_quality: Optional[float],
         benchmark: IndustryBenchmark
     ) -> PerformanceMetrics:
-        """Calculate performance metrics compared to benchmark"""
+        """
+        Calculate performance metrics compared to benchmark.
+
+        Handles None values for missing data.
+        farm_yield should not be None (checked before calling).
+        farm_quality can be None (quality not tracked yet).
+        """
+        # Calculate yield performance (farm_yield guaranteed not None by caller)
         yield_performance = (farm_yield / benchmark.yield_q_ha) * 100
-        quality_performance = (farm_quality / benchmark.quality_score) * 100
-        overall_performance = (yield_performance + quality_performance) / 2
-        
+
+        # Calculate quality performance (may be None)
+        quality_performance = None
+        if farm_quality is not None:
+            quality_performance = (farm_quality / benchmark.quality_score) * 100
+
+        # Calculate overall performance
+        if quality_performance is not None:
+            overall_performance = (yield_performance + quality_performance) / 2
+        else:
+            # If no quality data, overall = yield only
+            overall_performance = yield_performance
+
         return PerformanceMetrics(
             yield_performance_percent=round(yield_performance, 1),
-            quality_performance_percent=round(quality_performance, 1),
+            quality_performance_percent=round(quality_performance, 1) if quality_performance is not None else None,
             overall_performance_percent=round(overall_performance, 1)
         )
 

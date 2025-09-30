@@ -216,22 +216,27 @@ class IndustryBenchmark(BaseModel):
 
 
 class PerformanceMetrics(BaseModel):
-    """Performance metrics compared to benchmark"""
+    """
+    Performance metrics compared to benchmark.
+
+    quality_performance_percent is Optional because quality data may not be available.
+    """
     yield_performance_percent: float
-    quality_performance_percent: float
+    quality_performance_percent: Optional[float] = Field(default=None, description="None if no quality data available")
     overall_performance_percent: float
 
 
 class BenchmarkOutput(BaseModel):
     """Output schema for benchmark crop performance tool"""
-    
+
     success: bool = Field(default=True)
     crop: str
-    farm_performance: Dict[str, float] = Field(default_factory=dict)
+    farm_performance: Dict[str, Optional[float]] = Field(default_factory=dict)
     industry_benchmark: Optional[IndustryBenchmark] = None
     performance_metrics: Optional[PerformanceMetrics] = None
     performance_rank: Optional[PerformanceRank] = None
     benchmark_insights: List[str] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list, description="Data quality warnings")
     timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
     error: Optional[str] = None
     error_type: Optional[str] = None
