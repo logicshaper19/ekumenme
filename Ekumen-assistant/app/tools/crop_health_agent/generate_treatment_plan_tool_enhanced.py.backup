@@ -1,21 +1,21 @@
 """
-Enhanced Treatment Plan Generation Tool with Pydantic schemas, caching, and error handling
+Enhanced Treatment Plan Generation Tool
 
-Improvements over original:
-- ✅ Pydantic schemas for type safety
-- ✅ Redis caching with 30-min TTL
-- ✅ Async support
-- ✅ Granular error handling
-- ✅ Database integration (Crop table + EPPO codes)
-- ✅ Follows PoC pattern (Service class + StructuredTool)
+Integrates with Phase 2 database and enhanced crop health tools for:
+- Comprehensive treatment planning
+- Integration with disease, pest, and nutrient analyses
+- Crop-specific recommendations using Crop model
+- Cost analysis
+- Monitoring plans
+- Pydantic validation
+- Redis caching
 """
 
-import logging
 from typing import Optional, List, Dict, Any
+from langchain.tools import BaseTool
+import logging
 from datetime import datetime, timedelta
-
-from langchain.tools import StructuredTool
-from pydantic import ValidationError
+import asyncio
 
 from app.models.crop import Crop
 from app.tools.schemas.treatment_schemas import (
@@ -31,7 +31,8 @@ from app.tools.schemas.treatment_schemas import (
 )
 from app.tools.schemas.disease_schemas import DiseaseDiagnosisOutput
 from app.tools.schemas.pest_schemas import PestIdentificationOutput
-from app.core.cache import redis_cache
+from app.core.caching import redis_cache
+from app.core.errors import DataError, ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -48,11 +49,24 @@ TREATMENT_COSTS = {
 }
 
 
-class EnhancedTreatmentService:
-    """Service for treatment plan generation with caching and database integration"""
-
-    @redis_cache(ttl=1800, model_class=TreatmentPlanOutput, category="crop_health")
-    async def generate_treatment_plan(self, input_data: TreatmentPlanInput) -> TreatmentPlanOutput:
+class GenerateTreatmentPlanToolEnhanced(BaseTool):
+    """
+    Enhanced treatment plan generation tool with Phase 2 database integration.
+    
+    Features:
+    - Integrates disease, pest, and nutrient analyses
+    - Crop-specific recommendations using Crop model
+    - Comprehensive cost analysis
+    - Monitoring plans
+    - Pydantic validation
+    - Redis caching
+    """
+    
+    name: str = "generate_treatment_plan"
+    description: str = "Génère un plan de traitement complet intégrant maladies, ravageurs et carences"
+    
+    @redis_cache(ttl=1800, category="crop_health")
+    async def execute(self, input_data: TreatmentPlanInput) -> TreatmentPlanOutput:
         """
         Generate comprehensive treatment plan.
         
@@ -65,9 +79,12 @@ class EnhancedTreatmentService:
         try:
             # Step 1: Get crop from database
             crop = await self._get_crop_from_database(input_data.crop_type, input_data.eppo_code)
-
+            
             if not crop:
-                raise ValueError(f"Culture inconnue: {input_data.crop_type}")
+                raise DataError(
+                    f"Culture inconnue: {input_data.crop_type}",
+                    error_type="crop_not_found"
+                )
             
             # Step 2: Generate executive summary
             executive_summary = self._generate_executive_summary(
@@ -143,7 +160,7 @@ class EnhancedTreatmentService:
             
             return output
             
-        except ValueError as e:
+        except (DataError, ValidationError) as e:
             logger.error(f"Treatment plan generation error: {e}")
             return TreatmentPlanOutput(
                 success=False,
@@ -687,135 +704,79 @@ class EnhancedTreatmentService:
             return 3   # 3 days
         else:
             return 7   # Default 1 week
+    
+    def _run(self, **kwargs) -> str:
+        """Sync wrapper for LangChain compatibility"""
+        try:
+            input_data = TreatmentPlanInput(**kwargs)
+            
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                output = loop.run_until_complete(self.execute(input_data))
+                return output.model_dump_json(exclude_none=True)
+            finally:
+                loop.close()
+                
+        except Exception as e:
+            logger.error(f"Error in _run: {e}")
+            error_output = TreatmentPlanOutput(
+                success=False,
+                crop_type=kwargs.get("crop_type", "unknown"),
+                plan_metadata={},
+                executive_summary={},
+                treatment_steps=[],
+                treatment_schedule=[],
+                cost_analysis=CostAnalysis(
+                    total_estimated_cost_eur=0.0,
+                    cost_breakdown={}
+                ),
+                monitoring_plan=MonitoringPlan(
+                    monitoring_frequency="unknown",
+                    monitoring_methods=[],
+                    success_indicators=[],
+                    warning_signs=[]
+                ),
+                prevention_measures=[],
+                total_steps=0,
+                error=str(e),
+                error_type="execution_error"
+            )
+            return error_output.model_dump_json(exclude_none=True)
+    
+    async def _arun(self, **kwargs) -> str:
+        """Async wrapper for LangChain compatibility"""
+        try:
+            input_data = TreatmentPlanInput(**kwargs)
+            output = await self.execute(input_data)
+            return output.model_dump_json(exclude_none=True)
+        except Exception as e:
+            logger.error(f"Error in _arun: {e}")
+            error_output = TreatmentPlanOutput(
+                success=False,
+                crop_type=kwargs.get("crop_type", "unknown"),
+                plan_metadata={},
+                executive_summary={},
+                treatment_steps=[],
+                treatment_schedule=[],
+                cost_analysis=CostAnalysis(
+                    total_estimated_cost_eur=0.0,
+                    cost_breakdown={}
+                ),
+                monitoring_plan=MonitoringPlan(
+                    monitoring_frequency="unknown",
+                    monitoring_methods=[],
+                    success_indicators=[],
+                    warning_signs=[]
+                ),
+                prevention_measures=[],
+                total_steps=0,
+                error=str(e),
+                error_type="execution_error"
+            )
+            return error_output.model_dump_json(exclude_none=True)
 
 
-
-# Create service instance
-_service = EnhancedTreatmentService()
-
-
-# Async wrapper function
-async def generate_treatment_plan_enhanced(
-    crop_type: str,
-    eppo_code: Optional[str] = None,
-    disease_analysis: Optional[Dict[str, Any]] = None,
-    pest_analysis: Optional[Dict[str, Any]] = None,
-    nutrient_analysis: Optional[Dict[str, Any]] = None,
-    bbch_stage: Optional[int] = None,
-    organic_farming: Optional[bool] = False,
-    field_size_ha: Optional[float] = None,
-    budget_constraint: Optional[float] = None
-) -> str:
-    """
-    Generate comprehensive treatment plan integrating disease, pest, and nutrient analyses
-
-    Args:
-        crop_type: Type of crop (e.g., 'blé', 'maïs', 'colza')
-        eppo_code: Optional EPPO code for crop identification
-        disease_analysis: Optional disease diagnosis results
-        pest_analysis: Optional pest identification results
-        nutrient_analysis: Optional nutrient deficiency analysis results
-        bbch_stage: Optional BBCH growth stage (0-99)
-        organic_farming: Whether organic farming practices are required
-        field_size_ha: Optional field size in hectares
-        budget_constraint: Optional budget constraint in EUR
-
-    Returns:
-        JSON string with comprehensive treatment plan
-    """
-    try:
-        # Create input
-        input_data = TreatmentPlanInput(
-            crop_type=crop_type,
-            eppo_code=eppo_code,
-            disease_analysis=disease_analysis,
-            pest_analysis=pest_analysis,
-            nutrient_analysis=nutrient_analysis,
-            bbch_stage=bbch_stage,
-            organic_farming=organic_farming,
-            field_size_ha=field_size_ha,
-            budget_constraint=budget_constraint
-        )
-
-        # Execute treatment plan generation
-        result = await _service.generate_treatment_plan(input_data)
-
-        # Return JSON
-        return result.model_dump_json(indent=2)
-
-    except ValidationError as e:
-        logger.error(f"Treatment plan validation error: {e}")
-        error_result = TreatmentPlanOutput(
-            success=False,
-            crop_type=crop_type,
-            plan_metadata={},
-            executive_summary={},
-            treatment_steps=[],
-            treatment_schedule=[],
-            cost_analysis=CostAnalysis(
-                total_estimated_cost_eur=0.0,
-                cost_breakdown={}
-            ),
-            monitoring_plan=MonitoringPlan(
-                monitoring_frequency="unknown",
-                monitoring_methods=[],
-                success_indicators=[],
-                warning_signs=[]
-            ),
-            prevention_measures=[],
-            total_steps=0,
-            timestamp=datetime.now(),
-            error="Erreur de validation des paramètres. Vérifiez les analyses fournies.",
-            error_type="validation_error"
-        )
-        return error_result.model_dump_json(indent=2)
-
-    except Exception as e:
-        logger.error(f"Unexpected treatment plan error: {e}", exc_info=True)
-        error_result = TreatmentPlanOutput(
-            success=False,
-            crop_type=crop_type,
-            plan_metadata={},
-            executive_summary={},
-            treatment_steps=[],
-            treatment_schedule=[],
-            cost_analysis=CostAnalysis(
-                total_estimated_cost_eur=0.0,
-                cost_breakdown={}
-            ),
-            monitoring_plan=MonitoringPlan(
-                monitoring_frequency="unknown",
-                monitoring_methods=[],
-                success_indicators=[],
-                warning_signs=[]
-            ),
-            prevention_measures=[],
-            total_steps=0,
-            timestamp=datetime.now(),
-            error="Erreur inattendue lors de la génération du plan de traitement. Veuillez réessayer.",
-            error_type="unknown"
-        )
-        return error_result.model_dump_json(indent=2)
-
-
-# Create structured tool
-generate_treatment_plan_tool_enhanced = StructuredTool.from_function(
-    func=generate_treatment_plan_enhanced,
-    name="generate_treatment_plan",
-    description="""Génère un plan de traitement complet intégrant maladies, ravageurs et carences nutritionnelles.
-
-Retourne un plan détaillé avec:
-- Résumé exécutif des problèmes identifiés
-- Étapes de traitement prioritisées
-- Calendrier de traitement
-- Analyse des coûts
-- Plan de surveillance
-- Mesures préventives
-
-Utilisez cet outil pour créer un plan d'action complet après avoir identifié des problèmes de santé des cultures.""",
-    args_schema=TreatmentPlanInput,
-    return_direct=False,
-    coroutine=generate_treatment_plan_enhanced,
-    handle_validation_error=True
-)
+# Create tool instance
+generate_treatment_plan_tool_enhanced = GenerateTreatmentPlanToolEnhanced()
 

@@ -8,7 +8,7 @@ Provides type-safe input/output schemas for nutrient analysis with:
 - Treatment recommendations
 """
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, validator
 from typing import List, Optional, Dict, Any
 from enum import Enum
 from datetime import datetime
@@ -38,6 +38,46 @@ class NutrientType(str, Enum):
     MICRONUTRIENT = "micronutrient"
 
 
+class SoilAnalysis(BaseModel):
+    """Soil condition analysis"""
+    
+    pH: Optional[float] = Field(
+        default=None,
+        ge=3.0,
+        le=10.0,
+        description="Soil pH"
+    )
+    pH_interpretation: Optional[str] = Field(
+        default=None,
+        description="pH interpretation (acidic, neutral, alkaline)"
+    )
+    organic_matter_percent: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=100.0,
+        description="Organic matter percentage"
+    )
+    texture: Optional[str] = Field(
+        default=None,
+        description="Soil texture (clay, loam, sand, etc.)"
+    )
+    drainage: Optional[str] = Field(
+        default=None,
+        description="Drainage quality (poor, moderate, good)"
+    )
+    cec: Optional[float] = Field(
+        default=None,
+        description="Cation exchange capacity (meq/100g)"
+    )
+    nutrient_availability_factors: List[str] = Field(
+        default_factory=list,
+        description="Factors affecting nutrient availability"
+    )
+    
+    class Config:
+        use_enum_values = True
+
+
 class NutrientAnalysisInput(BaseModel):
     """Input schema for nutrient deficiency analysis"""
     
@@ -45,7 +85,7 @@ class NutrientAnalysisInput(BaseModel):
         description="Type of crop (e.g., 'blé', 'maïs', 'colza')"
     )
     plant_symptoms: List[str] = Field(
-        min_length=1,
+        min_items=1,
         description="List of observed plant symptoms"
     )
     soil_conditions: Optional[Dict[str, Any]] = Field(
@@ -75,8 +115,7 @@ class NutrientAnalysisInput(BaseModel):
         description="Previous fertilization history"
     )
     
-    @field_validator('plant_symptoms')
-    @classmethod
+    @validator('plant_symptoms')
     def validate_symptoms(cls, v: List[str]) -> List[str]:
         """Validate plant symptoms"""
         if not v:
@@ -86,6 +125,7 @@ class NutrientAnalysisInput(BaseModel):
         return v
     
     class Config:
+        use_enum_values = True
         json_schema_extra = {
             "example": {
                 "crop_type": "blé",
@@ -161,6 +201,7 @@ class NutrientDeficiency(BaseModel):
     )
     
     class Config:
+        use_enum_values = True
         json_schema_extra = {
             "example": {
                 "nutrient": "nitrogen",
@@ -181,43 +222,6 @@ class NutrientDeficiency(BaseModel):
                 ]
             }
         }
-
-
-class SoilAnalysis(BaseModel):
-    """Soil condition analysis"""
-    
-    pH: Optional[float] = Field(
-        default=None,
-        ge=3.0,
-        le=10.0,
-        description="Soil pH"
-    )
-    pH_interpretation: Optional[str] = Field(
-        default=None,
-        description="pH interpretation (acidic, neutral, alkaline)"
-    )
-    organic_matter_percent: Optional[float] = Field(
-        default=None,
-        ge=0.0,
-        le=100.0,
-        description="Organic matter percentage"
-    )
-    texture: Optional[str] = Field(
-        default=None,
-        description="Soil texture (clay, loam, sand, etc.)"
-    )
-    drainage: Optional[str] = Field(
-        default=None,
-        description="Drainage quality (poor, moderate, good)"
-    )
-    cec: Optional[float] = Field(
-        default=None,
-        description="Cation exchange capacity (meq/100g)"
-    )
-    nutrient_availability_factors: List[str] = Field(
-        default_factory=list,
-        description="Factors affecting nutrient availability"
-    )
 
 
 class NutrientAnalysisOutput(BaseModel):
@@ -307,33 +311,4 @@ class NutrientAnalysisOutput(BaseModel):
     )
     
     class Config:
-        json_schema_extra = {
-            "example": {
-                "success": True,
-                "crop_type": "blé",
-                "crop_eppo_code": "TRZAX",
-                "crop_category": "cereal",
-                "plant_symptoms": ["Jaunissement des feuilles", "Croissance ralentie"],
-                "nutrient_deficiencies": [
-                    {
-                        "nutrient": "nitrogen",
-                        "nutrient_name": "Azote",
-                        "symbol": "N",
-                        "nutrient_type": "macronutrient",
-                        "deficiency_level": "moderate",
-                        "confidence": 0.85,
-                        "symptoms_matched": ["Jaunissement des feuilles"],
-                        "treatment_recommendations": ["Apport d'engrais azoté"]
-                    }
-                ],
-                "analysis_confidence": "high",
-                "treatment_recommendations": [
-                    "Apport d'engrais azoté (100-150 kg N/ha)",
-                    "Fractionnement en 2-3 apports"
-                ],
-                "total_deficiencies": 1,
-                "critical_deficiencies": 0,
-                "data_source": "database_enhanced"
-            }
-        }
-
+        use_enum_values = True
