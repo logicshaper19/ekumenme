@@ -173,16 +173,18 @@ class EnhancedNutrientService:
             soil_matches = [indicator for indicator in soil_conditions.keys() if indicator in soil_indicators]
             soil_match_ratio = len(soil_matches) / len(soil_indicators) if soil_indicators else 0
 
-            # Bayesian-inspired confidence calculation
-            # Both symptoms and soil must align (multiplicative, not additive)
-            base_confidence = symptom_match_ratio * soil_match_ratio if soil_match_ratio > 0 else symptom_match_ratio * 0.5
+            # Weighted confidence calculation (symptoms 70%, soil 30%)
+            # This allows strong symptom evidence OR strong soil evidence to drive diagnosis
+            symptom_weight = 0.7
+            soil_weight = 0.3
+            base_confidence = (symptom_match_ratio * symptom_weight) + (soil_match_ratio * soil_weight)
 
-            # Specificity bonus: more matched symptoms = higher confidence
+            # Specificity bonus: matched symptoms / total observed (capped at 0.2)
             total_symptoms_observed = len(plant_symptoms)
-            specificity_bonus = len(symptom_matches) / total_symptoms_observed if total_symptoms_observed > 0 else 0
+            specificity_bonus = min(len(symptom_matches) / total_symptoms_observed, 0.2) if total_symptoms_observed > 0 else 0
 
             # Final confidence (capped at 1.0)
-            confidence = min(base_confidence * (1 + specificity_bonus * 0.2), 1.0)
+            confidence = min(base_confidence + specificity_bonus, 1.0)
 
             if confidence >= MIN_CONFIDENCE_THRESHOLD:  # 50% minimum threshold
                 # Map deficiency level string to enum
