@@ -64,6 +64,18 @@ from app.tools.schemas.compliance_schemas import (
     ComplianceRule
 )
 
+from app.tools.schemas.safety_schemas import (
+    SafetyGuidelinesInput,
+    SafetyGuidelinesOutput,
+    SafetyGuideline,
+    SafetyEquipment,
+    EmergencyProcedure,
+    RiskPhrase,
+    ProductSafetyInfo,
+    SafetyLevel,
+    SafetyPriority
+)
+
 __all__ = [
     # Weather schemas
     "WeatherInput",
@@ -113,5 +125,15 @@ __all__ = [
     "RegulationType",
     "PracticeType",
     "ComplianceRule",
+    # Safety schemas
+    "SafetyGuidelinesInput",
+    "SafetyGuidelinesOutput",
+    "SafetyGuideline",
+    "SafetyEquipment",
+    "EmergencyProcedure",
+    "RiskPhrase",
+    "ProductSafetyInfo",
+    "SafetyLevel",
+    "SafetyPriority",
 ]
 
