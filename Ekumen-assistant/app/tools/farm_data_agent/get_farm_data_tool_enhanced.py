@@ -12,12 +12,15 @@ Improvements:
 - Type-safe Pydantic schemas
 - Redis caching (1h TTL for farm data)
 - Structured error handling
-- Real database queries
+- Real database queries with eager loading (prevents N+1)
+- Async-safe database access
 - MesParcelles API integration (mock for now)
 """
 
 import logging
-from typing import Optional, List, Dict, Any, Tuple
+import json
+import asyncio
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from langchain.tools import StructuredTool
 
@@ -31,6 +34,17 @@ from app.tools.schemas.farm_data_schemas import (
 from app.core.cache import redis_cache
 
 logger = logging.getLogger(__name__)
+
+
+# Intervention type constants (from MesParcelles database)
+class InterventionType:
+    """Intervention type IDs from types_intervention table"""
+    SEMIS = 1
+    FERTILISATION = 2
+    TRAITEMENT_PHYTO = 3
+    RECOLTE = 4
+    IRRIGATION = 5
+    TRAVAIL_SOL = 6
 
 
 class EnhancedFarmDataService:
@@ -97,9 +111,37 @@ class EnhancedFarmDataService:
         time_period: Optional[TimePeriod] = None,
         crops: Optional[List[str]] = None,
         parcels: Optional[List[str]] = None,
-        farm_id: Optional[str] = None
+        farm_id: Optional[str] = None,
+        max_results: int = 100
     ) -> List[ParcelRecord]:
-        """Get farm data from MesParcelles database"""
+        """
+        Async wrapper for database farm data retrieval.
+
+        Runs synchronous database query in thread pool to avoid blocking event loop.
+        """
+        return await asyncio.to_thread(
+            self._get_database_farm_data_sync,
+            time_period,
+            crops,
+            parcels,
+            farm_id,
+            max_results
+        )
+
+    def _get_database_farm_data_sync(
+        self,
+        time_period: Optional[TimePeriod] = None,
+        crops: Optional[List[str]] = None,
+        parcels: Optional[List[str]] = None,
+        farm_id: Optional[str] = None,
+        max_results: int = 100
+    ) -> List[ParcelRecord]:
+        """
+        Get farm data from MesParcelles database (synchronous).
+
+        Uses eager loading to prevent N+1 query problem.
+        Limited to max_results to prevent memory issues.
+        """
         try:
             # Import MesParcelles models from Ekumenbackend
             import sys
@@ -111,11 +153,16 @@ class EnhancedFarmDataService:
             from app.models.mesparcelles import Parcelle, SuccessionCulture, Culture, Intervention
             from app.core.database import SessionLocal
             from sqlalchemy import select
+            from sqlalchemy.orm import joinedload
 
-            # Use synchronous session (async version would require more setup)
+            # Use synchronous session
             with SessionLocal() as db:
-                # Query parcelles for the farm (SIRET)
-                query = select(Parcelle)
+                # Query parcelles with eager loading to prevent N+1 queries
+                query = select(Parcelle).options(
+                    joinedload(Parcelle.succession_cultures).joinedload(SuccessionCulture.culture),
+                    joinedload(Parcelle.interventions).joinedload(Intervention.extrants),
+                    joinedload(Parcelle.interventions).joinedload(Intervention.intrants)
+                )
 
                 # Filter by farm_id (SIRET)
                 if farm_id:
@@ -134,36 +181,29 @@ class EnhancedFarmDataService:
                 if parcels:
                     query = query.where(Parcelle.nom.in_(parcels))
 
-                # Execute query
+                # Add pagination to prevent memory issues
+                query = query.limit(max_results)
+
+                # Execute query with unique() to handle joinedload duplicates
                 result = db.execute(query)
-                parcel_records = result.scalars().all()
+                parcel_records = result.scalars().unique().all()
 
                 # Convert to Pydantic models
                 farm_data = []
                 for parcelle in parcel_records:
-                    # Get succession cultures (crops) for this parcel
-                    cultures_query = select(SuccessionCulture).join(Culture).where(
-                        SuccessionCulture.uuid_parcelle == parcelle.uuid_parcelle
-                    )
-                    cultures_result = db.execute(cultures_query)
-                    succession_cultures = cultures_result.scalars().all()
-
-                    # Get culture names
+                    # Get culture names from eager-loaded succession_cultures
                     culture_names = []
-                    for sc in succession_cultures:
-                        if sc.culture:
-                            culture_names.append(sc.culture.libelle)
+                    if hasattr(parcelle, 'succession_cultures'):
+                        for sc in parcelle.succession_cultures:
+                            if sc.culture:
+                                culture_names.append(sc.culture.libelle)
 
                     # Filter by crops if specified
                     if crops and not any(crop in culture_names for crop in crops):
                         continue
 
-                    # Get interventions for this parcel
-                    interventions_query = select(Intervention).where(
-                        Intervention.uuid_parcelle == parcelle.uuid_parcelle
-                    )
-                    interventions_result = db.execute(interventions_query)
-                    interventions = interventions_result.scalars().all()
+                    # Get interventions from eager-loaded data (no extra query!)
+                    interventions = parcelle.interventions if hasattr(parcelle, 'interventions') else []
 
                     # Extract intervention summary with real data
                     intervention_summary = self._extract_intervention_summary(
@@ -203,7 +243,7 @@ class EnhancedFarmDataService:
 
         Extracts:
         - Harvest data from extrants (outputs)
-        - Cost data from intrants (inputs)
+        - Cost data from intrants (inputs) - NOT IMPLEMENTED (requires price database)
         - Intervention type counts
         """
         if not interventions:
@@ -222,41 +262,43 @@ class EnhancedFarmDataService:
 
         # Track harvest and cost data
         total_harvest_kg = 0.0
-        total_cost_eur = 0.0
         has_harvest_data = False
-        has_cost_data = False
 
         for intervention in interventions:
-            # Count by type (id_type_intervention: 1=semis, 2=fertilisation, 3=traitement, 4=récolte, etc.)
+            # Count by type using constants
             type_id = intervention.id_type_intervention
-            if type_id == 4:  # Récolte (harvest)
+            if type_id == InterventionType.RECOLTE:
                 harvest_count += 1
 
-                # Extract harvest quantity from extrants
+                # Extract harvest quantity from extrants with proper JSON validation
                 if hasattr(intervention, 'extrants') and intervention.extrants:
                     for extrant in intervention.extrants:
-                        if extrant.extrant_details:
-                            # extrant_details is JSON with harvest data
-                            details = extrant.extrant_details
-                            if isinstance(details, dict):
-                                quantity = details.get('quantite_kg') or details.get('quantite')
-                                if quantity:
-                                    total_harvest_kg += float(quantity)
-                                    has_harvest_data = True
+                        if not extrant.extrant_details:
+                            continue
 
-            elif type_id == 2:  # Fertilisation
+                        try:
+                            # Handle both JSON string and dict
+                            if isinstance(extrant.extrant_details, str):
+                                details = json.loads(extrant.extrant_details)
+                            elif isinstance(extrant.extrant_details, dict):
+                                details = extrant.extrant_details
+                            else:
+                                logger.warning(f"Unexpected extrant_details type: {type(extrant.extrant_details)}")
+                                continue
+
+                            # Try multiple field names for quantity
+                            quantity = details.get('quantite_kg') or details.get('quantite') or details.get('quantity_kg')
+                            if quantity is not None:
+                                total_harvest_kg += float(quantity)
+                                has_harvest_data = True
+                        except (json.JSONDecodeError, ValueError, TypeError) as e:
+                            logger.warning(f"Failed to parse extrant details: {e}")
+                            continue
+
+            elif type_id == InterventionType.FERTILISATION:
                 fertilization_count += 1
-            elif type_id == 3:  # Traitement phytosanitaire
+            elif type_id == InterventionType.TRAITEMENT_PHYTO:
                 pest_control_count += 1
-
-            # Extract cost data from intrants
-            if hasattr(intervention, 'intrants') and intervention.intrants:
-                for intrant in intervention.intrants:
-                    # Calculate cost from quantity and unit price (if available in intrant details)
-                    if hasattr(intrant, 'intrant') and intrant.intrant:
-                        # This would require price data - for now we can't calculate without it
-                        # TODO: Add price database or API integration
-                        pass
 
         # Calculate yield if we have harvest data and surface
         average_yield_q_ha = None
@@ -265,10 +307,8 @@ class EnhancedFarmDataService:
             total_harvest_q = total_harvest_kg / 100.0
             average_yield_q_ha = round(total_harvest_q / float(surface_ha), 2)
 
-        # Calculate average cost per hectare if we have cost data and surface
-        average_cost_eur_ha = None
-        if has_cost_data and surface_ha and surface_ha > 0:
-            average_cost_eur_ha = round(total_cost_eur / float(surface_ha), 2)
+        # Cost data not implemented (requires price database)
+        # Setting to None to be honest about missing data
 
         return InterventionSummary(
             total_interventions=len(interventions),
@@ -277,9 +317,9 @@ class EnhancedFarmDataService:
             pest_control_interventions=pest_control_count,
             total_harvest_quantity=round(total_harvest_kg, 2) if has_harvest_data else None,
             average_yield_q_ha=average_yield_q_ha,
-            total_cost_eur=round(total_cost_eur, 2) if has_cost_data else None,
-            average_cost_eur_ha=average_cost_eur_ha,
-            has_real_data=has_harvest_data or has_cost_data
+            total_cost_eur=None,  # Not implemented - requires price database
+            average_cost_eur_ha=None,  # Not implemented - requires price database
+            has_real_data=has_harvest_data  # Only harvest data available for now
         )
 
     async def _get_mesparcelles_data(
