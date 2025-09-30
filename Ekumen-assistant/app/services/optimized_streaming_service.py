@@ -364,6 +364,14 @@ class OptimizedStreamingService:
 
                     # Extract sources from tool results
                     for tool_name, tool_result in tool_results.items():
+                        # Handle JSON string results
+                        if isinstance(tool_result, str):
+                            try:
+                                tool_result = json.loads(tool_result)
+                            except json.JSONDecodeError:
+                                pass  # Not JSON, skip
+
+                        # Extract sources if present
                         if isinstance(tool_result, dict) and "sources" in tool_result:
                             sources.extend(tool_result["sources"])
 
