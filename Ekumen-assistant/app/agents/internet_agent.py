@@ -116,31 +116,34 @@ class InternetAgent:
                 "response": f"❌ Erreur: {result.get('error', 'Erreur inconnue')}",
                 "agent": self.agent_type
             }
-        
-        # Build response with AI summary and sources
+
+        # Build response with AI summary (without inline sources)
         response = f"🌐 **Recherche Internet**\n\n"
-        
+
         # Add AI-generated answer if available
         if result.get("answer"):
-            response += f"{result['answer']}\n\n"
-        
-        # Add sources
+            response += f"{result['answer']}\n"
+
+        # Format sources as structured data
+        sources = []
         if result.get("results"):
-            response += "**Sources:**\n"
-            for i, item in enumerate(result["results"][:5], 1):
-                response += f"{i}. [{item['title']}]({item['url']})\n"
-                if item.get("content"):
-                    # Truncate content to 150 chars
-                    content = item["content"][:150] + "..." if len(item["content"]) > 150 else item["content"]
-                    response += f"   {content}\n\n"
-        
+            for item in result["results"][:5]:
+                sources.append({
+                    "title": item.get("title", ""),
+                    "url": item.get("url", ""),
+                    "snippet": item.get("content", "")[:200] if item.get("content") else None,
+                    "relevance": item.get("score", 0.0),
+                    "type": "web"
+                })
+
         return {
             "success": True,
             "response": response,
             "agent": self.agent_type,
+            "sources": sources,  # Structured sources for frontend
             "metadata": {
                 "query": result.get("query"),
-                "source_count": len(result.get("results", [])),
+                "source_count": len(sources),
                 "timestamp": result.get("timestamp")
             }
         }
@@ -153,29 +156,33 @@ class InternetAgent:
                 "response": f"❌ Erreur: {result.get('error', 'Erreur inconnue')}",
                 "agent": self.agent_type
             }
-        
+
         response = f"💰 **Prix du marché - {result.get('commodity', 'Produit')}**\n\n"
-        
+
         # Add AI summary
         if result.get("summary"):
-            response += f"{result['summary']}\n\n"
-        
-        # Add price sources
+            response += f"{result['summary']}\n"
+
+        # Format sources as structured data
+        sources = []
         if result.get("prices"):
-            response += "**Sources de prix:**\n"
-            for i, item in enumerate(result["prices"][:5], 1):
-                response += f"{i}. [{item['source']}]({item['url']})\n"
-                if item.get("information"):
-                    info = item["information"][:200] + "..." if len(item["information"]) > 200 else item["information"]
-                    response += f"   {info}\n\n"
-        
+            for item in result["prices"][:5]:
+                sources.append({
+                    "title": item.get("source", ""),
+                    "url": item.get("url", ""),
+                    "snippet": item.get("information", "")[:200] if item.get("information") else None,
+                    "relevance": item.get("relevance", 0.0),
+                    "type": "web"
+                })
+
         return {
             "success": True,
             "response": response,
             "agent": self.agent_type,
+            "sources": sources,  # Structured sources for frontend
             "metadata": {
                 "commodity": result.get("commodity"),
-                "source_count": len(result.get("prices", [])),
+                "source_count": len(sources),
                 "timestamp": result.get("timestamp")
             }
         }
@@ -188,30 +195,33 @@ class InternetAgent:
                 "response": f"❌ Erreur: {result.get('error', 'Erreur inconnue')}",
                 "agent": self.agent_type
             }
-        
+
         response = f"📰 **Actualités agricoles**\n\n"
-        
+
         # Add summary
         if result.get("summary"):
-            response += f"{result['summary']}\n\n"
-        
-        # Add news articles
+            response += f"{result['summary']}\n"
+
+        # Format sources as structured data
+        sources = []
         if result.get("news"):
-            response += "**Articles récents:**\n"
-            for i, item in enumerate(result["news"][:5], 1):
-                response += f"{i}. **{item['title']}**\n"
-                response += f"   [{item['url']}]({item['url']})\n"
-                if item.get("summary"):
-                    summary = item["summary"][:150] + "..." if len(item["summary"]) > 150 else item["summary"]
-                    response += f"   {summary}\n\n"
-        
+            for item in result["news"][:5]:
+                sources.append({
+                    "title": item.get("title", ""),
+                    "url": item.get("url", ""),
+                    "snippet": item.get("summary", "")[:200] if item.get("summary") else None,
+                    "relevance": item.get("relevance", 0.0),
+                    "type": "web"
+                })
+
         return {
             "success": True,
             "response": response,
             "agent": self.agent_type,
+            "sources": sources,  # Structured sources for frontend
             "metadata": {
                 "topic": result.get("topic"),
-                "article_count": len(result.get("news", [])),
+                "article_count": len(sources),
                 "timestamp": result.get("timestamp")
             }
         }

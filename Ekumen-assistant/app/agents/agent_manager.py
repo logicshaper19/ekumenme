@@ -187,22 +187,35 @@ class AgentManager:
 
             # For new Tavily-powered agents, use actual implementation
             if agent_enum in [AgentType.INTERNET, AgentType.SUPPLIER, AgentType.MARKET_PRICES]:
-                response = self._execute_tavily_agent(agent_enum, message, context or {})
+                result = self._execute_tavily_agent(agent_enum, message, context or {})
+                # result is a dict with 'response' and optionally 'sources'
+                return {
+                    "response": result.get("response", ""),
+                    "sources": result.get("sources", []),  # Include sources if available
+                    "agent_type": profile.agent_type.value,
+                    "agent_name": profile.name,
+                    "capabilities": profile.capabilities,
+                    "metadata": {
+                        "cost": profile.cost_per_request,
+                        "message_length": len(message),
+                        "context_provided": bool(context),
+                        **(result.get("metadata", {}))  # Include agent metadata
+                    }
+                }
             else:
                 # Generate response based on agent type (legacy agents)
                 response = self._generate_agent_response(profile, message, context or {})
-
-            return {
-                "response": response,
-                "agent_type": profile.agent_type.value,
-                "agent_name": profile.name,
-                "capabilities": profile.capabilities,
-                "metadata": {
-                    "cost": profile.cost_per_request,
-                    "message_length": len(message),
-                    "context_provided": bool(context)
+                return {
+                    "response": response,
+                    "agent_type": profile.agent_type.value,
+                    "agent_name": profile.name,
+                    "capabilities": profile.capabilities,
+                    "metadata": {
+                        "cost": profile.cost_per_request,
+                        "message_length": len(message),
+                        "context_provided": bool(context)
+                    }
                 }
-            }
 
         except Exception as e:
             logger.error(f"Agent execution error: {e}")
@@ -289,8 +302,12 @@ Décrivez vos pratiques actuelles pour des recommandations personnalisées."""
 
         return agent_responses.get(profile.agent_type, f"Réponse de {profile.name} pour: {message}")
 
-    def _execute_tavily_agent(self, agent_type: AgentType, message: str, context: Dict[str, Any]) -> str:
-        """Execute Tavily-powered agents (Internet, Supplier, Market Prices)"""
+    def _execute_tavily_agent(self, agent_type: AgentType, message: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute Tavily-powered agents (Internet, Supplier, Market Prices)
+
+        Returns:
+            Dict with 'response' and optionally 'sources' keys
+        """
         try:
             # Import agents here to avoid circular imports
             from app.agents.internet_agent import InternetAgent
@@ -315,13 +332,13 @@ Décrivez vos pratiques actuelles pour des recommandations personnalisées."""
                 agent = InternetAgent()
                 result = loop.run_until_complete(agent.process(message, context))
             else:
-                return f"Agent type {agent_type} not implemented"
+                return {"response": f"Agent type {agent_type} not implemented"}
 
-            # Extract response from result
+            # Return full result dict (includes response and sources)
             if isinstance(result, dict):
-                return result.get("response", str(result))
-            return str(result)
+                return result
+            return {"response": str(result)}
 
         except Exception as e:
             logger.error(f"Error executing Tavily agent {agent_type}: {e}")
-            return f"❌ Erreur lors de l'exécution de l'agent: {str(e)}"
+            return {"response": f"❌ Erreur lors de l'exécution de l'agent: {str(e)}"}

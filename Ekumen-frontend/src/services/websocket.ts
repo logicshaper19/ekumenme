@@ -340,6 +340,13 @@ class WebSocketService {
     metadata?: any
     thread_id?: string
     is_complete: boolean
+    sources?: Array<{
+      title: string
+      url: string
+      snippet?: string
+      relevance?: number
+      type?: 'web' | 'database' | 'document' | 'api'
+    }>
   }) => void) {
     this.addEventListener('chat:streaming_complete', callback)
   }
