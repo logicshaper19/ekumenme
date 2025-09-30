@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth'
 import VoiceInterface from '../components/VoiceInterface'
 import MarkdownRenderer from '../components/MarkdownRenderer'
 import MessageActions from '../components/MessageActions'
+import Sources from '../components/Sources'
 
 type ChatMode = 'supplier' | 'internet' | null
 
@@ -14,6 +15,14 @@ interface AttachedFile {
   size: number
   type: string
   file: File
+}
+
+interface Source {
+  title: string
+  url: string
+  snippet?: string
+  relevance?: number
+  type?: 'web' | 'database' | 'document' | 'api'
 }
 
 interface Message {
@@ -27,6 +36,7 @@ interface Message {
   queryText?: string  // The user's original query (for assistant messages)
   attachments?: AttachedFile[]
   mode?: ChatMode
+  sources?: Source[]  // Sources used to generate the response
   metadata?: {
     agent_type?: string
     confidence?: number
@@ -234,6 +244,7 @@ const ChatInterface: React.FC = () => {
                   ...msg,
                   content: data.message,
                   isStreaming: false,
+                  sources: data.sources || [],  // Add sources from response
                   metadata: {
                     agent_type: data.agent_type,
                     confidence: data.confidence,
@@ -252,6 +263,7 @@ const ChatInterface: React.FC = () => {
             sender: 'assistant',
             timestamp: new Date(),
             isStreaming: false,
+            sources: data.sources || [],  // Add sources from response
             metadata: {
               agent_type: data.agent_type,
               confidence: data.confidence,
@@ -601,6 +613,11 @@ const ChatInterface: React.FC = () => {
                         <span className="inline-block w-2 h-5 bg-gray-400 ml-1 animate-pulse" />
                       )}
                     </div>
+
+                    {/* Sources for Assistant Messages */}
+                    {message.sender === 'assistant' && message.sources && message.sources.length > 0 && (
+                      <Sources sources={message.sources} />
+                    )}
 
                     {/* Attachments for User Messages */}
                     {message.sender === 'user' && message.attachments && message.attachments.length > 0 && (

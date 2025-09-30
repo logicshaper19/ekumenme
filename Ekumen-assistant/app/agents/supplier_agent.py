@@ -125,55 +125,47 @@ class SupplierAgent:
                 "response": f"❌ Erreur: {result.get('error', 'Erreur inconnue')}",
                 "agent": self.agent_type
             }
-        
+
         response = f"🎁 **Recherche de fournisseurs**\n\n"
-        
+
         # Add AI summary if available
         if result.get("summary"):
-            response += f"**Résumé:**\n{result['summary']}\n\n"
-        
-        # Add supplier results
+            response += f"{result['summary']}\n\n"
+
+        # Format sources as structured data
         suppliers = result.get("suppliers", [])
+        sources = []
+
         if suppliers:
-            response += f"**{len(suppliers)} fournisseur(s) trouvé(s):**\n\n"
-            
-            for i, supplier in enumerate(suppliers, 1):
-                response += f"**{i}. {supplier['name']}**\n"
-                response += f"   🔗 [{supplier['url']}]({supplier['url']})\n"
-                
-                if supplier.get("description"):
-                    # Truncate description
-                    desc = supplier["description"]
-                    if len(desc) > 200:
-                        desc = desc[:200] + "..."
-                    response += f"   📝 {desc}\n"
-                
-                # Add relevance indicator
-                score = supplier.get("relevance_score", 0)
-                if score > 0.8:
-                    response += f"   ⭐ Très pertinent\n"
-                elif score > 0.6:
-                    response += f"   ✓ Pertinent\n"
-                
-                response += "\n"
+            response += f"**{len(suppliers)} fournisseur(s) trouvé(s)**\n"
+
+            for supplier in suppliers:
+                sources.append({
+                    "title": supplier.get("name", ""),
+                    "url": supplier.get("url", ""),
+                    "snippet": supplier.get("description", "")[:200] if supplier.get("description") else None,
+                    "relevance": supplier.get("relevance_score", 0.0),
+                    "type": "web"
+                })
         else:
             response += "❌ Aucun fournisseur trouvé pour cette recherche.\n\n"
             response += "**Suggestions:**\n"
             response += "- Essayez d'élargir votre recherche\n"
             response += "- Vérifiez l'orthographe du produit\n"
             response += "- Ajoutez une localisation (ville, département)\n"
-        
+
         # Add helpful tips
-        response += "\n---\n"
-        response += "💡 **Conseils:**\n"
-        response += "- Contactez plusieurs fournisseurs pour comparer les prix\n"
-        response += "- Vérifiez les certifications et autorisations\n"
-        response += "- Demandez les délais de livraison\n"
-        
+        if suppliers:
+            response += "\n💡 **Conseils:**\n"
+            response += "- Contactez plusieurs fournisseurs pour comparer les prix\n"
+            response += "- Vérifiez les certifications et autorisations\n"
+            response += "- Demandez les délais de livraison\n"
+
         return {
             "success": True,
             "response": response,
             "agent": self.agent_type,
+            "sources": sources,  # Structured sources for frontend
             "metadata": {
                 "query": result.get("query"),
                 "supplier_count": len(suppliers),

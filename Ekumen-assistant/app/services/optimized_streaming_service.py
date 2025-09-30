@@ -350,6 +350,7 @@ class OptimizedStreamingService:
 
             # Step 3: Execute tools if needed
             tool_results = {}
+            sources = []  # Collect sources from tool results
             if routing_decision.required_tools and self.tool_executor:
                 tool_start = time.time()
                 try:
@@ -360,6 +361,11 @@ class OptimizedStreamingService:
                         context=context or {}
                     )
                     metrics["tool_execution_time"] = time.time() - tool_start
+
+                    # Extract sources from tool results
+                    for tool_name, tool_result in tool_results.items():
+                        if isinstance(tool_result, dict) and "sources" in tool_result:
+                            sources.extend(tool_result["sources"])
 
                     if websocket:
                         await websocket.send_json({
@@ -420,20 +426,24 @@ class OptimizedStreamingService:
                 await websocket.send_json({
                     "type": "workflow_result",
                     "response": response,
+                    "sources": sources,  # Include sources in WebSocket message
                     "message_id": context.get("message_id") if context else None,
                     "metadata": {
                         "total_time": total_time,
                         "routing_time": metrics["routing_time"],
                         "synthesis_time": metrics["synthesis_time"],
-                        "cache_hit": False
+                        "cache_hit": False,
+                        "source_count": len(sources)
                     }
                 })
 
             yield {
                 "type": "workflow_result",
                 "response": response,
+                "sources": sources,  # Include sources in yield
                 "metadata": {
                     "total_time": total_time,
+                    "source_count": len(sources),
                     **metrics
                 }
             }
