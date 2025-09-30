@@ -147,7 +147,9 @@ class EnhancedNutrientService:
         self,
         plant_symptoms: List[str],
         soil_conditions: Dict[str, Any],
-        deficiency_knowledge: Dict[str, Any]
+        deficiency_knowledge: Dict[str, Any],
+        bbch_stage: Optional[int] = None,
+        previous_fertilization: Optional[List[str]] = None
     ) -> List[NutrientDeficiency]:
         """Analyze nutrient deficiencies based on symptoms and soil conditions"""
         deficiencies = []
@@ -183,8 +185,29 @@ class EnhancedNutrientService:
             total_symptoms_observed = len(plant_symptoms)
             specificity_bonus = min(len(symptom_matches) / total_symptoms_observed, 0.2) if total_symptoms_observed > 0 else 0
 
+            # BBCH stage boost: 15% increase if in critical growth stage
+            bbch_boost = 0.0
+            critical_stages = nutrient_info.get("critical_stages", [])
+            if bbch_stage and critical_stages:
+                for stage_range in critical_stages:
+                    if isinstance(stage_range, list) and len(stage_range) == 2:
+                        if stage_range[0] <= bbch_stage <= stage_range[1]:
+                            bbch_boost = 0.15
+                            break
+
+            # Previous fertilization penalty: 30% reduction if recently applied
+            fert_penalty = 0.0
+            if previous_fertilization:
+                nutrient_symbol = nutrient_info.get("symbol", "").lower()
+                for fert in previous_fertilization:
+                    fert_lower = fert.lower()
+                    if nutrient_key.lower() in fert_lower or nutrient_symbol in fert_lower:
+                        fert_penalty = 0.3
+                        break
+
             # Final confidence (capped at 1.0)
-            confidence = min(base_confidence + specificity_bonus, 1.0)
+            confidence = base_confidence + specificity_bonus + bbch_boost - fert_penalty
+            confidence = max(0.0, min(confidence, 1.0))
 
             if confidence >= MIN_CONFIDENCE_THRESHOLD:  # 50% minimum threshold
                 # Map deficiency level string to enum
@@ -327,7 +350,9 @@ class EnhancedNutrientService:
             deficiencies = self._analyze_nutrient_deficiencies(
                 input_data.plant_symptoms,
                 input_data.soil_conditions or {},
-                deficiency_knowledge
+                deficiency_knowledge,
+                input_data.bbch_stage,
+                input_data.previous_fertilization
             )
 
             # Calculate confidence
