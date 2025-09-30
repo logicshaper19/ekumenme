@@ -8,6 +8,8 @@ Improvements over original:
 - ✅ Granular error handling
 - ✅ Database integration (Crop table + EPPO codes)
 - ✅ Follows PoC pattern (Service class + StructuredTool)
+- ✅ Input validation (max 10 analyses, budget constraints)
+- ✅ Multi-issue prioritization (not just top issue)
 """
 
 import logging
@@ -15,7 +17,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 
 from langchain.tools import StructuredTool
-from pydantic import ValidationError
+from pydantic import ValidationError, Field
 
 from app.models.crop import Crop
 from app.tools.schemas.treatment_schemas import (
@@ -34,6 +36,9 @@ from app.tools.schemas.pest_schemas import PestIdentificationOutput
 from app.core.cache import redis_cache
 
 logger = logging.getLogger(__name__)
+
+# Maximum number of treatment steps (realistic limit)
+MAX_TREATMENT_STEPS = 10
 
 
 # Treatment cost estimates (EUR per hectare)
@@ -300,7 +305,12 @@ class EnhancedTreatmentService:
                 step_number
             )
             steps.extend(nutrient_steps)
-        
+
+        # Limit to MAX_TREATMENT_STEPS (realistic constraint)
+        if len(steps) > MAX_TREATMENT_STEPS:
+            logger.warning(f"Treatment plan has {len(steps)} steps - limiting to {MAX_TREATMENT_STEPS}")
+            steps = steps[:MAX_TREATMENT_STEPS]
+
         return steps
     
     def _generate_disease_steps(
