@@ -143,17 +143,25 @@ class EnhancedFarmDataService:
         Limited to max_results to prevent memory issues.
         """
         try:
-            # Import MesParcelles models from Ekumenbackend
+            # TODO: Remove sys.path manipulation - fix PYTHONPATH in deployment
+            # This is a temporary workaround for development environment
             import sys
             import os
             backend_path = os.path.join(os.path.dirname(__file__), '../../../../Ekumenbackend')
             if backend_path not in sys.path:
                 sys.path.insert(0, backend_path)
 
-            from app.models.mesparcelles import Parcelle, SuccessionCulture, Culture, Intervention
-            from app.core.database import SessionLocal
-            from sqlalchemy import select
-            from sqlalchemy.orm import joinedload
+            # Import with validation
+            try:
+                from app.models.mesparcelles import Parcelle, SuccessionCulture, Culture, Intervention
+                from app.core.database import SessionLocal
+                from sqlalchemy import select, func
+                from sqlalchemy.orm import joinedload
+                from sqlalchemy.exc import SQLAlchemyError
+            except ImportError as e:
+                logger.error(f"Failed to import MesParcelles models: {e}")
+                logger.error("Check PYTHONPATH configuration and database setup")
+                return []
 
             # Use synchronous session
             with SessionLocal() as db:
@@ -181,8 +189,21 @@ class EnhancedFarmDataService:
                 if parcels:
                     query = query.where(Parcelle.nom.in_(parcels))
 
+                # Check total count before pagination
+                count_query = select(func.count()).select_from(Parcelle)
+                if farm_id:
+                    count_query = count_query.where(Parcelle.siret_exploitation == farm_id)
+                total_count = db.execute(count_query).scalar()
+
                 # Add pagination to prevent memory issues
                 query = query.limit(max_results)
+
+                # Warn if results are truncated
+                if total_count > max_results:
+                    logger.warning(
+                        f"Results limited to {max_results} of {total_count} parcels. "
+                        f"Increase max_results or add more specific filters."
+                    )
 
                 # Execute query with unique() to handle joinedload duplicates
                 result = db.execute(query)
@@ -228,8 +249,12 @@ class EnhancedFarmDataService:
                 logger.info(f"✅ Retrieved {len(farm_data)} parcels from MesParcelles database")
                 return farm_data
 
+        except SQLAlchemyError as e:
+            logger.error(f"❌ Database error: {e}", exc_info=True)
+            logger.warning("Returning empty result due to database error")
+            return []
         except Exception as e:
-            logger.error(f"❌ MesParcelles database query error: {e}", exc_info=True)
+            logger.error(f"❌ Unexpected error in farm data retrieval: {e}", exc_info=True)
             logger.warning("Returning empty result")
             return []
 
