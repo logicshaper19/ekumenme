@@ -337,12 +337,18 @@ class EnhancedSafetyGuidelinesService:
         # Generate safety measures from risk phrases
         safety_measures = self._generate_measures_from_risk_phrases(product_safety.risk_phrases)
 
-        # Add ZNT-based measures
+        # Add ZNT-based measures with context
         if product_safety.znt_requirements:
+            znt_context = {
+                "aquatic_m": "cours d'eau et points d'eau",
+                "arthropods_m": "insectes auxiliaires (abeilles, pollinisateurs)",
+                "plants_m": "plantes non-cibles et zones de biodiversité"
+            }
             for znt_type, distance in product_safety.znt_requirements.items():
                 if distance and distance > 0:
+                    context = znt_context.get(znt_type, znt_type)
                     safety_measures.append(
-                        f"Respecter ZNT {znt_type}: {distance}m"
+                        f"Respecter ZNT de {distance}m pour protéger {context}"
                     )
 
         # Add safety interval measure
@@ -356,12 +362,8 @@ class EnhancedSafetyGuidelinesService:
             product_safety.risk_phrases
         )
 
-        # Add legal references
-        legal_references = [
-            "Règlement (CE) n° 1272/2008 (CLP)",
-            "Code du travail - Articles R4412-1 à R4412-160",
-            "Arrêté du 4 mai 2017 relatif aux ZNT"
-        ]
+        # Add legal references based on risk level
+        legal_references = self._get_relevant_legal_references(product_safety.risk_phrases)
 
         return SafetyGuideline(
             guideline_type=f"product_{product_safety.amm_code}",
@@ -379,45 +381,81 @@ class EnhancedSafetyGuidelinesService:
         self,
         risk_phrases: List[RiskPhrase]
     ) -> List[SafetyEquipment]:
-        """Determine required equipment based on risk phrases"""
+        """Determine required equipment based on risk phrases - COMPREHENSIVE"""
         equipment_set = set()
 
         for phrase in risk_phrases:
             code = phrase.code
 
-            # Hazard phrases that require specific equipment
+            # Acute toxicity - oral, dermal, eye
             if code in ["H301", "H302", "H304", "H311", "H312", "H314", "H315", "H317", "H318", "H319"]:
                 equipment_set.add("gants")
                 equipment_set.add("lunettes")
 
+            # Respiratory hazards
             if code in ["H330", "H331", "H332", "H334", "H335"]:
                 equipment_set.add("masque_respiratoire")
 
+            # Skin corrosion/irritation
             if code in ["H310", "H311", "H312", "H314"]:
                 equipment_set.add("combinaison")
                 equipment_set.add("bottes")
+
+            # CMR (Carcinogenic, Mutagenic, Reprotoxic) - ENHANCED PPE
+            if code in ["H340", "H341", "H350", "H351", "H360", "H361"]:
+                equipment_set.add("combinaison_type_4")  # Gas-tight suit
+                equipment_set.add("masque_FFP3")  # High-efficiency respirator
+                equipment_set.add("gants_nitrile")  # Chemical-resistant gloves
+                equipment_set.add("bottes")
+
+            # Aspiration hazard
+            if code in ["H304"]:
+                equipment_set.add("masque_respiratoire")
+                equipment_set.add("gants")
+
+            # Environmental hazards (still need PPE)
+            if code in ["H400", "H410", "H411"]:
+                equipment_set.add("gants")
+                equipment_set.add("lunettes")
 
             # Precautionary phrases
             if code in ["P280", "P281"]:
                 equipment_set.add("EPI_complet")
 
-        # Convert to SafetyEquipment objects
-        equipment = [
-            SafetyEquipment(
-                equipment_type=eq,
-                is_mandatory=True,
-                specification="Conforme aux normes EN"
+        # Convert to SafetyEquipment objects with specific specifications
+        equipment = []
+        for eq in sorted(equipment_set):
+            spec = self._get_equipment_specification(eq)
+            equipment.append(
+                SafetyEquipment(
+                    equipment_type=eq,
+                    is_mandatory=True,
+                    specification=spec
+                )
             )
-            for eq in sorted(equipment_set)
-        ]
 
         return equipment if equipment else [
             SafetyEquipment(
                 equipment_type="EPI_standard",
                 is_mandatory=True,
-                specification="Gants, lunettes, masque minimum"
+                specification="Gants, lunettes, masque minimum (EN 374, EN 166, EN 149)"
             )
         ]
+
+    def _get_equipment_specification(self, equipment_type: str) -> str:
+        """Get specific equipment specifications"""
+        specs = {
+            "gants": "EN 374 (protection chimique)",
+            "gants_nitrile": "EN 374 Type A (nitrile, épaisseur ≥0.4mm)",
+            "lunettes": "EN 166 (protection oculaire)",
+            "masque_respiratoire": "EN 149 FFP2 minimum",
+            "masque_FFP3": "EN 149 FFP3 (haute efficacité)",
+            "combinaison": "EN 14605 Type 4 (protection chimique)",
+            "combinaison_type_4": "EN 14605 Type 4 (étanche aux pulvérisations)",
+            "bottes": "EN ISO 20345 (sécurité)",
+            "EPI_complet": "Ensemble complet EN 14605 Type 4"
+        }
+        return specs.get(equipment_type, "Conforme aux normes EN")
 
     def _generate_measures_from_risk_phrases(
         self,
@@ -437,34 +475,125 @@ class EnhancedSafetyGuidelinesService:
         self,
         risk_phrases: List[RiskPhrase]
     ) -> List[EmergencyProcedure]:
-        """Generate emergency procedures from risk phrases"""
+        """Generate emergency procedures from risk phrases - COMPREHENSIVE"""
         procedures = []
 
-        # Map risk codes to emergency procedures
+        # Map risk codes to emergency procedures - EXPANDED
         emergency_map = {
+            # Acute toxicity - oral
+            "H300": EmergencyProcedure(
+                situation="Ingestion (MORTEL)",
+                procedure="Appeler IMMÉDIATEMENT le centre antipoison (01 40 05 48 48). Ne PAS faire vomir. Rincer la bouche. Transporter d'urgence à l'hôpital.",
+                priority=SafetyPriority.CRITICAL,
+                contact_info="Centre Antipoison: 01 40 05 48 48, SAMU: 15"
+            ),
             "H301": EmergencyProcedure(
-                situation="Ingestion",
-                procedure="Appeler immédiatement un centre antipoison. Ne PAS faire vomir.",
+                situation="Ingestion (toxique)",
+                procedure="Appeler immédiatement un centre antipoison. Ne PAS faire vomir. Rincer la bouche.",
                 priority=SafetyPriority.CRITICAL,
                 contact_info="Centre Antipoison: 01 40 05 48 48"
             ),
+            "H302": EmergencyProcedure(
+                situation="Ingestion (nocif)",
+                procedure="Rincer la bouche. Appeler un centre antipoison en cas de malaise.",
+                priority=SafetyPriority.HIGH,
+                contact_info="Centre Antipoison: 01 40 05 48 48"
+            ),
+
+            # Aspiration hazard
+            "H304": EmergencyProcedure(
+                situation="Ingestion avec risque d'aspiration",
+                procedure="Ne PAS faire vomir. Appeler immédiatement un centre antipoison. Risque de pneumonie chimique.",
+                priority=SafetyPriority.CRITICAL,
+                contact_info="Centre Antipoison: 01 40 05 48 48, SAMU: 15"
+            ),
+
+            # Acute toxicity - dermal
+            "H310": EmergencyProcedure(
+                situation="Contact cutané (MORTEL)",
+                procedure="Retirer IMMÉDIATEMENT tous les vêtements contaminés. Rincer abondamment à l'eau pendant au moins 20 minutes. Appeler le SAMU.",
+                priority=SafetyPriority.CRITICAL,
+                contact_info="SAMU: 15"
+            ),
             "H311": EmergencyProcedure(
-                situation="Contact cutané",
-                procedure="Rincer abondamment à l'eau pendant au moins 15 minutes. Retirer vêtements contaminés.",
+                situation="Contact cutané (toxique)",
+                procedure="Rincer abondamment à l'eau pendant au moins 15 minutes. Retirer vêtements contaminés. Consulter un médecin.",
                 priority=SafetyPriority.HIGH,
                 contact_info="SAMU: 15"
             ),
+            "H312": EmergencyProcedure(
+                situation="Contact cutané (nocif)",
+                procedure="Laver abondamment à l'eau et au savon. Consulter un médecin en cas d'irritation.",
+                priority=SafetyPriority.MODERATE,
+                contact_info="Médecin traitant"
+            ),
+
+            # Skin corrosion/irritation
             "H314": EmergencyProcedure(
-                situation="Contact avec les yeux",
-                procedure="Rincer immédiatement et abondamment à l'eau pendant au moins 15 minutes. Consulter un médecin.",
+                situation="Contact cutané/oculaire (corrosif)",
+                procedure="Rincer IMMÉDIATEMENT et abondamment à l'eau pendant au moins 20 minutes. Retirer vêtements contaminés. Appeler le SAMU.",
                 priority=SafetyPriority.CRITICAL,
                 contact_info="SAMU: 15"
             ),
+
+            # Eye damage
+            "H318": EmergencyProcedure(
+                situation="Contact avec les yeux (lésions graves)",
+                procedure="Rincer IMMÉDIATEMENT et abondamment à l'eau pendant au moins 20 minutes en maintenant les paupières ouvertes. Retirer lentilles de contact si possible. Consulter IMMÉDIATEMENT un ophtalmologiste.",
+                priority=SafetyPriority.CRITICAL,
+                contact_info="SAMU: 15, Urgences ophtalmologiques"
+            ),
+            "H319": EmergencyProcedure(
+                situation="Contact avec les yeux (irritation)",
+                procedure="Rincer abondamment à l'eau pendant au moins 15 minutes. Retirer lentilles de contact. Consulter un médecin si l'irritation persiste.",
+                priority=SafetyPriority.HIGH,
+                contact_info="Médecin traitant"
+            ),
+
+            # Acute toxicity - inhalation
             "H330": EmergencyProcedure(
-                situation="Inhalation",
-                procedure="Transporter la personne à l'air frais. En cas de difficultés respiratoires, appeler le SAMU.",
+                situation="Inhalation (MORTEL)",
+                procedure="Transporter IMMÉDIATEMENT la personne à l'air frais. Appeler le SAMU. En cas d'arrêt respiratoire, pratiquer la respiration artificielle. Oxygène si disponible.",
+                priority=SafetyPriority.CRITICAL,
+                contact_info="SAMU: 15, Pompiers: 18"
+            ),
+            "H331": EmergencyProcedure(
+                situation="Inhalation (toxique)",
+                procedure="Transporter la personne à l'air frais. En cas de difficultés respiratoires, appeler le SAMU. Repos et surveillance.",
                 priority=SafetyPriority.CRITICAL,
                 contact_info="SAMU: 15"
+            ),
+            "H332": EmergencyProcedure(
+                situation="Inhalation (nocif)",
+                procedure="Transporter la personne à l'air frais. Consulter un médecin en cas de malaise.",
+                priority=SafetyPriority.HIGH,
+                contact_info="Médecin traitant"
+            ),
+            "H335": EmergencyProcedure(
+                situation="Inhalation (irritation respiratoire)",
+                procedure="Transporter la personne à l'air frais. Repos. Consulter un médecin si les symptômes persistent.",
+                priority=SafetyPriority.MODERATE,
+                contact_info="Médecin traitant"
+            ),
+
+            # CMR hazards
+            "H340": EmergencyProcedure(
+                situation="Exposition à un mutagène",
+                procedure="En cas d'exposition, consulter IMMÉDIATEMENT un médecin. Apporter la fiche de données de sécurité.",
+                priority=SafetyPriority.CRITICAL,
+                contact_info="Médecin du travail, SAMU: 15"
+            ),
+            "H350": EmergencyProcedure(
+                situation="Exposition à un cancérogène",
+                procedure="En cas d'exposition, consulter IMMÉDIATEMENT un médecin. Apporter la fiche de données de sécurité. Surveillance médicale renforcée.",
+                priority=SafetyPriority.CRITICAL,
+                contact_info="Médecin du travail, SAMU: 15"
+            ),
+            "H360": EmergencyProcedure(
+                situation="Exposition à un reprotoxique",
+                procedure="En cas d'exposition, consulter IMMÉDIATEMENT un médecin. Apporter la fiche de données de sécurité. Surveillance médicale.",
+                priority=SafetyPriority.CRITICAL,
+                contact_info="Médecin du travail, SAMU: 15"
             )
         }
 
@@ -477,7 +606,7 @@ class EnhancedSafetyGuidelinesService:
             procedures.append(
                 EmergencyProcedure(
                     situation="Urgence générale",
-                    procedure="En cas d'accident, appeler le centre antipoison ou le SAMU",
+                    procedure="En cas d'accident, appeler le centre antipoison ou le SAMU. Apporter la fiche de données de sécurité.",
                     priority=SafetyPriority.HIGH,
                     contact_info="Centre Antipoison: 01 40 05 48 48, SAMU: 15"
                 )
@@ -565,24 +694,86 @@ class EnhancedSafetyGuidelinesService:
         guidelines: List[SafetyGuideline],
         product_safety: Optional[ProductSafetyInfo]
     ) -> List[str]:
-        """Generate critical safety warnings"""
+        """Generate critical safety warnings - COMPREHENSIVE"""
         warnings = []
 
         if product_safety:
-            # Check for critical hazard phrases
+            # Check for critical hazard phrases - EXPANDED
             critical_phrases = {
-                "H300": "MORTEL en cas d'ingestion",
-                "H310": "MORTEL par contact cutané",
-                "H330": "MORTEL par inhalation",
-                "H370": "Risque avéré d'effets graves pour les organes",
-                "H372": "Risque avéré d'effets graves pour les organes en cas d'exposition prolongée"
+                # Acute toxicity
+                "H300": "⚠️ DANGER MORTEL: Mortel en cas d'ingestion",
+                "H310": "⚠️ DANGER MORTEL: Mortel par contact cutané",
+                "H330": "⚠️ DANGER MORTEL: Mortel par inhalation",
+
+                # Organ damage
+                "H370": "⚠️ DANGER: Risque avéré d'effets graves pour les organes (exposition unique)",
+                "H372": "⚠️ DANGER: Risque avéré d'effets graves pour les organes (exposition prolongée)",
+
+                # CMR (Carcinogenic, Mutagenic, Reprotoxic)
+                "H340": "⚠️ DANGER: Peut induire des anomalies génétiques (mutagène)",
+                "H350": "⚠️ DANGER: Peut provoquer le cancer (cancérogène)",
+                "H360": "⚠️ DANGER: Peut nuire à la fertilité ou au fœtus (reprotoxique)",
+
+                # Severe effects
+                "H314": "⚠️ DANGER: Provoque des brûlures de la peau et des lésions oculaires graves",
+                "H318": "⚠️ DANGER: Provoque des lésions oculaires graves",
+
+                # Environmental
+                "H400": "⚠️ ATTENTION: Très toxique pour les organismes aquatiques",
+                "H410": "⚠️ ATTENTION: Très toxique pour les organismes aquatiques, effets à long terme"
             }
 
+            # Add CMR-specific warnings
+            cmr_codes = []
             for phrase in product_safety.risk_phrases:
                 if phrase.code in critical_phrases:
-                    warnings.append(f"⚠️ DANGER: {critical_phrases[phrase.code]}")
+                    warnings.append(critical_phrases[phrase.code])
+
+                # Track CMR substances
+                if phrase.code in ["H340", "H341", "H350", "H351", "H360", "H361"]:
+                    cmr_codes.append(phrase.code)
+
+            # Add special CMR warning
+            if cmr_codes:
+                warnings.append(
+                    "🚨 SUBSTANCE CMR: Certiphyto obligatoire. Suivi médical renforcé requis. "
+                    "Interdiction pour les femmes enceintes et allaitantes."
+                )
 
         return warnings
+
+    def _get_relevant_legal_references(self, risk_phrases: List[RiskPhrase]) -> List[str]:
+        """Get relevant legal references based on risk phrases"""
+        refs = [
+            "Règlement (CE) n° 1272/2008 (CLP) - Classification, étiquetage et emballage"
+        ]
+
+        # Check for CMR substances
+        cmr_codes = [p.code for p in risk_phrases if p.code in ["H340", "H341", "H350", "H351", "H360", "H361"]]
+        if cmr_codes:
+            refs.append("Code du travail - Art. R4412-59 à R4412-93 (Agents CMR)")
+            refs.append("Décret n° 2001-97 du 1er février 2001 (Valeurs limites CMR)")
+            refs.append("Certiphyto OBLIGATOIRE pour manipulation de substances CMR")
+
+        # Check for acute toxicity
+        acute_codes = [p.code for p in risk_phrases if p.code in ["H300", "H301", "H310", "H311", "H330", "H331"]]
+        if acute_codes:
+            refs.append("Code du travail - Art. R4412-1 à R4412-58 (Agents chimiques dangereux)")
+
+        # Check for environmental hazards
+        env_codes = [p.code for p in risk_phrases if p.code in ["H400", "H410", "H411"]]
+        if env_codes:
+            refs.append("Arrêté du 4 mai 2017 relatif aux ZNT")
+            refs.append("Code de l'environnement - Art. L253-7 (Protection des milieux aquatiques)")
+
+        # General references
+        refs.extend([
+            "Code rural et de la pêche maritime - Art. L253-1 à L253-17",
+            "Arrêté du 12 septembre 2006 (Certiphyto)",
+            "Directive 2009/128/CE (Utilisation durable des pesticides)"
+        ])
+
+        return refs
 
     def _get_emergency_contacts(self) -> Dict[str, str]:
         """Get emergency contact information"""
