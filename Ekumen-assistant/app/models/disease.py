@@ -38,6 +38,8 @@ class Disease(Base):
     # Crop associations
     affected_crops = Column(JSON, nullable=False)  # List of crop types
     primary_crop = Column(String(100), nullable=False, index=True)
+    primary_crop_eppo = Column(String(6), nullable=True, index=True)  # EPPO code for primary crop (e.g., TRZAX for wheat)
+    crop_id = Column(Integer, nullable=True, index=True, doc="Foreign key to crops table (optional for referential integrity)")
     
     # Symptoms and identification
     symptoms = Column(JSON, nullable=False)  # List of symptom descriptions
@@ -90,6 +92,9 @@ class Disease(Base):
             "severity_level": self.severity_level,
             "affected_crops": self.affected_crops,
             "primary_crop": self.primary_crop,
+            "primary_crop_eppo": self.primary_crop_eppo,
+            "crop_id": self.crop_id,
+            "eppo_code": self.eppo_code,
             "symptoms": self.symptoms,
             "visual_indicators": self.visual_indicators,
             "damage_patterns": self.damage_patterns,

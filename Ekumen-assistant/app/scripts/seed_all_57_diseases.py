@@ -30,6 +30,12 @@ import json
 from sqlalchemy import text
 
 from app.core.database import AsyncSessionLocal
+from app.constants.crop_eppo_codes import (
+    validate_crop_strict,
+    get_eppo_code,
+    get_all_crops
+)
+from app.models.crop import Crop
 
 # Comprehensive disease database with official EPPO codes
 ALL_57_DISEASES = {
@@ -548,6 +554,22 @@ async def seed_all_diseases():
     print("🦠 Seeding All 57 Major French Crop Diseases with EPPO Codes")
     print("="*80)
 
+    # Pre-validate all crops before starting
+    print("\n🔍 Validating crop types...")
+    all_crops = set(ALL_57_DISEASES.keys())
+    supported_crops = set(get_all_crops())
+
+    invalid_crops = all_crops - supported_crops
+    if invalid_crops:
+        print(f"❌ ERROR: Invalid crop types found: {invalid_crops}")
+        print(f"   Supported crops: {', '.join(sorted(supported_crops))}")
+        raise ValueError(f"Invalid crops in disease database: {invalid_crops}")
+
+    print(f"✅ All {len(all_crops)} crop types are valid")
+    for crop in sorted(all_crops):
+        eppo = get_eppo_code(crop)
+        print(f"   - {crop}: {eppo}")
+
     async with AsyncSessionLocal() as db:
         total_added = 0
         total_skipped = 0
@@ -603,17 +625,33 @@ async def seed_all_diseases():
                     keywords.extend(disease_data.get('symptoms', []))
                     keywords = [k for k in keywords if k]  # Remove empty strings
 
+                    # Validate crop and get EPPO code + crop_id
+                    try:
+                        validated_crop = validate_crop_strict(crop_type)
+                        crop_eppo_code = get_eppo_code(validated_crop)
+
+                        # Get crop_id from crops table
+                        crop_query = text("SELECT id FROM crops WHERE eppo_code = :eppo_code")
+                        crop_result = await db.execute(crop_query, {"eppo_code": crop_eppo_code})
+                        crop_row = crop_result.fetchone()
+                        crop_id = crop_row[0] if crop_row else None
+
+                    except ValueError as e:
+                        print(f"  ⚠️  Crop validation error for '{crop_type}': {e}")
+                        total_errors += 1
+                        continue
+
                     # Insert disease
                     insert_query = text("""
                         INSERT INTO diseases (
                             name, scientific_name, common_names, disease_type, pathogen_name,
-                            severity_level, affected_crops, primary_crop, symptoms, visual_indicators,
+                            severity_level, affected_crops, primary_crop, primary_crop_eppo, crop_id, symptoms, visual_indicators,
                             favorable_conditions, seasonal_occurrence, treatment_options, prevention_methods,
                             yield_impact, confidence_score, data_source, last_verified,
                             description, keywords, eppo_code, is_active, created_at, updated_at
                         ) VALUES (
                             :name, :scientific_name, :common_names, :disease_type, :pathogen_name,
-                            :severity_level, :affected_crops, :primary_crop, :symptoms, :visual_indicators,
+                            :severity_level, :affected_crops, :primary_crop, :primary_crop_eppo, :crop_id, :symptoms, :visual_indicators,
                             :favorable_conditions, :seasonal_occurrence, :treatment_options, :prevention_methods,
                             :yield_impact, :confidence_score, :data_source, :last_verified,
                             :description, :keywords, :eppo_code, :is_active, NOW(), NOW()
@@ -627,8 +665,10 @@ async def seed_all_diseases():
                         "disease_type": disease_data["disease_type"],
                         "pathogen_name": disease_data["pathogen_name"],
                         "severity_level": disease_data["severity_level"],
-                        "affected_crops": json.dumps([crop_type]),
-                        "primary_crop": crop_type,
+                        "affected_crops": json.dumps([validated_crop]),
+                        "primary_crop": validated_crop,
+                        "primary_crop_eppo": crop_eppo_code,
+                        "crop_id": crop_id,
                         "symptoms": json.dumps(disease_data["symptoms"]),
                         "visual_indicators": json.dumps(disease_data.get("visual_indicators", [])),
                         "favorable_conditions": json.dumps(disease_data.get("favorable_conditions", {})),
@@ -646,7 +686,7 @@ async def seed_all_diseases():
                     })
 
                     total_added += 1
-                    print(f"  ✅ Added: {disease_data['name']} (EPPO: {disease_data.get('eppo_code', 'N/A')})")
+                    print(f"  ✅ Added: {disease_data['name']} (Disease EPPO: {disease_data.get('eppo_code', 'N/A')}, Crop: {validated_crop}/{crop_eppo_code})")
 
                 except Exception as e:
                     total_errors += 1

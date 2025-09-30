@@ -4,6 +4,7 @@ from .organization import Organization, OrganizationMembership, OrganizationFarm
 from .conversation import Conversation, Message
 from .feedback import ResponseFeedback, FeedbackType, FeedbackCategory
 from .intervention import VoiceJournalEntry, ProductUsage
+from .crop import Crop
 from .disease import Disease
 from .pest import Pest
 from .ephy import (
@@ -20,7 +21,7 @@ __all__ = [
     "Conversation", "Message",
     "ResponseFeedback", "FeedbackType", "FeedbackCategory",
     "VoiceJournalEntry", "ProductUsage",
-    "Disease", "Pest",
+    "Crop", "Disease", "Pest",
     "Produit", "SubstanceActive", "ProduitSubstance", "UsageProduit",
     "Titulaire", "Formulation", "Fonction",
     "PhraseRisque", "ProduitPhraseRisque", "ProduitClassification",
