@@ -76,6 +76,19 @@ class FarmDataInput(BaseModel):
     )
 
 
+class InterventionSummary(BaseModel):
+    """Summary of interventions for a parcel"""
+    total_interventions: int = Field(ge=0)
+    harvest_interventions: int = Field(ge=0)
+    fertilization_interventions: int = Field(ge=0)
+    pest_control_interventions: int = Field(ge=0)
+    total_harvest_quantity: Optional[float] = Field(default=None, description="Total harvest in kg")
+    average_yield_q_ha: Optional[float] = Field(default=None, description="Average yield in quintals/ha")
+    total_cost_eur: Optional[float] = Field(default=None, description="Total cost in EUR")
+    average_cost_eur_ha: Optional[float] = Field(default=None, description="Average cost per hectare")
+    has_real_data: bool = Field(default=False, description="Whether data is from real interventions or estimated")
+
+
 class ParcelRecord(BaseModel):
     """Individual parcel record"""
     id: str
@@ -86,6 +99,7 @@ class ParcelRecord(BaseModel):
     commune: Optional[str] = None
     cultures: List[str] = Field(default_factory=list)
     nb_interventions: int = Field(ge=0)
+    intervention_summary: Optional[InterventionSummary] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
