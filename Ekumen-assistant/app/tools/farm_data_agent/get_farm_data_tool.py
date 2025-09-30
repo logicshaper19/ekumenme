@@ -163,72 +163,10 @@ class GetFarmDataTool(BaseTool):
         parcels: List[str] = None,
         farm_id: str = None
     ) -> List[Dict[str, Any]]:
-        """Get farm data from local database."""
-        try:
-            async with AsyncSessionLocal() as db:
-                # TODO: Replace with actual database queries
-                # For now, return enhanced mock data that simulates database structure
-                mock_data = [
-                    {
-                        "id": 1,
-                        "farm_id": farm_id or "FR_FARM_123456",
-                        "parcel": "Parcelle A",
-                        "crop": "blé",
-                        "surface_ha": 15.5,
-                        "yield_qx_ha": 72.3,
-                        "harvest_date": "2024-08-15",
-                        "revenue_eur": 450.0,
-                        "quality_score": 8.2,
-                        "created_at": "2024-08-15T10:30:00",
-                        "updated_at": "2024-08-15T10:30:00"
-                    },
-                    {
-                        "id": 2,
-                        "farm_id": farm_id or "FR_FARM_123456",
-                        "parcel": "Parcelle B",
-                        "crop": "maïs",
-                        "surface_ha": 12.0,
-                        "yield_qx_ha": 95.8,
-                        "harvest_date": "2024-09-20",
-                        "revenue_eur": 520.0,
-                        "quality_score": 8.7,
-                        "created_at": "2024-09-20T14:15:00",
-                        "updated_at": "2024-09-20T14:15:00"
-                    },
-                    {
-                        "id": 3,
-                        "farm_id": farm_id or "FR_FARM_123456",
-                        "parcel": "Parcelle C",
-                        "crop": "colza",
-                        "surface_ha": 8.5,
-                        "yield_qx_ha": 35.2,
-                        "harvest_date": "2024-07-10",
-                        "revenue_eur": 380.0,
-                        "quality_score": 7.9,
-                        "created_at": "2024-07-10T09:45:00",
-                        "updated_at": "2024-07-10T09:45:00"
-                    }
-                ]
-
-                # Apply filters
-                filtered_data = mock_data
-
-                if time_period == "current_year":
-                    filtered_data = [d for d in filtered_data if d["harvest_date"].startswith("2024")]
-                elif time_period == "previous_year":
-                    filtered_data = [d for d in filtered_data if d["harvest_date"].startswith("2023")]
-
-                if crops:
-                    filtered_data = [d for d in filtered_data if d["crop"] in crops]
-
-                if parcels:
-                    filtered_data = [d for d in filtered_data if d["parcel"] in parcels]
-
-                return filtered_data
-
-        except Exception as e:
-            logger.error(f"Database query error: {e}")
-            return []
+        """Get farm data from MesParcelles database (async version)."""
+        # For now, call the sync version
+        # TODO: Implement true async version if needed for performance
+        return self._get_database_farm_data_sync(time_period, crops, parcels, farm_id)
 
     async def _get_mesparcelles_data(self, farm_id: str = None, parcels: List[str] = None) -> Dict[str, Any]:
         """Get data from MesParcelles API."""
@@ -311,70 +249,90 @@ class GetFarmDataTool(BaseTool):
         parcels: List[str] = None,
         farm_id: str = None
     ) -> List[Dict[str, Any]]:
-        """Get farm data from local database (synchronous version)."""
+        """Get farm data from MesParcelles database (synchronous version)."""
         try:
-            # TODO: Replace with actual database queries
-            # For now, return enhanced mock data that simulates database structure
-            mock_data = [
-                {
-                    "id": 1,
-                    "farm_id": farm_id or "FR_FARM_123456",
-                    "parcel": "Parcelle A",
-                    "crop": "blé",
-                    "surface_ha": 15.5,
-                    "yield_qx_ha": 72.3,
-                    "harvest_date": "2024-08-15",
-                    "revenue_eur": 450.0,
-                    "quality_score": 8.2,
-                    "created_at": "2024-08-15T10:30:00",
-                    "updated_at": "2024-08-15T10:30:00"
-                },
-                {
-                    "id": 2,
-                    "farm_id": farm_id or "FR_FARM_123456",
-                    "parcel": "Parcelle B",
-                    "crop": "maïs",
-                    "surface_ha": 12.0,
-                    "yield_qx_ha": 95.8,
-                    "harvest_date": "2024-09-20",
-                    "revenue_eur": 520.0,
-                    "quality_score": 8.7,
-                    "created_at": "2024-09-20T14:15:00",
-                    "updated_at": "2024-09-20T14:15:00"
-                },
-                {
-                    "id": 3,
-                    "farm_id": farm_id or "FR_FARM_123456",
-                    "parcel": "Parcelle C",
-                    "crop": "colza",
-                    "surface_ha": 8.5,
-                    "yield_qx_ha": 35.2,
-                    "harvest_date": "2024-07-10",
-                    "revenue_eur": 380.0,
-                    "quality_score": 7.9,
-                    "created_at": "2024-07-10T09:45:00",
-                    "updated_at": "2024-07-10T09:45:00"
-                }
-            ]
+            # Import MesParcelles models from Ekumenbackend
+            import sys
+            import os
+            backend_path = os.path.join(os.path.dirname(__file__), '../../../../Ekumenbackend')
+            if backend_path not in sys.path:
+                sys.path.insert(0, backend_path)
 
-            # Apply filters
-            filtered_data = mock_data
+            from app.models.mesparcelles import Parcelle, SuccessionCulture, Culture, Intervention
+            from app.core.database import SessionLocal
+            from sqlalchemy import select
+            from datetime import datetime
 
-            if time_period == "current_year":
-                filtered_data = [d for d in filtered_data if d["harvest_date"].startswith("2024")]
-            elif time_period == "previous_year":
-                filtered_data = [d for d in filtered_data if d["harvest_date"].startswith("2023")]
+            # Use synchronous session
+            with SessionLocal() as db:
+                # Query parcelles for the farm (SIRET)
+                query = select(Parcelle)
 
-            if crops:
-                filtered_data = [d for d in filtered_data if d["crop"] in crops]
+                # Filter by farm_id (SIRET)
+                if farm_id:
+                    query = query.where(Parcelle.siret_exploitation == farm_id)
 
-            if parcels:
-                filtered_data = [d for d in filtered_data if d["parcel"] in parcels]
+                # Filter by millesime (year) if time_period specified
+                current_year = datetime.now().year
+                if time_period == "current_year":
+                    query = query.where(Parcelle.millesime == current_year)
+                elif time_period == "previous_year":
+                    query = query.where(Parcelle.millesime == current_year - 1)
 
-            return filtered_data
+                # Filter by parcel names if specified
+                if parcels:
+                    query = query.where(Parcelle.nom.in_(parcels))
+
+                # Execute query
+                result = db.execute(query)
+                parcel_records = result.scalars().all()
+
+                # Convert to dict format
+                farm_data = []
+                for parcelle in parcel_records:
+                    # Get succession cultures (crops) for this parcel
+                    cultures_query = select(SuccessionCulture).join(Culture).where(
+                        SuccessionCulture.uuid_parcelle == parcelle.uuid_parcelle
+                    )
+                    cultures_result = db.execute(cultures_query)
+                    succession_cultures = cultures_result.scalars().all()
+
+                    # Get culture names
+                    culture_names = []
+                    for sc in succession_cultures:
+                        if sc.culture:
+                            culture_names.append(sc.culture.libelle)
+
+                    # Filter by crops if specified
+                    if crops and not any(crop in culture_names for crop in crops):
+                        continue
+
+                    # Get interventions for this parcel
+                    interventions_query = select(Intervention).where(
+                        Intervention.uuid_parcelle == parcelle.uuid_parcelle
+                    ).limit(10)  # Limit to recent interventions
+                    interventions_result = db.execute(interventions_query)
+                    interventions = interventions_result.scalars().all()
+
+                    farm_data.append({
+                        "id": str(parcelle.uuid_parcelle),
+                        "farm_id": parcelle.siret_exploitation,
+                        "parcel": parcelle.nom or f"Parcelle {parcelle.uuid_parcelle}",
+                        "millesime": parcelle.millesime,
+                        "surface_ha": float(parcelle.surface_mesuree_ha) if parcelle.surface_mesuree_ha else 0.0,
+                        "commune": parcelle.insee_commune,
+                        "cultures": culture_names,
+                        "nb_interventions": len(interventions),
+                        "created_at": parcelle.created_at.isoformat() if parcelle.created_at else None,
+                        "updated_at": parcelle.updated_at.isoformat() if parcelle.updated_at else None
+                    })
+
+                logger.info(f"✅ Retrieved {len(farm_data)} parcels from MesParcelles database for farm {farm_id}")
+                return farm_data
 
         except Exception as e:
-            logger.error(f"Database query error: {e}")
+            logger.error(f"❌ MesParcelles database query error: {e}", exc_info=True)
+            logger.warning("Returning empty result")
             return []
 
     def _get_mesparcelles_data_sync(self, farm_id: str = None, parcels: List[str] = None) -> Dict[str, Any]:

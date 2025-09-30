@@ -1,0 +1,81 @@
+{
+  "timestamp": "20250930_151231",
+  "phase": "PHASE_1_BASELINE",
+  "total_queries": 5,
+  "results": [
+    {
+      "query_id": 1,
+      "category": "farm_data",
+      "query": "Combien de tonnes de blé ai-je déjà vendu pour la récolte 2025 ?",
+      "prediction": "FAIL - No farm data access",
+      "response": "Pour la récolte 2025, vous avez vendu 15.5 tonnes de blé de la parcelle A. Aucune vente de blé n'a été enregistrée pour les autres parcelles ou cultures.",
+      "routing": "Query routed to standard_path path",
+      "tools_used": [],
+      "elapsed_time": 15.910195112228394,
+      "quality": "PARTIAL",
+      "expected_needs": [
+        "farm_data"
+      ]
+    },
+    {
+      "query_id": 2,
+      "category": "farm_data",
+      "query": "Quel est mon prix moyen de vente de blé à ce jour?",
+      "prediction": "FAIL - No farm data access",
+      "response": "Le prix moyen de vente de votre blé à ce jour n'est pas disponible en raison d'uneindisponibilité du service de recherche Internet. Je vous conseille de réessayer ultérieurement pour obtenir cette information. Si vous avez d'autres questions ou besoins d'informations, n'hésitez pas à me le faire savoir.",
+      "routing": "Query routed to standard_path path",
+      "tools_used": [],
+      "elapsed_time": 0.9516170024871826,
+      "quality": "PARTIAL",
+      "expected_needs": [
+        "farm_data"
+      ]
+    },
+    {
+      "query_id": 3,
+      "category": "farm_data_calculation",
+      "query": "Si je vendais mon blé (restant à vendre) à 170€/t, quel serait mon prix moyen de vente?",
+      "prediction": "FAIL - Needs farm data + calculation",
+      "response": "Pour calculer votre prix moyen de vente du blé, vous devez prendre en compte le revenu total que vous avez déjà généré avec la vente de votre blé et le revenu que vous obtiendrez en vendant le reste de votre récolte. \n\nVoici les informations pertinentes :\n- Vous avez déjà généré un revenu de 450€ avec la vente d'une partie de votre blé.\n- Il vous reste du blé à vendre.\n- Le prix de vente de votre blé restant est de 170€/t.\n\nPour calculer votre prix moyen de vente du blé, vous pouvez suivre ces é",
+      "routing": "Query routed to standard_path path",
+      "tools_used": [],
+      "elapsed_time": 1.8216941356658936,
+      "quality": "WORK",
+      "expected_needs": [
+        "farm_data",
+        "calculation"
+      ]
+    },
+    {
+      "query_id": 4,
+      "category": "market_supplier",
+      "query": "Quelles sont les propositions de prix d'achat d'engrais ammonitrate 33,5% en big bag livraison spot?",
+      "prediction": "PARTIAL - Might find generic prices",
+      "response": "Malheureusement, le service de recherche Internet pour les prix du marché n'est pas disponible actuellement. Je vous recommande de réessayer ultérieurement pour obtenir les propositions de prix d'achat d'engrais ammonitrate 33,5% en big bag livraison spot. N'hésitez pas à consulter les informations de marché une fois le service rétabli pour prendre une décision éclairée.",
+      "routing": "Query routed to standard_path path",
+      "tools_used": [],
+      "elapsed_time": 1.3006792068481445,
+      "quality": "FAIL",
+      "expected_needs": [
+        "market_prices",
+        "supplier"
+      ]
+    },
+    {
+      "query_id": 5,
+      "category": "farm_data_calculation",
+      "query": "Combien d'azote sous forme de solution azotée dois je acheter en tenant compte de mes stocks et mes achats d'azote sous toutes les formes? Hypothèse de 240 unités d'azote sur les blés, 160 unités en colza et 160 unités en orges",
+      "prediction": "FAIL - Complex multi-step",
+      "response": "Pour déterminer la quantité d'azote sous forme de solution azotée à acheter, nous devons prendre en compte les besoins en azote de vos cultures. Vous avez indiqué avoir besoin de 240 unités d'azote pour le blé, 160 unités pour le colza et 160 unités pour l'orge.\n\nEn combinant ces besoins, vous devrez acheter un total de 560 unités d'azote sous forme de solution azotée pour vos cultures de blé, colza et orge.\n\nMalheureusement, le service de recherche de fournisseurs n'est pas disponible actuellem",
+      "routing": "Query routed to standard_path path",
+      "tools_used": [],
+      "elapsed_time": 1.3707749843597412,
+      "quality": "WORK",
+      "expected_needs": [
+        "farm_data",
+        "planning",
+        "calculation"
+      ]
+    }
+  ]
+}

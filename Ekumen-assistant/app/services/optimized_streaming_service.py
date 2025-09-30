@@ -47,10 +47,10 @@ class StreamingMetrics:
 class OptimizedStreamingService:
     """
     Main optimized streaming service that orchestrates all components.
-    
+
     This replaces the old streaming_service.py with a fully optimized version.
     """
-    
+
     def __init__(self, tool_executor: Optional[Any] = None):
         # Initialize all optimization components
         self.router = UnifiedRouterService()
@@ -68,6 +68,31 @@ class OptimizedStreamingService:
         self.total_time_saved = 0.0
 
         logger.info("✅ Initialized Optimized Streaming Service")
+
+    def _normalize_context(self, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        PHASE 3 FIX: Normalize context keys for compatibility.
+
+        Different parts of the system use different key names:
+        - chat.py passes: farm_siret, user_id
+        - farm_data tools expect: farm_id
+
+        This ensures all tools receive the keys they expect.
+        """
+        if not context:
+            return {}
+
+        normalized = context.copy()
+
+        # Map farm_siret → farm_id (if farm_id not already present)
+        if "farm_siret" in normalized and "farm_id" not in normalized:
+            normalized["farm_id"] = normalized["farm_siret"]
+
+        # Map farm_id → farm_siret (if farm_siret not already present)
+        if "farm_id" in normalized and "farm_siret" not in normalized:
+            normalized["farm_siret"] = normalized["farm_id"]
+
+        return normalized
 
     def _map_query_complexity_to_llm(self, query_complexity: QueryComplexity) -> LLMComplexity:
         """Map QueryComplexity to LLMComplexity"""
@@ -275,6 +300,9 @@ class OptimizedStreamingService:
         """
         start_time = time.time()
         self.total_queries += 1
+
+        # PHASE 3 FIX: Normalize context keys
+        context = self._normalize_context(context)
 
         # Get WebSocket if connection_id provided
         websocket = None

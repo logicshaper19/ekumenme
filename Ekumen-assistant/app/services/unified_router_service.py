@@ -136,6 +136,13 @@ class UnifiedRouterService:
             "qu'est-ce que tu peux faire"
         ]
 
+        # Personal context keywords (PHASE 2 FIX)
+        self.personal_context_keywords = [
+            "mes", "mon", "ma", "j'ai", "je", "m'a", "m'ont",
+            "ma ferme", "mes parcelles", "mes cultures", "mon exploitation",
+            "chez moi", "sur ma ferme"
+        ]
+
         # Fast path - Single tool queries (simple lookups)
         self.fast_patterns = {
             "weather": ["météo", "temps", "pluie", "température", "prévision"],
@@ -400,15 +407,24 @@ class UnifiedRouterService:
                 reasoning="Simple conversational query, no tools needed"
             )
 
+        # PHASE 2 FIX: Check for personal context FIRST
+        # If query mentions "mes/mon/ma", it needs farm data
+        has_personal_context = any(kw in query_lower for kw in self.personal_context_keywords)
+
         # Check for COMPLEX queries FIRST (before fast path!)
         # This prevents analytical queries from being misclassified as simple lookups
         complex_matches = [kw for kw in self.complex_keywords if kw in query_lower]
         if complex_matches:
+            tools = ["weather", "regulatory", "farm_data", "planning"]
+            # Always include farm_data if personal context detected
+            if has_personal_context and "farm_data" not in tools:
+                tools.insert(0, "farm_data")
+
             return RoutingDecision(
                 complexity=QueryComplexity.COMPLEX,
                 execution_path=ExecutionPath.WORKFLOW_PATH,
-                required_tools=["weather", "regulatory", "farm_data", "planning"],
-                required_agents=["weather", "regulatory", "farm_data", "planning"],
+                required_tools=tools,
+                required_agents=tools,
                 use_gpt4=True,
                 estimated_time=30.0,
                 confidence=0.9,
@@ -418,11 +434,28 @@ class UnifiedRouterService:
         # Check for fast path (single tool) - only simple lookups
         for tool_type, patterns in self.fast_patterns.items():
             if any(pattern in query_lower for pattern in patterns):
+                # PHASE 2 FIX: If personal context detected, add farm_data
+                tools = [tool_type]
+                if has_personal_context and tool_type != "farm_data":
+                    tools.insert(0, "farm_data")  # Add farm_data first
+                    # Upgrade to standard path if multiple tools needed
+                    if len(tools) > 1:
+                        return RoutingDecision(
+                            complexity=QueryComplexity.MEDIUM,
+                            execution_path=ExecutionPath.STANDARD_PATH,
+                            required_tools=tools,
+                            required_agents=tools,
+                            use_gpt4=False,
+                            estimated_time=5.0,
+                            confidence=0.9,
+                            reasoning=f"Personal context detected, needs farm_data + {tool_type}"
+                        )
+
                 return RoutingDecision(
                     complexity=QueryComplexity.FAST,
                     execution_path=ExecutionPath.FAST_PATH,
-                    required_tools=[tool_type],
-                    required_agents=[tool_type],
+                    required_tools=tools,
+                    required_agents=tools,
                     use_gpt4=False,
                     estimated_time=3.0,
                     confidence=0.9,

@@ -1,0 +1,81 @@
+{
+  "timestamp": "20250930_144522",
+  "phase": "PHASE_1_BASELINE",
+  "total_queries": 5,
+  "results": [
+    {
+      "query_id": 1,
+      "category": "farm_data",
+      "query": "Combien de tonnes de blé ai-je déjà vendu pour la récolte 2025 ?",
+      "prediction": "FAIL - No farm data access",
+      "response": "Pour la récolte 2025, vous avez vendu 15.5 tonnes de blé de la parcelle A. Aucune autre vente de blé n'a été enregistrée pour cette récolte.",
+      "routing": "Query routed to standard_path path",
+      "tools_used": [],
+      "elapsed_time": 16.12667179107666,
+      "quality": "FAIL",
+      "expected_needs": [
+        "farm_data"
+      ]
+    },
+    {
+      "query_id": 2,
+      "category": "farm_data",
+      "query": "Quel est mon prix moyen de vente de blé à ce jour?",
+      "prediction": "FAIL - No farm data access",
+      "response": "Le prix moyen de vente de votre blé à ce jour est de 450,00 euros par hectare. Cette information provient de la parcelle A, où vous avez récolté 15,5 hectares de blé avec un rendement de 72,3 quintaux par hectare. La qualité du blé récolté a été évaluée à 8,2. Il est important de noter que cette donnée concerne uniquement la parcelle A et ne prend pas en compte les autres cultures ou parcelles de votre exploitation.",
+      "routing": "Query routed to standard_path path",
+      "tools_used": [],
+      "elapsed_time": 1.3163378238677979,
+      "quality": "FAIL",
+      "expected_needs": [
+        "farm_data"
+      ]
+    },
+    {
+      "query_id": 3,
+      "category": "farm_data_calculation",
+      "query": "Si je vendais mon blé (restant à vendre) à 170€/t, quel serait mon prix moyen de vente?",
+      "prediction": "FAIL - Needs farm data + calculation",
+      "response": "Pour calculer votre prix moyen de vente du blé, vous devez prendre en compte le revenu total que vous avez déjà généré avec la vente de votre blé et le montant que vous pourriez obtenir en vendant le reste de votre récolte de blé à 170€/t.\n\n1. Revenu total du blé déjà vendu:\n   - Parcelle A: 450€\n   - Total: 450€\n\n2. Calcul du prix moyen de vente:\n   - Supposons qu'il vous reste x tonnes de blé à vendre.\n   - Prix de vente actuel: 170€/t\n   - Revenu potentiel de la vente du reste du blé: x * 170",
+      "routing": "Query routed to standard_path path",
+      "tools_used": [],
+      "elapsed_time": 2.0667641162872314,
+      "quality": "FAIL",
+      "expected_needs": [
+        "farm_data",
+        "calculation"
+      ]
+    },
+    {
+      "query_id": 4,
+      "category": "market_supplier",
+      "query": "Quelles sont les propositions de prix d'achat d'engrais ammonitrate 33,5% en big bag livraison spot?",
+      "prediction": "PARTIAL - Might find generic prices",
+      "response": "Les outils ne fournissent pas directement les propositions de prix d'achat d'engrais ammonitrate 33,5% en big bag livraison spot. Cependant, je peux vous recommander de contacter des fournisseurs locaux d'engrais agricoles pour obtenir des devis personnalisés en fonction de vos besoins et de la quantité requise pour vos parcelles de blé, maïs et colza.\n\nVous pouvez également consulter les coopératives agricoles de votre région ou utiliser des plateformes en ligne spécialisées dans la vente d'eng",
+      "routing": "Query routed to standard_path path",
+      "tools_used": [],
+      "elapsed_time": 1.7036070823669434,
+      "quality": "FAIL",
+      "expected_needs": [
+        "market_prices",
+        "supplier"
+      ]
+    },
+    {
+      "query_id": 5,
+      "category": "farm_data_calculation",
+      "query": "Combien d'azote sous forme de solution azotée dois je acheter en tenant compte de mes stocks et mes achats d'azote sous toutes les formes? Hypothèse de 240 unités d'azote sur les blés, 160 unités en colza et 160 unités en orges",
+      "prediction": "FAIL - Complex multi-step",
+      "response": "Pour calculer la quantité d'azote sous forme de solution azotée à acheter, nous devons prendre en compte les besoins en azote de chaque culture. Vous avez estimé avoir besoin de 240 unités d'azote pour le blé, 160 unités pour le colza et 160 unités pour l'orge.\n\nEn consultant les données de vos parcelles, nous savons que vous cultivez du blé, du colza et de l'orge. Sur la parcelle A, qui comprend du blé, du colza et de l'orge, l'analyse du sol indique un niveau d'azote de 25 ppm.\n\nEn combinant c",
+      "routing": "Query routed to standard_path path",
+      "tools_used": [],
+      "elapsed_time": 2.753268003463745,
+      "quality": "FAIL",
+      "expected_needs": [
+        "farm_data",
+        "planning",
+        "calculation"
+      ]
+    }
+  ]
+}

@@ -17,6 +17,7 @@ from app.services.langgraph_workflow_service import LangGraphWorkflowService
 from app.services.memory_service import MemoryService
 from app.services.multi_agent_service import MultiAgentService
 from app.services.performance_optimization_service import PerformanceOptimizationService, performance_monitor
+from app.services.lcel_chat_service import get_lcel_chat_service
 import logging
 
 logger = logging.getLogger(__name__)
@@ -32,11 +33,16 @@ class ChatService:
         self.memory_service = None
         self.multi_agent_service = None
         self.performance_service = None
+        self.lcel_service = None  # NEW: LCEL service with automatic history
         self._initialize_all_services()
 
     def _initialize_all_services(self):
         """Initialize all advanced AI services"""
         try:
+            # Initialize LCEL service first (NEW - modern LangChain with automatic history)
+            self.lcel_service = get_lcel_chat_service()
+            logger.info("✅ LCEL Chat Service initialized (automatic history management)")
+
             # Initialize performance optimization first
             self.performance_service = PerformanceOptimizationService()
             logger.info("Performance optimization service initialized")
@@ -62,6 +68,7 @@ class ChatService:
         except Exception as e:
             logger.error(f"Failed to initialize advanced services: {e}")
             # Set fallback to None for failed services
+            self.lcel_service = None
             self.advanced_langchain_service = None
             self.workflow_service = None
             self.memory_service = None
@@ -322,6 +329,64 @@ class ChatService:
             "total_messages": total_messages
         }
     
+    @performance_monitor("process_message_with_lcel")
+    async def process_message_with_lcel(
+        self,
+        db: AsyncSession,
+        conversation_id: str,
+        user_id: str,
+        message_content: str,
+        use_rag: bool = False
+    ) -> dict:
+        """
+        Process message using LCEL service with automatic history management
+
+        This is the NEW recommended method that uses:
+        - RunnableWithMessageHistory for automatic history
+        - LCEL chains for modern LangChain
+        - Automatic message persistence
+
+        NO MANUAL MESSAGE LOADING/SAVING NEEDED!
+        """
+        try:
+            if not self.lcel_service:
+                logger.warning("LCEL service not available, falling back to legacy method")
+                return await self.process_message_with_agent(db, conversation_id, user_id, message_content)
+
+            logger.info(f"🚀 Using LCEL service with automatic history for conversation {conversation_id}")
+
+            # Process with LCEL service - history is automatic!
+            response = await self.lcel_service.process_message(
+                db_session=db,
+                conversation_id=conversation_id,
+                message=message_content,
+                use_rag=use_rag
+            )
+
+            # Return formatted response
+            return {
+                "user_message": {
+                    "content": message_content,
+                    "created_at": datetime.now().isoformat()
+                },
+                "ai_response": {
+                    "content": response,
+                    "agent": "lcel_agent",
+                    "created_at": datetime.now().isoformat(),
+                    "metadata": {
+                        "processing_method": "lcel_with_automatic_history",
+                        "use_rag": use_rag
+                    },
+                    "processing_method": "lcel_with_automatic_history",
+                    "confidence": 0.95
+                }
+            }
+
+        except Exception as e:
+            logger.error(f"Error processing message with LCEL: {e}")
+            # Fallback to legacy method
+            return await self.process_message_with_agent(db, conversation_id, user_id, message_content)
+
     @performance_monitor("process_message_with_agent")
     async def process_message_with_agent(
         self,
@@ -331,7 +396,11 @@ class ChatService:
         message_content: str,
         farm_siret: Optional[str] = None
     ) -> dict:
-        """Process a user message with the most advanced AI capabilities available"""
+        """
+        Process a user message with the most advanced AI capabilities available
+
+        LEGACY METHOD - Consider using process_message_with_lcel instead
+        """
         try:
             # Get conversation to determine agent type
             conversation = await self.get_conversation(db, conversation_id, user_id)
