@@ -237,22 +237,28 @@ class EnhancedEnvironmentalRegulationsService:
         amm_codes: List[str],
         impact_data: Optional[EnvironmentalImpactData]
     ) -> Optional[List[ZNTCompliance]]:
-        """Get ZNT compliance from EPHY database"""
+        """
+        Get ZNT compliance from EPHY database
+
+        PERFORMANCE OPTIMIZATION: Batch query for multiple products
+        """
         try:
             znt_compliance_list = []
-            
-            for amm_code in amm_codes:
-                # Get product usage data
-                usage_query = select(UsageProduit).where(
-                    UsageProduit.numero_amm == amm_code
-                ).limit(1)
-                
-                usage_result = await db.execute(usage_query)
-                usage = usage_result.scalars().first()
-                
-                if not usage:
-                    logger.info(f"No usage data found for AMM: {amm_code}")
-                    continue
+
+            # PERFORMANCE FIX: Batch query instead of N queries
+            usage_query = select(UsageProduit).where(
+                UsageProduit.numero_amm.in_(amm_codes)
+            )
+
+            usage_result = await db.execute(usage_query)
+            usages = usage_result.scalars().all()
+
+            if not usages:
+                logger.info(f"No usage data found for AMM codes: {amm_codes}")
+                return None
+
+            # Process each usage
+            for usage in usages:
                 
                 # Check each ZNT type
                 znt_types = {
@@ -262,47 +268,66 @@ class EnhancedEnvironmentalRegulationsService:
                 }
                 
                 for znt_type, znt_value in znt_types.items():
-                    if znt_value and float(znt_value) > 0:
-                        required_znt = float(znt_value)
-                        actual_distance = impact_data.water_proximity_m if impact_data else None
+                    # EDGE CASE FIX: Validate ZNT value is a valid number
+                    try:
+                        if znt_value and float(znt_value) > 0:
+                            required_znt = float(znt_value)
+                        else:
+                            continue
+                    except (ValueError, TypeError) as e:
+                        logger.warning(f"Invalid ZNT value for {znt_type}: {znt_value} - {e}")
+                        continue
 
-                        # HIGH PRIORITY #2: Enhanced ZNT reduction logic
-                        water_body_type = impact_data.water_body_type if impact_data else WaterBodyType.UNKNOWN
-                        equipment_class = impact_data.drift_reduction_equipment if impact_data else EquipmentDriftClass.NO_EQUIPMENT
-                        has_vegetation_buffer = impact_data.has_vegetation_buffer if impact_data else False
+                    actual_distance = impact_data.water_proximity_m if impact_data else None
 
-                        # Calculate ZNT with reduction
-                        znt_with_reduction = self._calculate_znt_reduction(
-                            required_znt,
-                            equipment_class,
-                            has_vegetation_buffer,
-                            water_body_type
+                    # HIGH PRIORITY #2: Enhanced ZNT reduction logic
+                    water_body_type = impact_data.water_body_type if impact_data else WaterBodyType.UNKNOWN
+                    equipment_class = impact_data.drift_reduction_equipment if impact_data else EquipmentDriftClass.NO_EQUIPMENT
+                    has_vegetation_buffer = impact_data.has_vegetation_buffer if impact_data else False
+
+                    # Calculate ZNT with reduction
+                    znt_with_reduction = self._calculate_znt_reduction(
+                        required_znt,
+                        equipment_class,
+                        has_vegetation_buffer,
+                        water_body_type
+                    )
+
+                    # Check compliance against reduced ZNT
+                    is_compliant = True
+                    if actual_distance is not None:
+                        effective_znt = znt_with_reduction.reduced_znt_m if znt_with_reduction.reduced_znt_m else required_znt
+                        is_compliant = actual_distance >= effective_znt
+
+                    znt_compliance_list.append(
+                        ZNTCompliance(
+                            required_znt_m=required_znt,
+                            actual_distance_m=actual_distance,
+                            is_compliant=is_compliant,
+                            znt_type=znt_type,
+                            reduction_possible=znt_with_reduction.reduction_possible,
+                            reduction_conditions=znt_with_reduction.reduction_conditions,
+                            equipment_class_required=znt_with_reduction.equipment_class_required,
+                            max_reduction_percent=znt_with_reduction.max_reduction_percent,
+                            minimum_absolute_znt_m=znt_with_reduction.minimum_absolute_znt_m,
+                            reduced_znt_m=znt_with_reduction.reduced_znt_m,
+                            water_body_type=water_body_type
                         )
-
-                        # Check compliance against reduced ZNT
-                        is_compliant = True
-                        if actual_distance is not None:
-                            effective_znt = znt_with_reduction.reduced_znt_m if znt_with_reduction.reduced_znt_m else required_znt
-                            is_compliant = actual_distance >= effective_znt
-
-                        znt_compliance_list.append(
-                            ZNTCompliance(
-                                required_znt_m=required_znt,
-                                actual_distance_m=actual_distance,
-                                is_compliant=is_compliant,
-                                znt_type=znt_type,
-                                reduction_possible=znt_with_reduction.reduction_possible,
-                                reduction_conditions=znt_with_reduction.reduction_conditions,
-                                equipment_class_required=znt_with_reduction.equipment_class_required,
-                                max_reduction_percent=znt_with_reduction.max_reduction_percent,
-                                minimum_absolute_znt_m=znt_with_reduction.minimum_absolute_znt_m,
-                                reduced_znt_m=znt_with_reduction.reduced_znt_m,
-                                water_body_type=water_body_type
-                            )
-                        )
+                    )
             
+            # EDGE CASE FIX: When multiple products, consolidate by ZNT type (use most restrictive)
+            if len(znt_compliance_list) > 1:
+                znt_by_type = {}
+                for znt in znt_compliance_list:
+                    znt_type = znt.znt_type
+                    if znt_type not in znt_by_type or znt.required_znt_m > znt_by_type[znt_type].required_znt_m:
+                        znt_by_type[znt_type] = znt
+
+                znt_compliance_list = list(znt_by_type.values())
+                logger.info(f"Consolidated {len(znt_by_type)} ZNT types from multiple products (using most restrictive)")
+
             return znt_compliance_list if znt_compliance_list else None
-            
+
         except Exception as e:
             logger.error(f"Error getting ZNT compliance from database: {e}")
             return None
