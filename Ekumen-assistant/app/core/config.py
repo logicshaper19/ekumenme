@@ -93,6 +93,9 @@ class Settings(BaseSettings):
         }
     }
     
+    # Tavily Search API Configuration (for Internet mode, Supplier mode, Market prices)
+    TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
+
     # Voice Processing Configuration
     ELEVENLABS_API_KEY: str = os.getenv("ELEVENLABS_API_KEY", "")
     ELEVENLABS_VOICE_ID: str = os.getenv("ELEVENLABS_VOICE_ID", "pNInz6obpgDQGcFmaJgB")  # Adam voice
