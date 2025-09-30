@@ -120,6 +120,7 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://localhost:3001",
         "http://localhost:3002",
+        "http://localhost:3003",  # Frontend running on port 3003
         "http://localhost:8080",
         "https://agricultural-chatbot.com",
         "https://www.agricultural-chatbot.com",
