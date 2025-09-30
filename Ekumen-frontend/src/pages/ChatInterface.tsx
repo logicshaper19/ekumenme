@@ -4,6 +4,7 @@ import { useWebSocket } from '../services/websocket'
 import { useAuth } from '../hooks/useAuth'
 import VoiceInterface from '../components/VoiceInterface'
 import MarkdownRenderer from '../components/MarkdownRenderer'
+import MessageActions from '../components/MessageActions'
 
 interface Message {
   id: string
@@ -13,6 +14,7 @@ interface Message {
   agent?: string
   agentName?: string
   isStreaming?: boolean
+  queryText?: string  // The user's original query (for assistant messages)
   metadata?: {
     agent_type?: string
     confidence?: number
@@ -39,6 +41,7 @@ const ChatInterface: React.FC = () => {
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [isCreatingConversation, setIsCreatingConversation] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const lastUserQueryRef = useRef<string>('')  // Track last user query for feedback
   const webSocket = useWebSocket()
 
   const agents: Record<string, AgentInfo> = {
@@ -151,7 +154,8 @@ const ChatInterface: React.FC = () => {
         sender: 'assistant',
         timestamp: new Date(data.message.timestamp),
         agent: data.agent,
-        agentName: agents[data.agent]?.name
+        agentName: agents[data.agent]?.name,
+        queryText: lastUserQueryRef.current
       }
 
       setMessages(prev => [...prev, assistantMessage])
@@ -165,7 +169,8 @@ const ChatInterface: React.FC = () => {
         content: '🌾 Traitement en cours...',
         sender: 'assistant',
         timestamp: new Date(),
-        isStreaming: true
+        isStreaming: true,
+        queryText: lastUserQueryRef.current
       }
 
       setMessages(prev => [...prev, assistantMessage])
@@ -372,13 +377,17 @@ const ChatInterface: React.FC = () => {
 
     const threadId = `thread-${Date.now()}`
     const messageId = `msg-${Date.now()}`
+    const queryText = inputValue.trim()
     const userMessage: Message = {
       id: messageId,
-      content: inputValue.trim(),
+      content: queryText,
       sender: 'user',
       timestamp: new Date(),
       metadata: { thread_id: threadId }
     }
+
+    // Store the query for feedback tracking
+    lastUserQueryRef.current = queryText
 
     // Select appropriate agent
     const selectedAgent = selectAgentForMessage(inputValue)
@@ -533,6 +542,16 @@ const ChatInterface: React.FC = () => {
                         minute: '2-digit'
                       })}
                     </div>
+
+                    {/* Message Actions (thumbs up/down, copy) - only for assistant messages */}
+                    {message.sender === 'assistant' && !message.isStreaming && conversationId && (
+                      <MessageActions
+                        messageId={message.id}
+                        conversationId={conversationId}
+                        content={message.content}
+                        queryText={message.queryText}
+                      />
+                    )}
                   </div>
                 </div>
               </div>

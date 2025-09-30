@@ -27,7 +27,7 @@ except ImportError:
 
 from app.core.config import settings
 from app.core.database import init_db, close_db
-from app.api.v1 import auth, chat, journal, farms, products, chat_optimized
+from app.api.v1 import auth, chat, journal, farms, products, chat_optimized, feedback
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -79,6 +79,7 @@ app.include_router(chat_optimized.router, prefix="/api/v1/chat", tags=["chat-opt
 app.include_router(journal.router, prefix="/api/v1/journal", tags=["journal"])
 app.include_router(farms.router, prefix="/api/v1/farms", tags=["farms"])
 app.include_router(products.router, prefix="/api/v1/products", tags=["products"])
+app.include_router(feedback.router, prefix="/api/v1/feedback", tags=["feedback"])
 
 # Health check endpoint
 @app.get("/health")
