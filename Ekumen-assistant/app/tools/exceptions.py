@@ -52,8 +52,8 @@ class WeatherDataError(ToolException):
     """Weather data missing or malformed"""
     def __init__(self, details: str):
         super().__init__(
-            f"Données météo manquantes ou invalides: {details}. "
-            f"Veuillez fournir des données météo valides."
+            f"Données météo incomplètes: {details}. "
+            f"Le service météo n'a pas retourné toutes les informations. Réessayez."
         )
 
 
@@ -181,6 +181,135 @@ class MillesimeNotFoundError(ToolException):
 
 
 # ============================================================================
+# EPPO Code Exceptions
+# ============================================================================
+
+class EPPOCodeNotFoundError(ToolException):
+    """EPPO code not found in database"""
+    def __init__(self, eppo_code: str):
+        super().__init__(
+            f"Code EPPO '{eppo_code}' non trouvé dans la base de données. "
+            f"Vérifiez le code ou utilisez le nom commun de la culture."
+        )
+
+
+class InvalidEPPOCodeError(ToolException):
+    """Invalid EPPO code format"""
+    def __init__(self, eppo_code: str):
+        super().__init__(
+            f"Code EPPO '{eppo_code}' invalide. "
+            f"Les codes EPPO doivent contenir 5 lettres (ex: TRZAX pour blé)."
+        )
+
+
+class EPPODatabaseError(ToolException):
+    """EPPO database access error"""
+    def __init__(self, details: str = ""):
+        message = "La base de données EPPO est temporairement indisponible."
+        if details:
+            message += f" (Détails: {details})"
+        super().__init__(message)
+
+
+class CropNotMappedToEPPOError(ToolException):
+    """Crop name not mapped to EPPO code"""
+    def __init__(self, crop_name: str):
+        super().__init__(
+            f"La culture '{crop_name}' n'est pas encore associée à un code EPPO. "
+            f"Contactez le support pour ajouter cette culture."
+        )
+
+
+# ============================================================================
+# BBCH Stage Exceptions
+# ============================================================================
+
+class BBCHStageNotFoundError(ToolException):
+    """BBCH stage not found for crop"""
+    def __init__(self, crop: str, bbch_stage: int):
+        super().__init__(
+            f"Stade BBCH {bbch_stage} non trouvé pour la culture '{crop}'. "
+            f"Vérifiez le stade (0-99) et la culture."
+        )
+
+
+class InvalidBBCHStageError(ToolException):
+    """Invalid BBCH stage number"""
+    def __init__(self, bbch_stage: int):
+        super().__init__(
+            f"Stade BBCH {bbch_stage} invalide. "
+            f"Les stades BBCH doivent être entre 0 et 99."
+        )
+
+
+class BBCHDataMissingError(ToolException):
+    """BBCH data not available for crop"""
+    def __init__(self, crop: str):
+        super().__init__(
+            f"Données BBCH non disponibles pour '{crop}'. "
+            f"Cette culture n'a pas encore de stades BBCH définis."
+        )
+
+
+class ZadoksStageNotFoundError(ToolException):
+    """Zadoks stage not found for cereal"""
+    def __init__(self, crop: str, zadoks_stage: int):
+        super().__init__(
+            f"Stade Zadoks {zadoks_stage} non trouvé pour '{crop}'. "
+            f"L'échelle Zadoks s'applique uniquement aux céréales (blé, orge, seigle)."
+        )
+
+
+# ============================================================================
+# Crop/Field Exceptions
+# ============================================================================
+
+class InvalidCropNameError(ToolException):
+    """Invalid or unknown crop name"""
+    def __init__(self, crop_name: str):
+        super().__init__(
+            f"Culture '{crop_name}' non reconnue. "
+            f"Utilisez les noms standards (blé, maïs, colza, tournesol, etc.)."
+        )
+
+
+class InvalidFieldSizeError(ToolException):
+    """Invalid field size"""
+    def __init__(self, size: float):
+        super().__init__(
+            f"Surface de parcelle invalide: {size} ha. "
+            f"Vérifiez la surface saisie (doit être > 0)."
+        )
+
+
+class InvalidDoseError(ToolException):
+    """Invalid product dose"""
+    def __init__(self, dose: float, unit: str):
+        super().__init__(
+            f"Dose invalide: {dose} {unit}. "
+            f"Vérifiez les recommandations du produit et les doses homologuées."
+        )
+
+
+class GrowthStageNotFoundError(ToolException):
+    """Growth stage not found for crop"""
+    def __init__(self, crop: str, stage: str):
+        super().__init__(
+            f"Stade de croissance '{stage}' non trouvé pour {crop}. "
+            f"Utilisez un stade valide (ex: semis, tallage, montaison, épiaison, floraison, maturation)."
+        )
+
+
+class KcCoefficientNotFoundError(ToolException):
+    """Kc coefficient not found"""
+    def __init__(self, crop: str, stage: str):
+        super().__init__(
+            f"Coefficient Kc non trouvé pour {crop} au stade {stage}. "
+            f"Données d'irrigation non disponibles pour cette combinaison."
+        )
+
+
+# ============================================================================
 # Crop Health Tool Exceptions
 # ============================================================================
 
@@ -246,8 +375,9 @@ class OptimizationError(ToolException):
     """Error optimizing schedule"""
     def __init__(self, details: str):
         super().__init__(
-            f"Erreur lors de l'optimisation du planning: {details}. "
-            f"Vérifiez les contraintes et les ressources disponibles."
+            f"Impossible d'optimiser le planning: {details}. "
+            f"Vérifiez que vous avez assez de matériel et de main-d'œuvre disponibles, "
+            f"et que les dates sont réalistes."
         )
 
 
@@ -336,6 +466,76 @@ class PriceNotAvailableError(ToolException):
 
 
 # ============================================================================
+# Database Exceptions
+# ============================================================================
+
+class DatabaseConnectionError(ToolException):
+    """Database connection failed"""
+    def __init__(self, db_name: str = ""):
+        message = "Impossible de se connecter à la base de données."
+        if db_name:
+            message += f" (Base: {db_name})"
+        message += " Réessayez ou contactez le support."
+        super().__init__(message)
+
+
+class DatabaseQueryError(ToolException):
+    """Database query failed"""
+    def __init__(self, details: str):
+        super().__init__(
+            f"Erreur lors de la requête en base de données: {details}. "
+            f"Contactez le support si le problème persiste."
+        )
+
+
+class DataIntegrityError(ToolException):
+    """Data integrity violation"""
+    def __init__(self, details: str):
+        super().__init__(
+            f"Erreur d'intégrité des données: {details}. "
+            f"Les données sont incohérentes. Contactez le support."
+        )
+
+
+# ============================================================================
+# Validation Exceptions
+# ============================================================================
+
+class DateValidationError(ToolException):
+    """Invalid date format or value"""
+    def __init__(self, date_str: str):
+        super().__init__(
+            f"Date invalide: '{date_str}'. "
+            f"Utilisez le format JJ/MM/AAAA ou AAAA-MM-JJ."
+        )
+
+
+class CoordinateValidationError(ToolException):
+    """Invalid GPS coordinates"""
+    def __init__(self, lat: float = None, lon: float = None):
+        if lat is not None and lon is not None:
+            super().__init__(
+                f"Coordonnées GPS invalides: latitude={lat}, longitude={lon}. "
+                f"Vérifiez les coordonnées (France: lat 41-51, lon -5 à 10)."
+            )
+        else:
+            super().__init__(
+                "Coordonnées GPS invalides. "
+                "Vérifiez le format (latitude, longitude)."
+            )
+
+
+class QuantityValidationError(ToolException):
+    """Invalid quantity value"""
+    def __init__(self, quantity: float, unit: str, context: str = ""):
+        message = f"Quantité invalide: {quantity} {unit}."
+        if context:
+            message += f" ({context})"
+        message += " Vérifiez la valeur saisie."
+        super().__init__(message)
+
+
+# ============================================================================
 # Generic Tool Exceptions
 # ============================================================================
 
@@ -364,4 +564,80 @@ class InsufficientDataError(ToolException):
             f"Données insuffisantes pour effectuer l'opération. "
             f"Données requises: {required_data}."
         )
+
+
+# ============================================================================
+# Exception Categories (for better error handling)
+# ============================================================================
+
+# Network/API related exceptions
+API_EXCEPTIONS = (
+    WeatherAPIError,
+    RegulatoryAPIError,
+    FarmDataAPIError,
+    CropHealthAPIError,
+    PlanningAPIError,
+    SustainabilityAPIError,
+    SearchAPIError,
+    SupplierAPIError,
+    EPPODatabaseError,
+)
+
+# Data validation related exceptions
+VALIDATION_EXCEPTIONS = (
+    WeatherValidationError,
+    AMMValidationError,
+    InvalidSIRETError,
+    InvalidDateRangeError,
+    DateValidationError,
+    CoordinateValidationError,
+    QuantityValidationError,
+    InvalidEPPOCodeError,
+    InvalidBBCHStageError,
+    InvalidCropNameError,
+    InvalidFieldSizeError,
+    InvalidDoseError,
+)
+
+# Not found errors
+NOT_FOUND_EXCEPTIONS = (
+    ProductNotFoundError,
+    FarmNotFoundError,
+    ParcelleNotFoundError,
+    InterventionNotFoundError,
+    MillesimeNotFoundError,
+    DiseaseNotFoundError,
+    PestNotFoundError,
+    SupplierNotFoundError,
+    WeatherLocationNotFoundError,
+    EPPOCodeNotFoundError,
+    BBCHStageNotFoundError,
+    BBCHDataMissingError,
+    ZadoksStageNotFoundError,
+    GrowthStageNotFoundError,
+    KcCoefficientNotFoundError,
+)
+
+# Database related exceptions
+DATABASE_EXCEPTIONS = (
+    DatabaseConnectionError,
+    DatabaseQueryError,
+    DataIntegrityError,
+    AMMDataError,
+)
+
+# Timeout related exceptions
+TIMEOUT_EXCEPTIONS = (
+    WeatherTimeoutError,
+    ToolTimeoutError,
+)
+
+# All agricultural tool exceptions
+ALL_TOOL_EXCEPTIONS = (
+    API_EXCEPTIONS +
+    VALIDATION_EXCEPTIONS +
+    NOT_FOUND_EXCEPTIONS +
+    DATABASE_EXCEPTIONS +
+    TIMEOUT_EXCEPTIONS
+)
 
