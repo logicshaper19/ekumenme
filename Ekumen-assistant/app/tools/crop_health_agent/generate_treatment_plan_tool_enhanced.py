@@ -27,6 +27,7 @@ from app.tools.schemas.treatment_schemas import (
     TreatmentSchedule,
     CostAnalysis,
     MonitoringPlan,
+    ExecutiveSummary,
     TreatmentPriority,
     TreatmentType,
     TreatmentTiming
@@ -154,7 +155,15 @@ class EnhancedTreatmentService:
                 success=False,
                 crop_type=input_data.crop_type,
                 plan_metadata={"error": str(e)},
-                executive_summary={},
+                executive_summary=ExecutiveSummary(
+                    total_issues_identified=0,
+                    priority_level=TreatmentPriority.LOW,
+                    estimated_treatment_duration="unknown",
+                    has_disease_issues=False,
+                    has_pest_issues=False,
+                    has_nutrient_issues=False,
+                    key_recommendations=["Erreur lors de la génération du plan"]
+                ),
                 treatment_steps=[],
                 treatment_schedule=[],
                 cost_analysis=CostAnalysis(
@@ -178,7 +187,15 @@ class EnhancedTreatmentService:
                 success=False,
                 crop_type=input_data.crop_type,
                 plan_metadata={},
-                executive_summary={},
+                executive_summary=ExecutiveSummary(
+                    total_issues_identified=0,
+                    priority_level=TreatmentPriority.LOW,
+                    estimated_treatment_duration="unknown",
+                    has_disease_issues=False,
+                    has_pest_issues=False,
+                    has_nutrient_issues=False,
+                    key_recommendations=["Aucune analyse fournie"]
+                ),
                 treatment_steps=[],
                 treatment_schedule=[],
                 cost_analysis=CostAnalysis(
@@ -759,7 +776,15 @@ async def generate_treatment_plan_enhanced(
             success=False,
             crop_type=crop_type,
             plan_metadata={},
-            executive_summary={},
+            executive_summary=ExecutiveSummary(
+                total_issues_identified=0,
+                priority_level=TreatmentPriority.LOW,
+                estimated_treatment_duration="unknown",
+                has_disease_issues=False,
+                has_pest_issues=False,
+                has_nutrient_issues=False,
+                key_recommendations=["Erreur de validation"]
+            ),
             treatment_steps=[],
             treatment_schedule=[],
             cost_analysis=CostAnalysis(
@@ -774,7 +799,6 @@ async def generate_treatment_plan_enhanced(
             ),
             prevention_measures=[],
             total_steps=0,
-            timestamp=datetime.now(),
             error="Erreur de validation des paramètres. Vérifiez les analyses fournies.",
             error_type="validation_error"
         )
@@ -786,7 +810,15 @@ async def generate_treatment_plan_enhanced(
             success=False,
             crop_type=crop_type,
             plan_metadata={},
-            executive_summary={},
+            executive_summary=ExecutiveSummary(
+                total_issues_identified=0,
+                priority_level=TreatmentPriority.LOW,
+                estimated_treatment_duration="unknown",
+                has_disease_issues=False,
+                has_pest_issues=False,
+                has_nutrient_issues=False,
+                key_recommendations=["Erreur inattendue"]
+            ),
             treatment_steps=[],
             treatment_schedule=[],
             cost_analysis=CostAnalysis(
@@ -801,7 +833,6 @@ async def generate_treatment_plan_enhanced(
             ),
             prevention_measures=[],
             total_steps=0,
-            timestamp=datetime.now(),
             error="Erreur inattendue lors de la génération du plan de traitement. Veuillez réessayer.",
             error_type="unknown"
         )
