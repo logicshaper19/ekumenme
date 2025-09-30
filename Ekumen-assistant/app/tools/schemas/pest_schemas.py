@@ -56,16 +56,27 @@ class PestIdentificationInput(BaseModel):
     """Input schema for pest identification"""
     
     crop_type: str = Field(
-        description="Type of crop (e.g., 'blé', 'maïs', 'colza')"
+        description="Type of crop (e.g., 'blé', 'maïs', 'colza')",
+        min_length=1,
+        max_length=100
     )
     damage_symptoms: List[str] = Field(
         min_items=1,
+        max_items=50,
         description="List of observed damage symptoms"
     )
     pest_indicators: Optional[List[str]] = Field(
         default=None,
         description="List of pest indicators (eggs, larvae, adults observed)"
     )
+
+    @validator('pest_indicators')
+    def clean_indicators(cls, v):
+        """Remove empty strings and limit to 30 items"""
+        if v is None:
+            return None
+        cleaned = [s.strip() for s in v if s and s.strip()]
+        return cleaned[:30] if len(cleaned) > 30 else cleaned
     eppo_code: Optional[str] = Field(
         default=None,
         description="EPPO code for crop identification"

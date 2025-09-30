@@ -305,24 +305,40 @@ class EnhancedPestService:
         # Convert database results to PestIdentification objects
         for pest_result in pest_results:
             pest_data = pest_result.get("pest", {})
-            
+
+            # Base confidence from database
+            base_confidence = pest_result.get("confidence_score", 0.5)
+
+            # BBCH stage boost: 15% if in susceptible stage
+            bbch_boost = 0.0
+            susceptible_stages = pest_data.get("susceptible_stages")
+            if bbch_stage and susceptible_stages:
+                for stage_range in susceptible_stages:
+                    if isinstance(stage_range, list) and len(stage_range) == 2:
+                        if stage_range[0] <= bbch_stage <= stage_range[1]:
+                            bbch_boost = 0.15
+                            break
+
+            # Final confidence
+            final_confidence = min(base_confidence + bbch_boost, 1.0)
+
             identification = PestIdentification(
                 pest_name=pest_data.get("name", "Unknown"),
                 scientific_name=pest_data.get("scientific_name"),
                 pest_type=PestType(pest_data.get("type", "unknown")),
                 pest_stage=PestStage(pest_data.get("stage", "unknown")) if pest_data.get("stage") else None,
-                confidence=pest_result.get("confidence_score", 0.5),
+                confidence=final_confidence,
                 severity=PestSeverity(pest_data.get("severity_level", "moderate")),
                 damage_patterns=pest_result.get("matching_damage", []),
                 treatment_recommendations=pest_data.get("treatment_options", []),
                 prevention_measures=pest_data.get("prevention_methods", []),
                 eppo_code=pest_data.get("eppo_code"),
-                susceptible_bbch_stages=pest_data.get("susceptible_stages"),
+                susceptible_bbch_stages=susceptible_stages,
                 economic_threshold=pest_data.get("economic_threshold"),
                 natural_enemies=pest_data.get("natural_enemies"),
                 monitoring_methods=pest_data.get("monitoring_methods")
             )
-            
+
             identifications.append(identification)
         
         # Filter by minimum confidence threshold
