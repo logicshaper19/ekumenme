@@ -1,10 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Send, Bot, User, Loader2 } from 'lucide-react'
+import { Send, Bot, User, Loader2, Paperclip, X, FileText, Globe, Package } from 'lucide-react'
 import { useWebSocket } from '../services/websocket'
 import { useAuth } from '../hooks/useAuth'
 import VoiceInterface from '../components/VoiceInterface'
 import MarkdownRenderer from '../components/MarkdownRenderer'
 import MessageActions from '../components/MessageActions'
+
+type ChatMode = 'supplier' | 'internet' | null
+
+interface AttachedFile {
+  id: string
+  name: string
+  size: number
+  type: string
+  file: File
+}
 
 interface Message {
   id: string
@@ -15,6 +25,8 @@ interface Message {
   agentName?: string
   isStreaming?: boolean
   queryText?: string  // The user's original query (for assistant messages)
+  attachments?: AttachedFile[]
+  mode?: ChatMode
   metadata?: {
     agent_type?: string
     confidence?: number
@@ -40,8 +52,11 @@ const ChatInterface: React.FC = () => {
   const [showVoiceInterface, setShowVoiceInterface] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [isCreatingConversation, setIsCreatingConversation] = useState(false)
+  const [chatMode, setChatMode] = useState<ChatMode>(null)
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const lastUserQueryRef = useRef<string>('')  // Track last user query for feedback
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const webSocket = useWebSocket()
 
   const agents: Record<string, AgentInfo> = {
@@ -372,6 +387,32 @@ const ChatInterface: React.FC = () => {
     return agents.farm_data
   }
 
+  // File handling functions
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files) return
+
+    const newFiles: AttachedFile[] = Array.from(files).map(file => ({
+      id: `file-${Date.now()}-${Math.random()}`,
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      file: file
+    }))
+
+    setAttachedFiles(prev => [...prev, ...newFiles])
+  }
+
+  const handleRemoveFile = (fileId: string) => {
+    setAttachedFiles(prev => prev.filter(f => f.id !== fileId))
+  }
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + ' B'
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+  }
+
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading || !conversationId) return
 
@@ -383,6 +424,8 @@ const ChatInterface: React.FC = () => {
       content: queryText,
       sender: 'user',
       timestamp: new Date(),
+      attachments: attachedFiles.length > 0 ? [...attachedFiles] : undefined,
+      mode: chatMode,
       metadata: { thread_id: threadId }
     }
 
@@ -394,6 +437,7 @@ const ChatInterface: React.FC = () => {
 
     setMessages(prev => [...prev, userMessage])
     setInputValue('')
+    setAttachedFiles([])  // Clear attachments after sending
     setIsLoading(true)
     setIsStreaming(true)
 
@@ -526,6 +570,24 @@ const ChatInterface: React.FC = () => {
                         <span>{message.agentName}</span>
                       </div>
                     )}
+
+                    {/* Mode Badge for User Messages */}
+                    {message.sender === 'user' && message.mode && (
+                      <div className="mb-2 flex items-center gap-1 text-xs opacity-80">
+                        {message.mode === 'supplier' ? (
+                          <>
+                            <Package className="h-3 w-3" />
+                            <span>Supplier Mode</span>
+                          </>
+                        ) : (
+                          <>
+                            <Globe className="h-3 w-3" />
+                            <span>Internet</span>
+                          </>
+                        )}
+                      </div>
+                    )}
+
                     <div className="text-base leading-relaxed">
                       {message.sender === 'assistant' ? (
                         <MarkdownRenderer content={message.content} />
@@ -536,6 +598,19 @@ const ChatInterface: React.FC = () => {
                         <span className="inline-block w-2 h-5 bg-gray-400 ml-1 animate-pulse" />
                       )}
                     </div>
+
+                    {/* Attachments for User Messages */}
+                    {message.sender === 'user' && message.attachments && message.attachments.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {message.attachments.map(file => (
+                          <div key={file.id} className="flex items-center gap-1 bg-white bg-opacity-20 px-2 py-1 rounded text-xs">
+                            <FileText className="h-3 w-3" />
+                            <span>{file.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     <div className="text-xs opacity-70 mt-2">
                       {message.timestamp.toLocaleTimeString('fr-FR', {
                         hour: '2-digit',
@@ -564,48 +639,122 @@ const ChatInterface: React.FC = () => {
       {/* Input Area - At the bottom like normal chat */}
       <div className="bg-white border-t border-gray-200 px-8 py-4">
         <div className="max-w-4xl mx-auto">
-          <div className="flex items-end gap-3">
-            {/* Voice Interface Toggle */}
-            <button
-              onClick={toggleVoiceInterface}
-              className={`flex-shrink-0 p-2 rounded-full transition-colors ${
-                showVoiceInterface
-                  ? 'bg-green-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-              disabled={isLoading}
-              title="Interface vocale"
-            >
-              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C13.1 2 14 2.9 14 4V10C14 11.1 13.1 12 12 12S10 11.1 10 10V4C10 2.9 10.9 2 12 2M19 10V12C19 15.9 15.9 19 12 19S5 15.9 5 12V10H7V12C7 14.8 9.2 17 12 17S17 14.8 17 12V10H19Z"/>
-              </svg>
-            </button>
+          {/* Attached Files Display */}
+          {attachedFiles.length > 0 && (
+            <div className="mb-3 flex flex-wrap gap-2">
+              {attachedFiles.map(file => (
+                <div key={file.id} className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg text-sm">
+                  <FileText className="h-4 w-4 text-gray-600" />
+                  <span className="text-gray-700">{file.name}</span>
+                  <span className="text-gray-500">({formatFileSize(file.size)})</span>
+                  <button
+                    onClick={() => handleRemoveFile(file.id)}
+                    className="ml-1 text-gray-500 hover:text-red-600"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
+          {/* Main Input Container */}
+          <div className="bg-gray-50 rounded-2xl border border-gray-200 p-4">
             {/* Text Input */}
-            <div className="flex-1 relative">
+            <div className="mb-3">
               <textarea
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Posez votre question agricole..."
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-base"
-                rows={1}
+                placeholder="Message DeepSeek"
+                className="w-full px-0 py-0 bg-transparent border-none resize-none focus:ring-0 focus:outline-none text-base text-gray-800 placeholder-gray-500"
+                rows={3}
                 disabled={isLoading}
               />
             </div>
 
-            {/* Send Button */}
-            <button
-              onClick={handleSendMessage}
-              disabled={!inputValue.trim() || isLoading}
-              className="flex-shrink-0 p-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isLoading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <Send className="h-5 w-5" />
-              )}
-            </button>
+            {/* Bottom Bar: Mode Buttons + Actions */}
+            <div className="flex items-center justify-between">
+              {/* Mode Selection Buttons */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setChatMode(chatMode === 'supplier' ? null : 'supplier')}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    chatMode === 'supplier'
+                      ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                  disabled={isLoading}
+                >
+                  <Package className="h-4 w-4" />
+                  <span>Supplier Mode</span>
+                </button>
+
+                <button
+                  onClick={() => setChatMode(chatMode === 'internet' ? null : 'internet')}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    chatMode === 'internet'
+                      ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                  disabled={isLoading}
+                >
+                  <Globe className="h-4 w-4" />
+                  <span>Internet</span>
+                </button>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2">
+                {/* File Attachment Button */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.csv,.xlsx"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-2 text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
+                  disabled={isLoading}
+                  title="Attach files"
+                >
+                  <Paperclip className="h-5 w-5" />
+                </button>
+
+                {/* Voice Interface Toggle */}
+                <button
+                  onClick={toggleVoiceInterface}
+                  className={`p-2 rounded-lg transition-colors ${
+                    showVoiceInterface
+                      ? 'bg-green-600 text-white'
+                      : 'text-gray-600 hover:bg-gray-200'
+                  }`}
+                  disabled={isLoading}
+                  title="Voice interface"
+                >
+                  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2C13.1 2 14 2.9 14 4V10C14 11.1 13.1 12 12 12S10 11.1 10 10V4C10 2.9 10.9 2 12 2M19 10V12C19 15.9 15.9 19 12 19S5 15.9 5 12V10H7V12C7 14.8 9.2 17 12 17S17 14.8 17 12V10H19Z"/>
+                  </svg>
+                </button>
+
+                {/* Send Button */}
+                <button
+                  onClick={handleSendMessage}
+                  disabled={!inputValue.trim() || isLoading}
+                  className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  title="Send message"
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <Send className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Agent Selection Indicator */}

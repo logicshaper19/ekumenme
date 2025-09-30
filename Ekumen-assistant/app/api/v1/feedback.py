@@ -11,7 +11,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 from datetime import datetime
 
-from app.core.database import get_db
+from app.core.database import get_sync_db
 from app.models.feedback import ResponseFeedback, FeedbackType, FeedbackCategory
 from app.models.user import User
 from app.api.v1.auth import get_current_user
@@ -64,7 +64,7 @@ class FeedbackStats(BaseModel):
 async def create_feedback(
     feedback: FeedbackCreate,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_sync_db)
 ):
     """
     Submit feedback on an AI response.
@@ -145,7 +145,7 @@ async def create_feedback(
 async def get_message_feedback(
     message_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_sync_db)
 ):
     """
     Get feedback for a specific message by the current user.
@@ -164,7 +164,7 @@ async def get_message_feedback(
 async def get_conversation_feedback(
     conversation_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_sync_db)
 ):
     """
     Get all feedback for a conversation by the current user.
@@ -180,7 +180,7 @@ async def get_conversation_feedback(
 @router.get("/stats", response_model=FeedbackStats)
 async def get_feedback_stats(
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_sync_db)
 ):
     """
     Get feedback statistics for the current user.
@@ -212,7 +212,7 @@ async def get_feedback_stats(
 async def delete_feedback(
     feedback_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_sync_db)
 ):
     """
     Delete feedback (only by the user who created it).
@@ -242,7 +242,7 @@ async def get_feedback_needing_review(
     skip: int = 0,
     limit: int = 50,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_sync_db)
 ):
     """
     Get all negative feedback that needs review (admin only).
