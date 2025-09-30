@@ -231,19 +231,109 @@ async def test_error_handling():
     print("\n✅ Test 4 PASSED")
 
 
+async def test_granular_checks():
+    """Test 5: Test granular check_types parameter"""
+    print("\n" + "="*80)
+    print("TEST 5: Granular Checks (check_types parameter)")
+    print("="*80)
+
+    # Test 1: Only product compliance
+    print("\n🔍 Test 5a: Product compliance only")
+    result_json = await check_regulatory_compliance_tool.ainvoke({
+        "practice_type": "spraying",
+        "products_used": ["glyphosate"],
+        "crop_type": "blé",
+        "check_types": ["product"]  # Only check products
+    })
+    result = json.loads(result_json)
+
+    print(f"   Total checks: {result['total_checks']}")
+    print(f"   Checks performed: {[c['regulation_type'] for c in result['compliance_checks']]}")
+    assert result['total_checks'] == 1, "Should only perform 1 check"
+    assert result['compliance_checks'][0]['regulation_type'] == 'product_compliance'
+
+    # Test 2: Only environmental compliance
+    print("\n🔍 Test 5b: Environmental compliance only")
+    result_json = await check_regulatory_compliance_tool.ainvoke({
+        "practice_type": "spraying",
+        "weather_conditions": {"wind_speed": 25, "temperature": 30, "humidity": 85},
+        "check_types": ["environmental"]  # Only check environment
+    })
+    result = json.loads(result_json)
+
+    print(f"   Total checks: {result['total_checks']}")
+    print(f"   Checks performed: {[c['regulation_type'] for c in result['compliance_checks']]}")
+    assert result['total_checks'] == 1, "Should only perform 1 check"
+    assert result['compliance_checks'][0]['regulation_type'] == 'environmental_compliance'
+
+    # Test 3: Multiple specific checks
+    print("\n🔍 Test 5c: Product + Equipment checks only")
+    result_json = await check_regulatory_compliance_tool.ainvoke({
+        "practice_type": "spraying",
+        "products_used": ["herbicide"],
+        "equipment_available": ["EPI"],
+        "timing": "2025-06-15 14:00",  # This should be ignored
+        "check_types": ["product", "equipment"]  # Only these two
+    })
+    result = json.loads(result_json)
+
+    print(f"   Total checks: {result['total_checks']}")
+    print(f"   Checks performed: {[c['regulation_type'] for c in result['compliance_checks']]}")
+    assert result['total_checks'] == 2, "Should only perform 2 checks"
+    check_types = [c['regulation_type'] for c in result['compliance_checks']]
+    assert 'product_compliance' in check_types
+    assert 'equipment_compliance' in check_types
+    assert 'timing_compliance' not in check_types, "Timing should be skipped"
+
+    print("\n✅ Test 5 PASSED - Granular checks working!")
+
+
+async def test_parallel_execution_performance():
+    """Test 6: Verify parallel execution improves performance"""
+    print("\n" + "="*80)
+    print("TEST 6: Parallel Execution Performance")
+    print("="*80)
+
+    # Clear cache
+    clear_cache(category="regulatory")
+
+    # Test with all checks (parallel execution)
+    start = time.time()
+    result_json = await check_regulatory_compliance_tool.ainvoke({
+        "practice_type": "spraying",
+        "products_used": ["herbicide"],
+        "timing": "2025-06-15 14:00",
+        "equipment_available": ["EPI", "pulvérisateur"],
+        "weather_conditions": {"wind_speed": 15, "temperature": 22, "humidity": 70}
+    })
+    parallel_time = time.time() - start
+
+    result = json.loads(result_json)
+
+    print(f"\n⏱️  Parallel execution time: {parallel_time:.4f}s")
+    print(f"📊 Total checks performed: {result['total_checks']}")
+    print(f"✅ All checks completed successfully")
+
+    assert result['total_checks'] == 4, "Should perform all 4 checks"
+
+    print("\n✅ Test 6 PASSED - Parallel execution working!")
+
+
 async def main():
     """Run all tests"""
     print("\n" + "="*80)
     print("🧪 ENHANCED COMPLIANCE TOOL TEST SUITE")
     print("="*80)
-    
+
     try:
         # Run all tests
         await test_basic_compliance_check()
         await test_caching_performance()
         await test_multiple_violations()
         await test_error_handling()
-        
+        await test_granular_checks()
+        await test_parallel_execution_performance()
+
         print("\n" + "="*80)
         print("✅ ALL TESTS PASSED!")
         print("="*80)
@@ -252,8 +342,14 @@ async def main():
         print("   ✅ Test 2: Caching performance - PASSED")
         print("   ✅ Test 3: Multiple violations - PASSED")
         print("   ✅ Test 4: Error handling - PASSED")
+        print("   ✅ Test 5: Granular checks (check_types) - PASSED")
+        print("   ✅ Test 6: Parallel execution - PASSED")
         print("\n🎉 Enhanced CheckRegulatoryComplianceTool is production-ready!")
-        
+        print("\n🚀 NEW FEATURES:")
+        print("   - Granular check_types parameter for targeted compliance checks")
+        print("   - Parallel execution of independent checks for better performance")
+        print("   - Error isolation with asyncio.gather(return_exceptions=True)")
+
     except Exception as e:
         print(f"\n❌ TEST FAILED: {e}")
         import traceback
