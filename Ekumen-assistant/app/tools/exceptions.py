@@ -80,11 +80,27 @@ class ProductNotFoundError(ToolException):
 
 
 class AMMValidationError(ToolException):
-    """Invalid AMM code"""
-    def __init__(self, amm_code: str):
+    """Invalid AMM code or search parameters"""
+    def __init__(self, details: str):
         super().__init__(
-            f"Code AMM '{amm_code}' invalide. "
-            f"Le code AMM doit être au format numérique (ex: 2010234)."
+            f"Paramètres de recherche AMM invalides: {details}"
+        )
+
+
+class AMMDataError(ToolException):
+    """AMM database access error"""
+    def __init__(self, details: str):
+        super().__init__(
+            f"Erreur d'accès à la base AMM: {details}. "
+            f"Veuillez réessayer plus tard."
+        )
+
+
+class AMMLookupError(ToolException):
+    """General AMM lookup error"""
+    def __init__(self, details: str):
+        super().__init__(
+            f"Erreur lors de la recherche AMM: {details}"
         )
 
 

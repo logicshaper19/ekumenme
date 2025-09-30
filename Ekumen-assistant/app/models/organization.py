@@ -150,7 +150,7 @@ class OrganizationFarmAccess(Base):
     
     # Foreign keys
     organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False, index=True)
-    farm_siret = Column(String(14), ForeignKey("farms.siret"), nullable=False, index=True)
+    farm_siret = Column(String(14), nullable=False, index=True)  # TODO: Re-enable FK when Farm model is restored
     
     # Access details
     access_type = Column(SQLEnum(AccessType), nullable=False)
@@ -168,7 +168,7 @@ class OrganizationFarmAccess(Base):
     
     # Relationships
     organization = relationship("Organization", back_populates="farm_access", lazy="select")
-    farm = relationship("Farm", back_populates="organization_access", lazy="select")
+    # farm = relationship("Farm", back_populates="organization_access", lazy="select")  # TODO: Re-enable when Farm model is restored
     granted_by_user = relationship("User", foreign_keys=[granted_by], lazy="select")
     
     def __repr__(self):
