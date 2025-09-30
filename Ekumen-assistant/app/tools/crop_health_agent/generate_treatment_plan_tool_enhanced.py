@@ -13,7 +13,7 @@ Improvements over original:
 """
 
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime, timedelta
 
 from langchain.tools import StructuredTool
@@ -341,7 +341,7 @@ class EnhancedTreatmentService:
         nutrient_analysis: Optional[Dict[str, Any]],
         bbch_stage: Optional[int],
         organic_farming: bool
-    ) -> tuple[List[TreatmentStep], List[str]]:
+    ) -> Tuple[List[TreatmentStep], List[str]]:
         """Generate treatment steps and warnings"""
         steps = []
         warnings = []
@@ -482,12 +482,16 @@ class EnhancedTreatmentService:
                 confidence = pest.get("confidence", 0.5)
                 severity = pest.get("severity", "moderate")
                 treatments = pest.get("treatment_recommendations", [])
+                economic_threshold = pest.get("economic_threshold")
+                natural_enemies = pest.get("natural_enemies", [])
             else:
                 pest_name = pest.pest_name
                 confidence = pest.confidence
                 severity = pest.severity.value if hasattr(pest.severity, 'value') else pest.severity
                 treatments = pest.treatment_recommendations
-            
+                economic_threshold = getattr(pest, 'economic_threshold', None)
+                natural_enemies = getattr(pest, 'natural_enemies', [])
+
             if confidence >= 0.5:
                 # Determine priority
                 if severity == "critical" or severity == "high":
@@ -502,11 +506,23 @@ class EnhancedTreatmentService:
                 
                 # Select treatment type
                 treatment_type = TreatmentType.BIOLOGICAL if organic_farming else TreatmentType.INTEGRATED
-                
+
+                # Build safety precautions with natural enemies warning
+                safety_precautions = ["Port EPI obligatoire", "Respecter ZNT"]
+                if natural_enemies:
+                    safety_precautions.insert(0, f"⚠️ Auxiliaires présents ({', '.join(natural_enemies[:2])}) - éviter insecticides à large spectre")
+                else:
+                    safety_precautions.append("Protéger auxiliaires")
+
+                # Build description with economic threshold
+                description = f"Lutte contre {pest_name} sur {crop.name_fr}"
+                if economic_threshold:
+                    description += f". Seuil d'intervention: {economic_threshold}"
+
                 step = TreatmentStep(
                     step_number=start_number + i,
                     step_name=f"Traitement ravageur: {pest_name}",
-                    description=f"Lutte contre {pest_name} sur {crop.name_fr}",
+                    description=description,
                     treatment_type=treatment_type,
                     priority=priority,
                     timing=timing,
@@ -516,11 +532,7 @@ class EnhancedTreatmentService:
                     application_method="Pulvérisation ou piégeage",
                     cost_estimate_eur=TREATMENT_COSTS.get("biological" if organic_farming else "insecticide", 35.0),
                     effectiveness_rating="high" if confidence > 0.7 else "moderate",
-                    safety_precautions=[
-                        "Port EPI obligatoire",
-                        "Respecter ZNT",
-                        "Protéger auxiliaires"
-                    ],
+                    safety_precautions=safety_precautions,
                     weather_requirements="Température < 25°C, vent < 15 km/h"
                 )
                 steps.append(step)
@@ -646,7 +658,16 @@ class EnhancedTreatmentService:
         for step in treatment_steps:
             treatment_type = step.treatment_type.value
             cost_breakdown[treatment_type] = cost_breakdown.get(treatment_type, 0.0) + (step.cost_estimate_eur or 0.0)
-        
+
+        # Validate breakdown sum matches total (within floating-point tolerance)
+        breakdown_sum = sum(cost_breakdown.values())
+        if abs(total_cost - breakdown_sum) > 0.01:
+            logger.warning(
+                f"Cost breakdown sum ({breakdown_sum:.2f}) doesn't match total ({total_cost:.2f}). "
+                f"Adjusting total to match breakdown."
+            )
+            total_cost = breakdown_sum
+
         # Budget status
         budget_status = "no_budget_set"
         if budget_constraint:
