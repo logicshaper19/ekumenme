@@ -30,7 +30,7 @@ from app.core.cache import redis_cache
 from app.core.database import AsyncSessionLocal
 from app.services.configuration_service import ConfigurationService
 from app.services.unified_regulatory_service import UnifiedRegulatoryService
-from app.models.ephy import Produit, UsageProduit
+from app.models.ephy import Produit, UsageProduit, SubstanceActive, ProduitSubstance, PhraseRisque, ProduitPhraseRisque
 from app.tools.schemas.environmental_schemas import (
     EnvironmentalRegulationsInput,
     EnvironmentalRegulationsOutput,
@@ -42,7 +42,11 @@ from app.tools.schemas.environmental_schemas import (
     ComplianceStatus,
     RiskLevel,
     RegulationType,
-    PracticeType
+    PracticeType,
+    ProductEnvironmentalData,
+    WaterBodyClassification,
+    WaterBodyType,
+    EquipmentDriftClass
 )
 
 logger = logging.getLogger(__name__)
@@ -104,20 +108,36 @@ class EnhancedEnvironmentalRegulationsService:
                 impact_data
             )
             
-            # Get database-based ZNT compliance
+            # Get database-based ZNT compliance and product environmental data
             znt_compliance = None
             database_regulations = []
-            
+            product_environmental_data = None
+            water_body_classification = None
+
             if amm_codes:
                 async with AsyncSessionLocal() as db:
+                    # Get ZNT compliance with enhanced reduction logic
                     znt_compliance = await self._get_znt_compliance_from_db(
                         db, amm_codes, impact_data
                     )
-                    
+
                     if znt_compliance:
                         # Create regulation from ZNT data
                         znt_regulation = self._create_znt_regulation(znt_compliance)
                         database_regulations.append(znt_regulation)
+
+                    # Get product environmental data (HIGH PRIORITY #1)
+                    product_environmental_data = await self._get_product_environmental_data(
+                        db, amm_codes
+                    )
+
+            # Classify water body (HIGH PRIORITY #3)
+            if impact_data and impact_data.water_proximity_m is not None:
+                water_body_classification = self._classify_water_body(
+                    impact_data.water_proximity_m,
+                    impact_data.water_body_type,
+                    impact_data.water_body_width_m
+                )
             
             # Combine regulations
             all_regulations = config_regulations + database_regulations
@@ -171,6 +191,8 @@ class EnhancedEnvironmentalRegulationsService:
                 environmental_regulations=all_regulations,
                 environmental_risk=environmental_risk,
                 znt_compliance=znt_compliance,
+                product_environmental_data=product_environmental_data,
+                water_body_classification=water_body_classification,
                 environmental_recommendations=environmental_recommendations,
                 critical_warnings=critical_warnings,
                 total_regulations=len(all_regulations),
@@ -243,29 +265,39 @@ class EnhancedEnvironmentalRegulationsService:
                     if znt_value and float(znt_value) > 0:
                         required_znt = float(znt_value)
                         actual_distance = impact_data.water_proximity_m if impact_data else None
-                        
+
+                        # HIGH PRIORITY #2: Enhanced ZNT reduction logic
+                        water_body_type = impact_data.water_body_type if impact_data else WaterBodyType.UNKNOWN
+                        equipment_class = impact_data.drift_reduction_equipment if impact_data else EquipmentDriftClass.NO_EQUIPMENT
+                        has_vegetation_buffer = impact_data.has_vegetation_buffer if impact_data else False
+
+                        # Calculate ZNT with reduction
+                        znt_with_reduction = self._calculate_znt_reduction(
+                            required_znt,
+                            equipment_class,
+                            has_vegetation_buffer,
+                            water_body_type
+                        )
+
+                        # Check compliance against reduced ZNT
                         is_compliant = True
                         if actual_distance is not None:
-                            is_compliant = actual_distance >= required_znt
-                        
-                        # ZNT reduction possible with anti-drift equipment
-                        reduction_possible = required_znt > 5
-                        reduction_conditions = []
-                        if reduction_possible:
-                            reduction_conditions = [
-                                "Buses anti-dérive homologuées",
-                                "Réduction maximale de 50% (minimum 5m)",
-                                "Conditions météo favorables (vent < 19 km/h)"
-                            ]
-                        
+                            effective_znt = znt_with_reduction.reduced_znt_m if znt_with_reduction.reduced_znt_m else required_znt
+                            is_compliant = actual_distance >= effective_znt
+
                         znt_compliance_list.append(
                             ZNTCompliance(
                                 required_znt_m=required_znt,
                                 actual_distance_m=actual_distance,
                                 is_compliant=is_compliant,
                                 znt_type=znt_type,
-                                reduction_possible=reduction_possible,
-                                reduction_conditions=reduction_conditions if reduction_possible else None
+                                reduction_possible=znt_with_reduction.reduction_possible,
+                                reduction_conditions=znt_with_reduction.reduction_conditions,
+                                equipment_class_required=znt_with_reduction.equipment_class_required,
+                                max_reduction_percent=znt_with_reduction.max_reduction_percent,
+                                minimum_absolute_znt_m=znt_with_reduction.minimum_absolute_znt_m,
+                                reduced_znt_m=znt_with_reduction.reduced_znt_m,
+                                water_body_type=water_body_type
                             )
                         )
             
@@ -274,6 +306,292 @@ class EnhancedEnvironmentalRegulationsService:
         except Exception as e:
             logger.error(f"Error getting ZNT compliance from database: {e}")
             return None
+
+    async def _get_product_environmental_data(
+        self,
+        db: AsyncSession,
+        amm_codes: List[str]
+    ) -> Optional[List[ProductEnvironmentalData]]:
+        """
+        HIGH PRIORITY #1: Get product environmental fate and ecotoxicology data from EPHY
+        """
+        try:
+            product_env_data_list = []
+
+            for amm_code in amm_codes:
+                # Get product
+                product_query = select(Produit).where(Produit.numero_amm == amm_code)
+                product_result = await db.execute(product_query)
+                product = product_result.scalars().first()
+
+                if not product:
+                    logger.info(f"No product found for AMM: {amm_code}")
+                    continue
+
+                # Get active substances
+                substances_query = select(SubstanceActive).join(
+                    ProduitSubstance
+                ).where(ProduitSubstance.numero_amm == amm_code)
+                substances_result = await db.execute(substances_query)
+                substances = substances_result.scalars().all()
+
+                # Get risk phrases for classification
+                risk_phrases_query = select(PhraseRisque).join(
+                    ProduitPhraseRisque
+                ).where(ProduitPhraseRisque.numero_amm == amm_code)
+                risk_phrases_result = await db.execute(risk_phrases_query)
+                risk_phrases = risk_phrases_result.scalars().all()
+
+                # Classify based on risk phrases
+                is_cmr = any(
+                    p.code_phrase in ["H340", "H341", "H350", "H351", "H360", "H361"]
+                    for p in risk_phrases
+                )
+
+                # Determine aquatic toxicity from H-phrases
+                aquatic_toxicity = "low"
+                if any(p.code_phrase == "H400" for p in risk_phrases):
+                    aquatic_toxicity = "very_high"
+                elif any(p.code_phrase == "H410" for p in risk_phrases):
+                    aquatic_toxicity = "very_high"
+                elif any(p.code_phrase == "H411" for p in risk_phrases):
+                    aquatic_toxicity = "high"
+                elif any(p.code_phrase in ["H412", "H413"] for p in risk_phrases):
+                    aquatic_toxicity = "moderate"
+
+                # Determine bee toxicity
+                bee_toxicity = "not_toxic"
+                if any(p.code_phrase in ["H410", "H411"] for p in risk_phrases):
+                    bee_toxicity = "highly_toxic"
+                elif any(p.code_phrase in ["H412"] for p in risk_phrases):
+                    bee_toxicity = "toxic"
+
+                # Check for PBT/vPvB (would need additional data, using CMR as proxy)
+                is_pbt = False  # Would need specific data
+                is_vpvb = False  # Would need specific data
+
+                product_env_data_list.append(
+                    ProductEnvironmentalData(
+                        amm_code=amm_code,
+                        product_name=product.nom_produit,
+                        active_substances=[s.nom_substance for s in substances],
+                        is_cmr=is_cmr,
+                        aquatic_toxicity_level=aquatic_toxicity,
+                        bee_toxicity=bee_toxicity,
+                        is_pbt=is_pbt,
+                        is_vpvb=is_vpvb
+                    )
+                )
+
+            return product_env_data_list if product_env_data_list else None
+
+        except Exception as e:
+            logger.error(f"Error getting product environmental data: {e}")
+            return None
+
+    def _calculate_znt_reduction(
+        self,
+        base_znt_m: float,
+        equipment_class: EquipmentDriftClass,
+        has_vegetation_buffer: bool,
+        water_body_type: WaterBodyType
+    ) -> ZNTCompliance:
+        """
+        HIGH PRIORITY #2: Calculate ZNT with proper reduction rules
+
+        Equipment-based reduction:
+        - 1-star: 25% reduction
+        - 3-star: 33% reduction
+        - 5-star: 50% reduction
+
+        Vegetation buffer: +20% additional reduction
+        Maximum total reduction: 66% (cannot exceed 2/3)
+        """
+        # Drinking water sources: NO reduction allowed
+        if water_body_type == WaterBodyType.DRINKING_WATER_SOURCE:
+            return ZNTCompliance(
+                required_znt_m=max(base_znt_m, 200),
+                reduction_possible=False,
+                minimum_absolute_znt_m=200,
+                water_body_type=water_body_type,
+                is_compliant=False,  # Will be updated by caller
+                znt_type="drinking_water"
+            )
+
+        # Equipment-based reduction rates
+        reduction_rates = {
+            EquipmentDriftClass.NO_EQUIPMENT: 0.0,
+            EquipmentDriftClass.ONE_STAR: 0.25,
+            EquipmentDriftClass.THREE_STAR: 0.33,
+            EquipmentDriftClass.FIVE_STAR: 0.50
+        }
+
+        base_reduction = reduction_rates.get(equipment_class, 0.0)
+
+        # Additional reduction with vegetation buffer
+        if has_vegetation_buffer:
+            base_reduction += 0.20
+
+        # Cap total reduction at 66% (cannot reduce more than 2/3)
+        total_reduction = min(base_reduction, 0.66)
+
+        # Calculate reduced ZNT
+        reduced_znt = base_znt_m * (1 - total_reduction)
+
+        # Minimum absolute ZNT (cannot go below these values)
+        min_znt_by_type = {
+            WaterBodyType.PERMANENT_STREAM: 5.0,
+            WaterBodyType.INTERMITTENT_STREAM: 5.0,
+            WaterBodyType.LAKE_POND: 5.0,
+            WaterBodyType.WETLAND: 5.0,
+            WaterBodyType.DRAINAGE_DITCH: 1.0,
+            WaterBodyType.UNKNOWN: 5.0
+        }
+
+        min_znt = min_znt_by_type.get(water_body_type, 5.0)
+        final_znt = max(reduced_znt, min_znt)
+
+        # Build reduction conditions
+        reduction_conditions = []
+        if total_reduction > 0:
+            if equipment_class != EquipmentDriftClass.NO_EQUIPMENT:
+                reduction_conditions.append(
+                    f"Buses anti-dérive {equipment_class.value} homologuées"
+                )
+            if has_vegetation_buffer:
+                reduction_conditions.append(
+                    "Bande enherbée ou végétalisée (largeur ≥ 5m)"
+                )
+            reduction_conditions.append(
+                "Conditions météo favorables (vent < 19 km/h)"
+            )
+            reduction_conditions.append(
+                f"ZNT minimale absolue: {min_znt}m"
+            )
+
+        # Determine required equipment class for reduction
+        equipment_required = None
+        if base_znt_m > 5:
+            equipment_required = EquipmentDriftClass.THREE_STAR
+
+        return ZNTCompliance(
+            required_znt_m=base_znt_m,
+            reduced_znt_m=final_znt if total_reduction > 0 else None,
+            reduction_possible=total_reduction > 0,
+            equipment_class_required=equipment_required,
+            max_reduction_percent=total_reduction * 100 if total_reduction > 0 else None,
+            minimum_absolute_znt_m=min_znt,
+            water_body_type=water_body_type,
+            reduction_conditions=reduction_conditions if reduction_conditions else None,
+            is_compliant=False,  # Will be updated by caller
+            znt_type="calculated"
+        )
+
+    def _classify_water_body(
+        self,
+        water_proximity_m: float,
+        water_body_type: WaterBodyType,
+        water_body_width_m: Optional[float]
+    ) -> WaterBodyClassification:
+        """
+        HIGH PRIORITY #3: Classify water body and determine protection requirements
+        """
+        # Water body type-specific rules
+        water_body_rules = {
+            WaterBodyType.DRINKING_WATER_SOURCE: {
+                "base_znt_m": 200.0,
+                "reduction_allowed": False,
+                "special_protections": [
+                    "Périmètre de protection rapprochée (PPR)",
+                    "Interdiction totale de produits phytosanitaires",
+                    "Autorisation préfectorale requise pour toute intervention",
+                    "Sanctions pénales en cas de pollution"
+                ],
+                "is_drinking_water_source": True,
+                "is_fish_bearing": False
+            },
+            WaterBodyType.PERMANENT_STREAM: {
+                "base_znt_m": 5.0,
+                "reduction_allowed": True,
+                "special_protections": [
+                    "Protection contre le ruissellement",
+                    "Bande enherbée recommandée (5-10m)",
+                    "Interdiction de rinçage du matériel",
+                    "Respect des ZNT aquatiques, arthropodes, plantes"
+                ],
+                "is_drinking_water_source": False,
+                "is_fish_bearing": True
+            },
+            WaterBodyType.INTERMITTENT_STREAM: {
+                "base_znt_m": 5.0,
+                "reduction_allowed": True,
+                "special_protections": [
+                    "Vérifier l'état (sec ou en eau) avant traitement",
+                    "Protection renforcée en période d'écoulement",
+                    "Attention aux connexions avec cours d'eau permanents",
+                    "Bande enherbée recommandée"
+                ],
+                "is_drinking_water_source": False,
+                "is_fish_bearing": False
+            },
+            WaterBodyType.DRAINAGE_DITCH: {
+                "base_znt_m": 1.0,
+                "reduction_allowed": False,
+                "special_protections": [
+                    "Éviter le ruissellement direct",
+                    "Attention aux connexions avec cours d'eau",
+                    "Pas de rinçage du matériel à proximité",
+                    "Vérifier l'exutoire du fossé"
+                ],
+                "is_drinking_water_source": False,
+                "is_fish_bearing": False
+            },
+            WaterBodyType.LAKE_POND: {
+                "base_znt_m": 5.0,
+                "reduction_allowed": True,
+                "special_protections": [
+                    "Protection contre le ruissellement",
+                    "Attention aux zones de baignade",
+                    "Respect des ZNT aquatiques",
+                    "Bande enherbée recommandée"
+                ],
+                "is_drinking_water_source": False,
+                "is_fish_bearing": True
+            },
+            WaterBodyType.WETLAND: {
+                "base_znt_m": 10.0,
+                "reduction_allowed": False,
+                "special_protections": [
+                    "Zone humide protégée (Code de l'environnement)",
+                    "Biodiversité sensible (amphibiens, oiseaux)",
+                    "Interdiction stricte de traitement dans la zone",
+                    "Possible classement Natura 2000"
+                ],
+                "is_drinking_water_source": False,
+                "is_fish_bearing": True
+            }
+        }
+
+        # Get rules for water body type
+        rules = water_body_rules.get(water_body_type, {
+            "base_znt_m": 5.0,
+            "reduction_allowed": True,
+            "special_protections": [
+                "Respecter les ZNT réglementaires",
+                "Éviter le ruissellement"
+            ],
+            "is_drinking_water_source": False,
+            "is_fish_bearing": False
+        })
+
+        return WaterBodyClassification(
+            water_body_type=water_body_type,
+            base_znt_m=rules["base_znt_m"],
+            reduction_allowed=rules["reduction_allowed"],
+            special_protections=rules["special_protections"],
+            is_drinking_water_source=rules["is_drinking_water_source"],
+            is_fish_bearing=rules["is_fish_bearing"]
+        )
 
     def _create_znt_regulation(self, znt_compliance: List[ZNTCompliance]) -> EnvironmentalRegulation:
         """Create environmental regulation from ZNT compliance data"""
