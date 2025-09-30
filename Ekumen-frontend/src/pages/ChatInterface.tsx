@@ -666,7 +666,7 @@ const ChatInterface: React.FC = () => {
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Message DeepSeek"
+                placeholder="Posez-moi vos questions sur votre exploitation ou vos fournisseurs"
                 className="w-full px-0 py-0 bg-transparent border-none resize-none focus:ring-0 focus:outline-none text-base text-gray-800 placeholder-gray-500"
                 rows={3}
                 disabled={isLoading}
