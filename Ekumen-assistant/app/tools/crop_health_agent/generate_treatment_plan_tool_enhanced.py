@@ -75,15 +75,50 @@ class EnhancedTreatmentService:
             if not crop:
                 raise ValueError(f"Culture inconnue: {input_data.crop_type}")
             
-            # Step 2: Generate executive summary
+            # Step 2: Validate at least one analysis provided
+            if not any([input_data.disease_analysis, input_data.pest_analysis, input_data.nutrient_analysis]):
+                logger.warning("No analysis provided for treatment plan")
+                return TreatmentPlanOutput(
+                    success=False,
+                    crop_type=crop.name_fr,
+                    crop_eppo_code=crop.eppo_code,
+                    plan_metadata={},
+                    executive_summary=ExecutiveSummary(
+                        total_issues_identified=0,
+                        priority_level=TreatmentPriority.LOW,
+                        estimated_treatment_duration="N/A",
+                        has_disease_issues=False,
+                        has_pest_issues=False,
+                        has_nutrient_issues=False,
+                        key_recommendations=["Aucune analyse fournie"]
+                    ),
+                    treatment_steps=[],
+                    treatment_schedule=[],
+                    cost_analysis=CostAnalysis(
+                        total_estimated_cost_eur=0.0,
+                        cost_breakdown={}
+                    ),
+                    monitoring_plan=MonitoringPlan(
+                        monitoring_frequency="N/A",
+                        monitoring_methods=[],
+                        success_indicators=[],
+                        warning_signs=[]
+                    ),
+                    prevention_measures=[],
+                    total_steps=0,
+                    error="Aucune analyse fournie. Au moins une analyse (maladie, ravageur ou carence) est requise.",
+                    error_type="no_analysis"
+                )
+
+            # Step 3: Generate executive summary
             executive_summary = self._generate_executive_summary(
                 input_data.disease_analysis,
                 input_data.pest_analysis,
                 input_data.nutrient_analysis
             )
-            
-            # Step 3: Generate treatment steps
-            treatment_steps = self._generate_treatment_steps(
+
+            # Step 4: Generate treatment steps
+            treatment_steps, warnings = self._generate_treatment_steps(
                 crop=crop,
                 disease_analysis=input_data.disease_analysis,
                 pest_analysis=input_data.pest_analysis,
@@ -139,7 +174,7 @@ class EnhancedTreatmentService:
                 prevention_measures=prevention_measures,
                 total_steps=len(treatment_steps),
                 estimated_duration_days=self._estimate_duration(treatment_steps),
-                timestamp=datetime.now()
+                warnings=warnings if warnings else None
             )
             
             logger.info(
@@ -234,50 +269,69 @@ class EnhancedTreatmentService:
         disease_analysis: Optional[Any],
         pest_analysis: Optional[Any],
         nutrient_analysis: Optional[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    ) -> ExecutiveSummary:
         """Generate executive summary"""
         total_issues = 0
         priority_level = TreatmentPriority.LOW
-        
+        key_recommendations = []
+
         # Count issues from disease analysis
         if disease_analysis:
             if isinstance(disease_analysis, DiseaseDiagnosisOutput):
                 total_issues += disease_analysis.total_diagnoses
+                if disease_analysis.total_diagnoses > 0:
+                    key_recommendations.append(f"{disease_analysis.total_diagnoses} maladie(s) identifiée(s)")
             elif isinstance(disease_analysis, dict):
-                total_issues += len(disease_analysis.get("diagnoses", []))
-        
+                diagnoses = disease_analysis.get("diagnoses", [])
+                total_issues += len(diagnoses)
+                if diagnoses:
+                    key_recommendations.append(f"{len(diagnoses)} maladie(s) identifiée(s)")
+
         # Count issues from pest analysis
         if pest_analysis:
             if isinstance(pest_analysis, PestIdentificationOutput):
                 total_issues += pest_analysis.total_identifications
+                if pest_analysis.total_identifications > 0:
+                    key_recommendations.append(f"{pest_analysis.total_identifications} ravageur(s) identifié(s)")
             elif isinstance(pest_analysis, dict):
-                total_issues += len(pest_analysis.get("pest_identifications", []))
-        
+                pests = pest_analysis.get("pest_identifications", [])
+                total_issues += len(pests)
+                if pests:
+                    key_recommendations.append(f"{len(pests)} ravageur(s) identifié(s)")
+
         # Count issues from nutrient analysis
         if nutrient_analysis:
-            total_issues += len(nutrient_analysis.get("nutrient_deficiencies", []))
-        
+            deficiencies = nutrient_analysis.get("nutrient_deficiencies", [])
+            total_issues += len(deficiencies)
+            if deficiencies:
+                key_recommendations.append(f"{len(deficiencies)} carence(s) identifiée(s)")
+
         # Determine priority
         if total_issues > 5:
             priority_level = TreatmentPriority.CRITICAL
             duration = "3-4 semaines"
+            key_recommendations.insert(0, "⚠️ PRIORITÉ CRITIQUE - Intervention immédiate requise")
         elif total_issues > 2:
             priority_level = TreatmentPriority.HIGH
             duration = "2-3 semaines"
+            key_recommendations.insert(0, "Intervention rapide recommandée")
         elif total_issues > 0:
             priority_level = TreatmentPriority.MODERATE
             duration = "1-2 semaines"
+            key_recommendations.insert(0, "Traitement préventif recommandé")
         else:
             duration = "Aucun traitement nécessaire"
-        
-        return {
-            "total_issues_identified": total_issues,
-            "priority_level": priority_level.value,
-            "estimated_treatment_duration": duration,
-            "has_disease_issues": disease_analysis is not None,
-            "has_pest_issues": pest_analysis is not None,
-            "has_nutrient_issues": nutrient_analysis is not None
-        }
+            key_recommendations.append("Aucun problème majeur détecté")
+
+        return ExecutiveSummary(
+            total_issues_identified=total_issues,
+            priority_level=priority_level,
+            estimated_treatment_duration=duration,
+            has_disease_issues=disease_analysis is not None,
+            has_pest_issues=pest_analysis is not None,
+            has_nutrient_issues=nutrient_analysis is not None,
+            key_recommendations=key_recommendations
+        )
     
     def _generate_treatment_steps(
         self,
@@ -287,9 +341,10 @@ class EnhancedTreatmentService:
         nutrient_analysis: Optional[Dict[str, Any]],
         bbch_stage: Optional[int],
         organic_farming: bool
-    ) -> List[TreatmentStep]:
-        """Generate treatment steps"""
+    ) -> tuple[List[TreatmentStep], List[str]]:
+        """Generate treatment steps and warnings"""
         steps = []
+        warnings = []
         step_number = 1
         
         # Disease treatment steps
@@ -325,10 +380,16 @@ class EnhancedTreatmentService:
 
         # Limit to MAX_TREATMENT_STEPS (realistic constraint)
         if len(steps) > MAX_TREATMENT_STEPS:
+            truncated_count = len(steps) - MAX_TREATMENT_STEPS
+            warnings.append(
+                f"⚠️ Plan limité à {MAX_TREATMENT_STEPS} étapes prioritaires. "
+                f"{truncated_count} traitement(s) supplémentaire(s) recommandé(s). "
+                f"Consulter un expert pour plan complet."
+            )
             logger.warning(f"Treatment plan has {len(steps)} steps - limiting to {MAX_TREATMENT_STEPS}")
             steps = steps[:MAX_TREATMENT_STEPS]
 
-        return steps
+        return steps, warnings
     
     def _generate_disease_steps(
         self,
@@ -359,7 +420,7 @@ class EnhancedTreatmentService:
                 severity = diagnosis.severity.value if hasattr(diagnosis.severity, 'value') else diagnosis.severity
                 treatments = diagnosis.treatment_recommendations
             
-            if confidence > 0.5:
+            if confidence >= 0.5:
                 # Determine priority
                 if severity == "critical" or severity == "high":
                     priority = TreatmentPriority.CRITICAL
@@ -427,7 +488,7 @@ class EnhancedTreatmentService:
                 severity = pest.severity.value if hasattr(pest.severity, 'value') else pest.severity
                 treatments = pest.treatment_recommendations
             
-            if confidence > 0.5:
+            if confidence >= 0.5:
                 # Determine priority
                 if severity == "critical" or severity == "high":
                     priority = TreatmentPriority.CRITICAL
@@ -480,7 +541,8 @@ class EnhancedTreatmentService:
         for i, deficiency in enumerate(deficiencies):
             nutrient = deficiency.get("nutrient", "Unknown")
             severity = deficiency.get("severity", "moderate")
-            recommendations = deficiency.get("recommendations", [])
+            # Fix field name: nutrient tool uses "treatment_recommendations", not "recommendations"
+            recommendations = deficiency.get("treatment_recommendations", deficiency.get("recommendations", []))
             
             # Determine priority
             if severity == "severe":
