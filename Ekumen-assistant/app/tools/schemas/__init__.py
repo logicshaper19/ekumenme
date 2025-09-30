@@ -94,6 +94,39 @@ from app.tools.schemas.environmental_schemas import (
     GroundwaterVulnerability
 )
 
+from app.tools.schemas.disease_schemas import (
+    DiseaseDiagnosisInput,
+    DiseaseDiagnosisOutput,
+    DiseaseDiagnosis,
+    DiseaseSeverity,
+    DiseaseType,
+    ConfidenceLevel as DiseaseConfidenceLevel,
+    EnvironmentalConditions,
+    BBCHStageInfo
+)
+
+from app.tools.schemas.pest_schemas import (
+    PestIdentificationInput,
+    PestIdentificationOutput,
+    PestIdentification,
+    PestSeverity,
+    PestType,
+    PestStage,
+    CropCategoryRiskProfile
+)
+
+from app.tools.schemas.treatment_schemas import (
+    TreatmentPlanInput,
+    TreatmentPlanOutput,
+    TreatmentStep,
+    TreatmentSchedule,
+    CostAnalysis,
+    MonitoringPlan,
+    TreatmentPriority,
+    TreatmentType,
+    TreatmentTiming
+)
+
 __all__ = [
     # Weather schemas
     "WeatherInput",
@@ -169,5 +202,32 @@ __all__ = [
     "WaterBodyType",
     "EquipmentDriftClass",
     "GroundwaterVulnerability",
+    # Disease schemas
+    "DiseaseDiagnosisInput",
+    "DiseaseDiagnosisOutput",
+    "DiseaseDiagnosis",
+    "DiseaseSeverity",
+    "DiseaseType",
+    "DiseaseConfidenceLevel",
+    "EnvironmentalConditions",
+    "BBCHStageInfo",
+    # Pest schemas
+    "PestIdentificationInput",
+    "PestIdentificationOutput",
+    "PestIdentification",
+    "PestSeverity",
+    "PestType",
+    "PestStage",
+    "CropCategoryRiskProfile",
+    # Treatment schemas
+    "TreatmentPlanInput",
+    "TreatmentPlanOutput",
+    "TreatmentStep",
+    "TreatmentSchedule",
+    "CostAnalysis",
+    "MonitoringPlan",
+    "TreatmentPriority",
+    "TreatmentType",
+    "TreatmentTiming",
 ]
 
