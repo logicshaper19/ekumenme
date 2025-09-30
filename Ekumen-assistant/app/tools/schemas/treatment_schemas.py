@@ -45,9 +45,11 @@ class TreatmentTiming(str, Enum):
 
 class TreatmentPlanInput(BaseModel):
     """Input schema for treatment plan generation"""
-    
+
     crop_type: str = Field(
-        description="Type of crop (e.g., 'blé', 'maïs', 'colza')"
+        description="Type of crop (e.g., 'blé', 'maïs', 'colza')",
+        min_length=1,
+        max_length=100
     )
     eppo_code: Optional[str] = Field(
         default=None,
@@ -74,12 +76,14 @@ class TreatmentPlanInput(BaseModel):
     field_size_ha: Optional[float] = Field(
         default=None,
         ge=0,
-        description="Field size in hectares"
+        le=10000,
+        description="Field size in hectares (max 10,000 ha)"
     )
     budget_constraint: Optional[float] = Field(
         default=None,
         ge=0,
-        description="Budget constraint in euros"
+        le=1000000,
+        description="Budget constraint in euros (max 1M EUR)"
     )
     organic_farming: Optional[bool] = Field(
         default=False,
