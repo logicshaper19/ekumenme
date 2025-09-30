@@ -275,6 +275,21 @@ def classify_agent_by_keywords(message: str) -> str:
     if any(word in message_lower for word in sustainability_keywords):
         return "sustainability"
 
+    # Internet search keywords
+    internet_keywords = ["recherche internet", "chercher sur le web", "actualité", "news", "dernières nouvelles", "info récente"]
+    if any(word in message_lower for word in internet_keywords):
+        return "internet"
+
+    # Supplier keywords
+    supplier_keywords = ["fournisseur", "vendeur", "acheter", "où trouver", "qui vend", "magasin", "distributeur", "revendeur", "disponibilité", "stock", "commander"]
+    if any(word in message_lower for word in supplier_keywords):
+        return "supplier"
+
+    # Market prices keywords
+    market_keywords = ["prix", "cours", "cotation", "marché", "valeur", "prix du blé", "prix du maïs", "cours du colza"]
+    if any(word in message_lower for word in market_keywords):
+        return "market_prices"
+
     # Default to farm data for general questions
     return "farm_data"
 
@@ -330,7 +345,10 @@ def get_agent_name(agent_type: str) -> str:
         "planning": "Expert Planification",
         "farm_data": "Expert Données d'Exploitation",
         "regulatory": "Expert Conformité",
-        "sustainability": "Expert Durabilité"
+        "sustainability": "Expert Durabilité",
+        "internet": "Agent Internet",
+        "supplier": "Agent Fournisseurs",
+        "market_prices": "Agent Prix du Marché"
     }
     return agent_names.get(agent_type, "Assistant Général")
 

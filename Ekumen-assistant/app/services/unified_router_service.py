@@ -139,7 +139,10 @@ class UnifiedRouterService:
         # Fast path - Single tool queries (simple lookups)
         self.fast_patterns = {
             "weather": ["météo", "temps", "pluie", "température", "prévision"],
-            "regulatory": ["amm code", "numéro amm", "autorisation produit"]
+            "regulatory": ["amm code", "numéro amm", "autorisation produit"],
+            "internet": ["recherche internet", "chercher sur le web", "actualité", "news"],
+            "supplier": ["fournisseur", "vendeur", "acheter", "où trouver", "qui vend"],
+            "market_prices": ["prix", "cours", "cotation", "marché agricole"]
         }
 
         # Medium path - Multiple tools but simple
@@ -235,6 +238,30 @@ class UnifiedRouterService:
                 "Diagnostic approfondi de la situation",
                 "Comparaison entre plusieurs parcelles",
                 "Quelle est la raison de cette variation?"
+            ],
+            "internet": [
+                "Recherche sur internet",
+                "Dernières actualités agricoles",
+                "Nouvelles réglementations",
+                "Informations récentes",
+                "Chercher sur le web",
+                "Actualités du secteur"
+            ],
+            "supplier": [
+                "Où acheter des semences?",
+                "Fournisseur d'engrais près de chez moi",
+                "Qui vend du glyphosate?",
+                "Trouver un distributeur",
+                "Magasin agricole dans ma région",
+                "Acheter du matériel agricole"
+            ],
+            "market_prices": [
+                "Prix du blé aujourd'hui",
+                "Cours du maïs",
+                "Cotation des céréales",
+                "Valeur du colza",
+                "Prix agricoles actuels",
+                "Marché des matières premières"
             ]
         }
     

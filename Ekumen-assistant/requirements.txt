@@ -32,6 +32,7 @@ elevenlabs==0.2.26
 httpx==0.25.2
 aiohttp==3.9.1
 requests==2.31.0
+tavily-python==0.7.12
 
 # Data validation and serialization
 pydantic==2.5.0
