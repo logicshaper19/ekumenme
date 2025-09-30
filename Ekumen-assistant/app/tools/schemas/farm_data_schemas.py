@@ -145,22 +145,32 @@ class PerformanceMetricsInput(BaseModel):
 
 
 class OverallMetrics(BaseModel):
-    """Overall performance metrics"""
+    """
+    Overall performance metrics.
+
+    Fields are Optional to support cases where real data is not available.
+    None values indicate missing data rather than zero values.
+    """
     total_surface_ha: float = Field(ge=0)
-    average_yield_q_ha: float = Field(ge=0)
-    total_cost_eur: float = Field(ge=0)
-    average_cost_eur_ha: float = Field(ge=0)
-    average_quality_score: float = Field(ge=0, le=10)
+    average_yield_q_ha: Optional[float] = Field(default=None, ge=0, description="None if no harvest data available")
+    total_cost_eur: Optional[float] = Field(default=None, ge=0, description="None if no cost data available")
+    average_cost_eur_ha: Optional[float] = Field(default=None, ge=0, description="None if no cost data available")
+    average_quality_score: Optional[float] = Field(default=None, ge=0, le=10, description="None if no quality data available")
     yield_trend: TrendDirection
     record_count: int = Field(ge=0)
 
 
 class CropMetrics(BaseModel):
-    """Metrics for a specific crop"""
+    """
+    Metrics for a specific crop.
+
+    Fields are Optional to support cases where real data is not available.
+    None values indicate missing data rather than zero values.
+    """
     total_surface: float = Field(ge=0)
-    average_yield: float = Field(ge=0)
-    average_cost: float = Field(ge=0)
-    average_quality: float = Field(ge=0, le=10)
+    average_yield: Optional[float] = Field(default=None, ge=0, description="None if no harvest data available")
+    average_cost: Optional[float] = Field(default=None, ge=0, description="None if no cost data available")
+    average_quality: Optional[float] = Field(default=None, ge=0, le=10, description="None if no quality data available")
     record_count: int = Field(ge=0)
 
 
