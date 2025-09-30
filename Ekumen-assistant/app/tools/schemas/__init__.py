@@ -76,6 +76,17 @@ from app.tools.schemas.safety_schemas import (
     SafetyPriority
 )
 
+from app.tools.schemas.environmental_schemas import (
+    EnvironmentalRegulationsInput,
+    EnvironmentalRegulationsOutput,
+    EnvironmentalRegulation,
+    EnvironmentalRisk,
+    ZNTCompliance,
+    EnvironmentalImpactData,
+    EnvironmentalImpactLevel,
+    RiskLevel as EnvironmentalRiskLevel
+)
+
 __all__ = [
     # Weather schemas
     "WeatherInput",
@@ -135,5 +146,14 @@ __all__ = [
     "ProductSafetyInfo",
     "SafetyLevel",
     "SafetyPriority",
+    # Environmental schemas
+    "EnvironmentalRegulationsInput",
+    "EnvironmentalRegulationsOutput",
+    "EnvironmentalRegulation",
+    "EnvironmentalRisk",
+    "ZNTCompliance",
+    "EnvironmentalImpactData",
+    "EnvironmentalImpactLevel",
+    "EnvironmentalRiskLevel",
 ]
 
