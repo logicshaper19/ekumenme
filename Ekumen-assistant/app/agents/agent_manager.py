@@ -16,6 +16,7 @@ No prompting logic, no orchestration, no agent responsibilities.
 
 from typing import Dict, List, Any, Optional
 import logging
+import asyncio
 from enum import Enum
 from dataclasses import dataclass
 
@@ -29,6 +30,9 @@ class AgentType(Enum):
     PLANNING = "planning"
     REGULATORY = "regulatory"
     SUSTAINABILITY = "sustainability"
+    INTERNET = "internet"
+    SUPPLIER = "supplier"
+    MARKET_PRICES = "market_prices"
 
 @dataclass
 class AgentProfile:
@@ -96,6 +100,27 @@ class AgentManager:
                 description="Analyzes environmental impact and sustainability",
                 capabilities=["carbon_footprint", "biodiversity", "soil_health"],
                 cost_per_request=0.08
+            ),
+            AgentType.INTERNET: AgentProfile(
+                agent_type=AgentType.INTERNET,
+                name="Internet Agent",
+                description="Searches the web for real-time information",
+                capabilities=["web_search", "news", "market_prices", "general_info"],
+                cost_per_request=0.02
+            ),
+            AgentType.SUPPLIER: AgentProfile(
+                agent_type=AgentType.SUPPLIER,
+                name="Supplier Agent",
+                description="Finds agricultural suppliers and products",
+                capabilities=["supplier_search", "product_availability", "price_comparison"],
+                cost_per_request=0.02
+            ),
+            AgentType.MARKET_PRICES: AgentProfile(
+                agent_type=AgentType.MARKET_PRICES,
+                name="Market Prices Agent",
+                description="Provides real-time agricultural commodity prices",
+                capabilities=["price_lookup", "market_trends", "price_comparison"],
+                cost_per_request=0.02
             )
         }
     
@@ -138,7 +163,10 @@ class AgentManager:
                     "crop_health": AgentType.CROP_HEALTH,
                     "planning": AgentType.PLANNING,
                     "regulatory": AgentType.REGULATORY,
-                    "sustainability": AgentType.SUSTAINABILITY
+                    "sustainability": AgentType.SUSTAINABILITY,
+                    "internet": AgentType.INTERNET,
+                    "supplier": AgentType.SUPPLIER,
+                    "market_prices": AgentType.MARKET_PRICES
                 }
                 agent_enum = agent_type_map.get(agent_type)
                 if not agent_enum:
@@ -157,8 +185,12 @@ class AgentManager:
                     "error": "Agent not found"
                 }
 
-            # Generate response based on agent type
-            response = self._generate_agent_response(profile, message, context or {})
+            # For new Tavily-powered agents, use actual implementation
+            if agent_enum in [AgentType.INTERNET, AgentType.SUPPLIER, AgentType.MARKET_PRICES]:
+                response = self._execute_tavily_agent(agent_enum, message, context or {})
+            else:
+                # Generate response based on agent type (legacy agents)
+                response = self._generate_agent_response(profile, message, context or {})
 
             return {
                 "response": response,
@@ -256,3 +288,40 @@ Décrivez vos pratiques actuelles pour des recommandations personnalisées."""
         }
 
         return agent_responses.get(profile.agent_type, f"Réponse de {profile.name} pour: {message}")
+
+    def _execute_tavily_agent(self, agent_type: AgentType, message: str, context: Dict[str, Any]) -> str:
+        """Execute Tavily-powered agents (Internet, Supplier, Market Prices)"""
+        try:
+            # Import agents here to avoid circular imports
+            from app.agents.internet_agent import InternetAgent
+            from app.agents.supplier_agent import SupplierAgent
+
+            # Create event loop if needed
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
+            # Execute the appropriate agent
+            if agent_type == AgentType.INTERNET:
+                agent = InternetAgent()
+                result = loop.run_until_complete(agent.process(message, context))
+            elif agent_type == AgentType.SUPPLIER:
+                agent = SupplierAgent()
+                result = loop.run_until_complete(agent.process(message, context))
+            elif agent_type == AgentType.MARKET_PRICES:
+                # Market prices uses Internet agent with specific query
+                agent = InternetAgent()
+                result = loop.run_until_complete(agent.process(message, context))
+            else:
+                return f"Agent type {agent_type} not implemented"
+
+            # Extract response from result
+            if isinstance(result, dict):
+                return result.get("response", str(result))
+            return str(result)
+
+        except Exception as e:
+            logger.error(f"Error executing Tavily agent {agent_type}: {e}")
+            return f"❌ Erreur lors de l'exécution de l'agent: {str(e)}"

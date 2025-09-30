@@ -65,7 +65,10 @@ const ChatInterface: React.FC = () => {
     crop_health: { type: 'crop_health', name: 'Santé des Cultures', icon: '🌱', description: 'Diagnostic et protection' },
     planning: { type: 'planning', name: 'Planification', icon: '📋', description: 'Organisation des activités' },
     regulatory: { type: 'regulatory', name: 'Conformité', icon: '⚖️', description: 'Réglementation et AMM' },
-    sustainability: { type: 'sustainability', name: 'Durabilité', icon: '🌍', description: 'Impact environnemental' }
+    sustainability: { type: 'sustainability', name: 'Durabilité', icon: '🌍', description: 'Impact environnemental' },
+    internet: { type: 'internet', name: 'Internet', icon: '🌐', description: 'Recherche web en temps réel' },
+    supplier: { type: 'supplier', name: 'Fournisseurs', icon: '🎁', description: 'Trouver des fournisseurs agricoles' },
+    market_prices: { type: 'market_prices', name: 'Prix du Marché', icon: '💰', description: 'Prix des matières premières' }
   }
 
   const scrollToBottom = () => {
