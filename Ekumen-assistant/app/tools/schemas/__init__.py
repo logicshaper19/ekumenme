@@ -127,6 +127,16 @@ from app.tools.schemas.treatment_schemas import (
     TreatmentTiming
 )
 
+from app.tools.schemas.nutrient_schemas import (
+    NutrientAnalysisInput,
+    NutrientAnalysisOutput,
+    NutrientDeficiency,
+    SoilAnalysis,
+    DeficiencyLevel,
+    NutrientType,
+    ConfidenceLevel as NutrientConfidenceLevel
+)
+
 __all__ = [
     # Weather schemas
     "WeatherInput",
@@ -229,5 +239,13 @@ __all__ = [
     "TreatmentPriority",
     "TreatmentType",
     "TreatmentTiming",
+    # Nutrient schemas
+    "NutrientAnalysisInput",
+    "NutrientAnalysisOutput",
+    "NutrientDeficiency",
+    "SoilAnalysis",
+    "DeficiencyLevel",
+    "NutrientType",
+    "NutrientConfidenceLevel",
 ]
 
