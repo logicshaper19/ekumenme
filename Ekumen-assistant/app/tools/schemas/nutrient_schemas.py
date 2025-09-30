@@ -80,14 +80,22 @@ class SoilAnalysis(BaseModel):
 
 class NutrientAnalysisInput(BaseModel):
     """Input schema for nutrient deficiency analysis"""
-    
+
     crop_type: str = Field(
-        description="Type of crop (e.g., 'blé', 'maïs', 'colza')"
+        description="Type of crop (e.g., 'blé', 'maïs', 'colza')",
+        min_length=1,
+        max_length=100
     )
     plant_symptoms: List[str] = Field(
         min_items=1,
+        max_items=50,
         description="List of observed plant symptoms"
     )
+
+    @validator('plant_symptoms')
+    def clean_symptoms(cls, v):
+        """Remove empty strings and strip whitespace"""
+        return [s.strip() for s in v if s and s.strip()]
     soil_conditions: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Soil conditions (pH, organic_matter, texture, etc.)"

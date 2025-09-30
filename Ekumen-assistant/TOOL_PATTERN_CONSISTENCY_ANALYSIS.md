@@ -1,8 +1,8 @@
 # 🔍 Tool Pattern Consistency Analysis
 
-**Date**: 2025-09-30  
-**Issue**: Inconsistent patterns across 12 enhanced tools  
-**Status**: ⚠️ **CRITICAL - 2 tools deviate from PoC pattern**  
+**Date**: 2025-10-01
+**Issue**: ~~Inconsistent patterns across 12 enhanced tools~~ **RESOLVED** ✅
+**Status**: ✅ **COMPLETE - 100% pattern consistency achieved**
 
 ---
 
@@ -39,27 +39,79 @@
 | Tool | Pattern | Service Class | Tool Type | Status |
 |------|---------|---------------|-----------|--------|
 | `diagnose_disease_tool_enhanced` | ✅ PoC | ✅ EnhancedDiseaseService | StructuredTool() | ✅ CORRECT |
-| `analyze_nutrient_deficiency_tool_enhanced` | ❌ Different | ❌ None | BaseTool class | ⚠️ DEVIATION |
-| `identify_pest_tool_enhanced` | ❌ Different | ❌ None | BaseTool class | ⚠️ DEVIATION |
-| `generate_treatment_plan_tool_enhanced` | ❌ Different | ❌ None | BaseTool class | ⚠️ DEVIATION |
+| `analyze_nutrient_deficiency_tool_enhanced` | ✅ PoC | ✅ EnhancedNutrientService | StructuredTool.from_function() | ✅ **REFACTORED** |
+| `identify_pest_tool_enhanced` | ✅ PoC | ✅ EnhancedPestService | StructuredTool.from_function() | ✅ **REFACTORED** |
+| `generate_treatment_plan_tool_enhanced` | ✅ PoC | ✅ EnhancedTreatmentService | StructuredTool.from_function() | ✅ **REFACTORED** |
 
-**Crop Health Tools**: 1/4 follow PoC pattern ❌
+**Crop Health Tools**: 4/4 follow PoC pattern ✅
 
 ---
 
 ## 🎯 SUMMARY
 
-### **Following PoC Pattern** ✅ (9 tools):
+### **Following PoC Pattern** ✅ (12 tools):
 - ✅ All 4 Weather tools
 - ✅ All 4 Regulatory tools
-- ✅ 1 Crop Health tool (diagnose_disease)
+- ✅ All 4 Crop Health tools
 
-### **Deviating from PoC Pattern** ❌ (3 tools):
-- ❌ `analyze_nutrient_deficiency_tool_enhanced`
-- ❌ `identify_pest_tool_enhanced` (NEW - just created)
-- ❌ `generate_treatment_plan_tool_enhanced` (NEW - just created)
+### **Deviating from PoC Pattern** ❌ (0 tools):
+- None! All tools now follow the PoC pattern ✅
 
-**Total**: 9/12 tools follow PoC pattern (75%)
+**Total**: 12/12 tools follow PoC pattern (100%) 🎉
+
+---
+
+## ✅ REFACTORING COMPLETED (2025-10-01)
+
+### **Tools Refactored** (3 tools):
+
+1. **`analyze_nutrient_deficiency_tool_enhanced`** (454 lines)
+   - Created `nutrient_schemas.py` (315 lines) with Pydantic models
+   - Converted from `BaseTool` to `EnhancedNutrientService`
+   - Added `@redis_cache(ttl=3600, model_class=NutrientAnalysisOutput, category="crop_health")`
+   - Created async wrapper function `analyze_nutrient_deficiency_enhanced()`
+   - Used `StructuredTool.from_function()`
+   - Replaced dataclasses with Pydantic `BaseModel`
+   - Removed manual `_run()` and `_arun()` methods
+
+2. **`identify_pest_tool_enhanced`** (446 lines)
+   - Converted from `BaseTool` to `EnhancedPestService`
+   - Added `@redis_cache(ttl=3600, model_class=PestIdentificationOutput, category="crop_health")`
+   - Created async wrapper function `identify_pest_enhanced()`
+   - Used `StructuredTool.from_function()`
+   - Fixed error handling (ValueError instead of DataError)
+   - Removed manual `_run()` and `_arun()` methods
+
+3. **`generate_treatment_plan_tool_enhanced`** (820 lines)
+   - Converted from `BaseTool` to `EnhancedTreatmentService`
+   - Added `@redis_cache(ttl=1800, model_class=TreatmentPlanOutput, category="crop_health")`
+   - Created async wrapper function `generate_treatment_plan_enhanced()`
+   - Used `StructuredTool.from_function()`
+   - Fixed error handling (ValueError instead of DataError)
+   - Removed manual `_run()` and `_arun()` methods
+
+### **Technical Improvements**:
+- ✅ Removed `BaseTool` inheritance
+- ✅ Removed manual event loop management (`asyncio.new_event_loop()`)
+- ✅ Removed ~40 lines of boilerplate per tool
+- ✅ Added proper Pydantic validation
+- ✅ Improved error handling with user-friendly messages
+- ✅ Added timestamp to all error outputs
+- ✅ Consistent caching strategy across all tools
+
+### **Files Modified**:
+- `app/tools/schemas/nutrient_schemas.py` (created, 315 lines)
+- `app/tools/crop_health_agent/analyze_nutrient_deficiency_tool_enhanced.py` (refactored)
+- `app/tools/crop_health_agent/identify_pest_tool_enhanced.py` (refactored)
+- `app/tools/crop_health_agent/generate_treatment_plan_tool_enhanced.py` (refactored)
+
+### **Verification**:
+- ✅ All tools export correctly from `__init__.py`
+- ✅ All tools use `StructuredTool.from_function()`
+- ✅ All tools have `@redis_cache` with `model_class` parameter
+- ✅ All tools have async wrapper functions
+- ✅ All tools use Pydantic schemas
+- ✅ No `BaseTool` classes remain
 
 ---
 

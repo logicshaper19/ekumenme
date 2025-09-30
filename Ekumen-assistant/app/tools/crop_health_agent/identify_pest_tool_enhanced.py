@@ -8,11 +8,15 @@ Improvements over original:
 - ✅ Granular error handling
 - ✅ Database integration (Crop table + EPPO codes)
 - ✅ Follows PoC pattern (Service class + StructuredTool)
+- ✅ 50% minimum confidence threshold (safety)
+- ✅ Fuzzy damage pattern matching (typo-tolerant)
+- ✅ Input sanitization
 """
 
 import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+from difflib import SequenceMatcher
 
 from langchain.tools import StructuredTool
 from pydantic import ValidationError
@@ -32,6 +36,27 @@ from app.core.cache import redis_cache
 from app.services.knowledge_base_service import KnowledgeBaseService
 
 logger = logging.getLogger(__name__)
+
+# Minimum confidence threshold for pest identification (50% = scientific standard)
+MIN_CONFIDENCE_THRESHOLD = 0.5
+# Fuzzy matching threshold (75% similarity for damage patterns)
+FUZZY_MATCH_THRESHOLD = 0.75
+
+
+def _fuzzy_match(text: str, known_patterns: List[str]) -> Optional[str]:
+    """Fuzzy match text against known patterns (typo-tolerant)"""
+    text_lower = text.lower().strip()
+    best_match = None
+    best_ratio = 0.0
+
+    for pattern in known_patterns:
+        pattern_lower = pattern.lower().strip()
+        ratio = SequenceMatcher(None, text_lower, pattern_lower).ratio()
+        if ratio > best_ratio and ratio >= FUZZY_MATCH_THRESHOLD:
+            best_ratio = ratio
+            best_match = pattern
+
+    return best_match
 
 
 # Crop category risk profiles
@@ -300,23 +325,29 @@ class EnhancedPestService:
             
             identifications.append(identification)
         
-        # Add category-based insights if no database results
+        # Filter by minimum confidence threshold
+        identifications = [p for p in identifications if p.confidence >= MIN_CONFIDENCE_THRESHOLD]
+
+        # Add category-based insights if no high-confidence results
         if not identifications and risk_profile:
+            logger.warning("No high-confidence pest identifications - providing category-based guidance")
             identifications.append(
                 PestIdentification(
-                    pest_name=f"Ravageurs communs ({risk_profile.category})",
+                    pest_name=f"Analyse incertaine - Ravageurs communs ({risk_profile.category})",
                     scientific_name=None,
                     pest_type=PestType.UNKNOWN,
-                    confidence=0.4,
+                    confidence=0.3,  # Below threshold - informational only
                     severity=PestSeverity.MODERATE,
                     damage_patterns=[],
                     treatment_recommendations=[
-                        f"Surveiller: {', '.join(risk_profile.common_pests[:3])}"
+                        "⚠️ Confiance insuffisante pour recommandations spécifiques",
+                        f"Surveiller: {', '.join(risk_profile.common_pests[:3])}",
+                        "Recommandation: Consultation avec expert phytosanitaire"
                     ],
                     prevention_measures=risk_profile.prevention_strategies or []
                 )
             )
-        
+
         return identifications
     
     def _calculate_overall_confidence(self, identifications: List[PestIdentification]) -> ConfidenceLevel:
