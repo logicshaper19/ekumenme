@@ -33,6 +33,7 @@ class Disease(Base):
     disease_type = Column(String(100), nullable=False, index=True)  # fungal, bacterial, viral, etc.
     pathogen_name = Column(String(200), nullable=True)
     severity_level = Column(String(50), nullable=False, index=True)  # low, moderate, high, critical
+    eppo_code = Column(String(10), nullable=True, index=True)  # EPPO code for international standardization
     
     # Crop associations
     affected_crops = Column(JSON, nullable=False)  # List of crop types
