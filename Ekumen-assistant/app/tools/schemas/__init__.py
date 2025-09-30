@@ -50,7 +50,18 @@ from app.tools.schemas.amm_schemas import (
     SearchSummary,
     RegulatoryContext,
     ProductType,
-    ComplianceStatus
+    ComplianceStatus as AMMComplianceStatus
+)
+
+from app.tools.schemas.compliance_schemas import (
+    ComplianceInput,
+    ComplianceOutput,
+    ComplianceCheckDetail,
+    OverallCompliance,
+    ComplianceStatus,
+    RegulationType,
+    PracticeType,
+    ComplianceRule
 )
 
 __all__ = [
@@ -92,6 +103,15 @@ __all__ = [
     "SearchSummary",
     "RegulatoryContext",
     "ProductType",
+    "AMMComplianceStatus",
+    # Compliance schemas
+    "ComplianceInput",
+    "ComplianceOutput",
+    "ComplianceCheckDetail",
+    "OverallCompliance",
     "ComplianceStatus",
+    "RegulationType",
+    "PracticeType",
+    "ComplianceRule",
 ]
 
