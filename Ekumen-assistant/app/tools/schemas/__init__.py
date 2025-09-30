@@ -42,6 +42,17 @@ from app.tools.schemas.evapotranspiration_schemas import (
     CROP_COEFFICIENTS,
 )
 
+from app.tools.schemas.amm_schemas import (
+    AMMInput,
+    AMMOutput,
+    ProductInfo,
+    SubstanceInfo,
+    SearchSummary,
+    RegulatoryContext,
+    ProductType,
+    ComplianceStatus
+)
+
 __all__ = [
     # Weather schemas
     "WeatherInput",
@@ -73,5 +84,14 @@ __all__ = [
     "CropType",
     "IrrigationMethod",
     "CROP_COEFFICIENTS",
+    # AMM schemas
+    "AMMInput",
+    "AMMOutput",
+    "ProductInfo",
+    "SubstanceInfo",
+    "SearchSummary",
+    "RegulatoryContext",
+    "ProductType",
+    "ComplianceStatus",
 ]
 
