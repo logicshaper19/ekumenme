@@ -1,6 +1,5 @@
 # Model imports for proper relationship resolution
 from .user import User, UserSession, UserActivity
-from .farm import Farm, Parcel, CropRotation
 from .organization import Organization, OrganizationMembership, OrganizationFarmAccess, KnowledgeBaseEntry
 from .conversation import Conversation, Message
 from .feedback import ResponseFeedback, FeedbackType, FeedbackCategory
@@ -17,7 +16,6 @@ from .ephy import (
 
 __all__ = [
     "User", "UserSession", "UserActivity",
-    "Farm", "Parcel", "CropRotation",
     "Organization", "OrganizationMembership", "OrganizationFarmAccess", "KnowledgeBaseEntry",
     "Conversation", "Message",
     "ResponseFeedback", "FeedbackType", "FeedbackCategory",

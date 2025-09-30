@@ -75,7 +75,7 @@ class User(Base):
     email_verified_at = Column(DateTime(timezone=True), nullable=True)
     
     # Relationships
-    farms = relationship("Farm", back_populates="owner", cascade="all, delete-orphan", lazy="select")
+    # NOTE: Farm model removed - use Ekumenbackend MesParcelles models instead
     conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan", lazy="select")
     interventions = relationship("VoiceJournalEntry", back_populates="user", cascade="all, delete-orphan", lazy="select")
     organization_memberships = relationship("OrganizationMembership", back_populates="user", cascade="all, delete-orphan", lazy="select")

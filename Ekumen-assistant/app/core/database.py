@@ -126,8 +126,8 @@ async def init_db():
     try:
         async with async_engine.begin() as conn:
             # Import all models to ensure they are registered
-            from app.models import user, farm, conversation, intervention, organization, product
-            
+            from app.models import user, conversation, intervention, organization, product
+
             # Create all tables
             await conn.run_sync(Base.metadata.create_all)
             logger.info("Database tables created successfully")

@@ -129,20 +129,20 @@ class ToolRegistryService:
     ) -> Any:
         """
         Execute a tool by name.
-        
+
         Args:
             tool_name: Name of the tool to execute
             context: Execution context
             **kwargs: Tool-specific arguments
-        
+
         Returns:
             Tool execution result
         """
         tool = self.get_tool(tool_name)
-        
+
         if not tool:
             raise ValueError(f"Tool not found: {tool_name}")
-        
+
         # Execute tool
         try:
             # Check if tool has async run method
@@ -151,12 +151,85 @@ class ToolRegistryService:
             else:
                 # Fallback to sync run
                 result = tool._run(**kwargs)
-            
+
             return result
-            
+
         except Exception as e:
             logger.error(f"Tool execution failed: {tool_name} - {e}")
             raise
+
+    async def execute_tools(
+        self,
+        tools: list[str],
+        query: str,
+        context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Execute multiple tools (for compatibility with OptimizedStreamingService).
+
+        Args:
+            tools: List of tool names or categories to execute
+            query: User query
+            context: Execution context
+
+        Returns:
+            Dict mapping tool names to results
+        """
+        # Import agents here to avoid circular imports
+        from app.agents.internet_agent import InternetAgent
+        from app.agents.supplier_agent import SupplierAgent
+        from app.agents.weather_agent import WeatherIntelligenceAgent
+        from app.agents.regulatory_agent import IntegratedRegulatoryAgent
+
+        # Category to primary tool mapping (for LangChain tools)
+        category_to_tool = {
+            "farm_data": "get_farm_data",
+            "planning": "generate_planning_tasks",
+            "crop_health": "diagnose_disease",
+            "sustainability": "calculate_carbon_footprint"
+        }
+
+        # Category to agent mapping (for standalone agents)
+        category_to_agent = {
+            "internet": InternetAgent,
+            "supplier": SupplierAgent,
+            "market_prices": InternetAgent,  # Market prices uses internet agent
+            "weather": WeatherIntelligenceAgent,
+            "regulatory": IntegratedRegulatoryAgent
+        }
+
+        results = {}
+
+        for tool_name in tools:
+            try:
+                # Check if this is an agent-based category
+                if tool_name in category_to_agent:
+                    agent_class = category_to_agent[tool_name]
+                    agent = agent_class()
+                    result = await agent.process(query, context)
+                    results[tool_name] = result
+                    logger.info(f"✅ Executed agent: {tool_name}")
+
+                # Otherwise, try to execute as a LangChain tool
+                elif tool_name in category_to_tool:
+                    actual_tool_name = category_to_tool[tool_name]
+                    result = await self.execute_tool(
+                        tool_name=actual_tool_name,
+                        context=context,
+                        query=query
+                    )
+                    results[tool_name] = result
+                    logger.info(f"✅ Executed tool: {actual_tool_name}")
+
+                else:
+                    logger.warning(f"⚠️ Unknown tool/agent: {tool_name}")
+                    results[tool_name] = {"error": f"Unknown tool: {tool_name}"}
+
+            except Exception as e:
+                logger.error(f"❌ Tool {tool_name} failed: {e}")
+                results[tool_name] = {"error": str(e)}
+
+        return results
     
     def get_all_tool_names(self) -> list[str]:
         """Get list of all registered tool names"""

@@ -185,62 +185,7 @@ def test_advisor_token(test_advisor_user):
     return token
 
 
-@pytest.fixture(scope="function")
-async def test_farm(db_session: AsyncSession, test_user):
-    """Create a test farm."""
-    from app.models.farm import Farm, FarmType, FarmStatus
-    
-    farm = Farm(
-        siret="12345678901234",
-        farm_name="Test Farm",
-        legal_name="Test Farm SARL",
-        legal_form="SARL",
-        farm_type=FarmType.INDIVIDUAL,
-        status=FarmStatus.ACTIVE,
-        owner_user_id=test_user.id,
-        region_code="75",
-        department_code="75",
-        commune_insee="75001",
-        address="123 Test Street",
-        postal_code="75001",
-        total_area_ha=100.0,
-        utilized_agricultural_area_ha=80.0,
-        organic_certified=False
-    )
-    
-    db_session.add(farm)
-    await db_session.commit()
-    await db_session.refresh(farm)
-    
-    return farm
 
-
-@pytest.fixture(scope="function")
-async def test_parcel(db_session: AsyncSession, test_farm):
-    """Create a test parcel."""
-    from app.models.farm import Parcel
-    
-    parcel = Parcel(
-        farm_siret=test_farm.siret,
-        parcel_number="P001",
-        cadastral_reference="1234567890",
-        area_ha=5.0,
-        current_crop="Blé",
-        crop_variety="Blé tendre",
-        soil_type="Argileux",
-        ph_level=6.5,
-        organic_matter_percent=2.5,
-        irrigation_available=False,
-        drainage_system=True,
-        slope_percent=2.0,
-        exposure="Sud"
-    )
-    
-    db_session.add(parcel)
-    await db_session.commit()
-    await db_session.refresh(parcel)
-    
-    return parcel
 
 
 @pytest.fixture(scope="function")
