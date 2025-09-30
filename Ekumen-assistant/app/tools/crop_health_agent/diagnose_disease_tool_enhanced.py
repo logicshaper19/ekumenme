@@ -21,6 +21,7 @@ import logging
 import json
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+from difflib import SequenceMatcher
 
 from pydantic import BaseModel, Field
 from langchain.tools import StructuredTool
@@ -107,7 +108,144 @@ class DiagnoseDiseaseService:
                 }
             }
         }
-    
+
+    def _fuzzy_match_symptom(self, symptom1: str, symptom2: str, threshold: float = 0.75) -> bool:
+        """
+        Fuzzy match two symptom strings using SequenceMatcher.
+
+        Args:
+            symptom1: First symptom string
+            symptom2: Second symptom string
+            threshold: Minimum similarity ratio (0.0-1.0)
+
+        Returns:
+            True if symptoms match above threshold
+        """
+        # Normalize strings
+        s1 = symptom1.lower().strip()
+        s2 = symptom2.lower().strip()
+
+        # Exact match
+        if s1 == s2:
+            return True
+
+        # Fuzzy match using SequenceMatcher
+        ratio = SequenceMatcher(None, s1, s2).ratio()
+        return ratio >= threshold
+
+    def _match_environmental_conditions(
+        self,
+        observed: Optional[EnvironmentalConditions],
+        required: Dict[str, Any]
+    ) -> float:
+        """
+        Match observed environmental conditions against required conditions.
+
+        Args:
+            observed: Observed environmental conditions
+            required: Required conditions from disease data
+
+        Returns:
+            Match score (0.0-1.0)
+        """
+        if not observed or not required:
+            return 0.5  # Neutral score if no data
+
+        score = 0.0
+        checks = 0
+
+        # Humidity matching
+        if observed.humidity_percent is not None and required.get("humidity"):
+            checks += 1
+            req_humidity = required["humidity"]
+            if req_humidity == "high" and observed.humidity_percent > 70:
+                score += 1.0
+            elif req_humidity == "moderate" and 40 <= observed.humidity_percent <= 70:
+                score += 1.0
+            elif req_humidity == "low" and observed.humidity_percent < 40:
+                score += 1.0
+            else:
+                # Partial credit for close matches
+                if req_humidity == "high" and observed.humidity_percent > 60:
+                    score += 0.5
+                elif req_humidity == "moderate" and 30 <= observed.humidity_percent <= 80:
+                    score += 0.5
+
+        # Temperature matching
+        if observed.temperature_c is not None and required.get("temperature"):
+            checks += 1
+            req_temp = required["temperature"]
+            if req_temp == "warm" and observed.temperature_c > 20:
+                score += 1.0
+            elif req_temp == "moderate" and 10 <= observed.temperature_c <= 20:
+                score += 1.0
+            elif req_temp == "cool" and observed.temperature_c < 10:
+                score += 1.0
+            else:
+                # Partial credit
+                if req_temp == "warm" and observed.temperature_c > 15:
+                    score += 0.5
+                elif req_temp == "moderate" and 5 <= observed.temperature_c <= 25:
+                    score += 0.5
+
+        # Temperature range matching (more precise)
+        if observed.temperature_c is not None and required.get("temperature_range"):
+            checks += 1
+            temp_range = required["temperature_range"]
+            if len(temp_range) == 2:
+                min_temp, max_temp = temp_range
+                if min_temp <= observed.temperature_c <= max_temp:
+                    score += 1.0
+                elif min_temp - 5 <= observed.temperature_c <= max_temp + 5:
+                    score += 0.5  # Close to range
+
+        # Rainfall matching
+        if observed.rainfall_mm is not None and required.get("rainfall"):
+            checks += 1
+            req_rainfall = required["rainfall"]
+            if req_rainfall == "frequent" and observed.rainfall_mm > 5:
+                score += 1.0
+            elif req_rainfall == "moderate" and 1 <= observed.rainfall_mm <= 5:
+                score += 1.0
+            elif req_rainfall == "low" and observed.rainfall_mm < 1:
+                score += 1.0
+
+        return score / checks if checks > 0 else 0.5
+
+    def _adjust_confidence_for_bbch(
+        self,
+        base_confidence: float,
+        bbch_stage: Optional[int],
+        susceptible_stages: Optional[List[int]]
+    ) -> float:
+        """
+        Adjust confidence based on BBCH stage susceptibility.
+
+        Args:
+            base_confidence: Base confidence score
+            bbch_stage: Current BBCH stage
+            susceptible_stages: List of susceptible BBCH stages
+
+        Returns:
+            Adjusted confidence score
+        """
+        if bbch_stage is None or not susceptible_stages:
+            return base_confidence
+
+        # Check if current stage is in susceptible stages
+        if bbch_stage in susceptible_stages:
+            # Boost confidence - plant is at susceptible stage
+            return min(base_confidence * 1.3, 1.0)
+
+        # Check if close to susceptible stage (within 5 stages)
+        min_distance = min(abs(bbch_stage - stage) for stage in susceptible_stages)
+        if min_distance <= 5:
+            # Slight boost - close to susceptible stage
+            return min(base_confidence * 1.1, 1.0)
+
+        # Reduce confidence - not at susceptible stage
+        return base_confidence * 0.7
+
     @redis_cache(ttl=7200, model_class=DiseaseDiagnosisOutput, category="crop_health")
     async def diagnose_disease(
         self,
@@ -135,6 +273,56 @@ class DiagnoseDiseaseService:
             DiseaseDiagnosisOutput with diagnoses and recommendations
         """
         try:
+            # Input validation
+            if bbch_stage is not None and not (0 <= bbch_stage <= 99):
+                return DiseaseDiagnosisOutput(
+                    success=False,
+                    crop_type=crop_type,
+                    symptoms_observed=symptoms,
+                    environmental_conditions=environmental_conditions,
+                    bbch_stage=bbch_stage,
+                    diagnoses=[],
+                    diagnosis_confidence=ConfidenceLevel.LOW,
+                    treatment_recommendations=[],
+                    total_diagnoses=0,
+                    data_source="validation_error",
+                    timestamp=datetime.now(),
+                    error=f"BBCH stage must be between 0 and 99, got {bbch_stage}",
+                    error_type="validation"
+                )
+
+            if affected_area_percent is not None and not (0 <= affected_area_percent <= 100):
+                return DiseaseDiagnosisOutput(
+                    success=False,
+                    crop_type=crop_type,
+                    symptoms_observed=symptoms,
+                    environmental_conditions=environmental_conditions,
+                    diagnoses=[],
+                    diagnosis_confidence=ConfidenceLevel.LOW,
+                    treatment_recommendations=[],
+                    total_diagnoses=0,
+                    data_source="validation_error",
+                    timestamp=datetime.now(),
+                    error=f"Affected area must be between 0 and 100%, got {affected_area_percent}",
+                    error_type="validation"
+                )
+
+            if not symptoms or len(symptoms) == 0:
+                return DiseaseDiagnosisOutput(
+                    success=False,
+                    crop_type=crop_type,
+                    symptoms_observed=symptoms,
+                    environmental_conditions=environmental_conditions,
+                    diagnoses=[],
+                    diagnosis_confidence=ConfidenceLevel.LOW,
+                    treatment_recommendations=[],
+                    total_diagnoses=0,
+                    data_source="validation_error",
+                    timestamp=datetime.now(),
+                    error="At least one symptom must be provided",
+                    error_type="validation"
+                )
+
             async with AsyncSessionLocal() as db:
                 # Get BBCH stage info if provided
                 bbch_info = None
@@ -174,17 +362,37 @@ class DiagnoseDiseaseService:
                 if db_results.get("total_results", 0) > 0:
                     for result in db_results.get("diseases", []):
                         disease_data = result["disease"]
+                        base_confidence = result["confidence_score"]
+
+                        # Extract susceptible BBCH stages from description if available
+                        # (since we stored them in the description field)
+                        susceptible_stages = None
+                        description = disease_data.get("description", "")
+                        if "Susceptible BBCH stages:" in description:
+                            try:
+                                stages_str = description.split("Susceptible BBCH stages:")[1].split(".")[0]
+                                susceptible_stages = [int(s.strip()) for s in stages_str.split(",")]
+                            except:
+                                pass
+
+                        # Adjust confidence based on BBCH stage
+                        adjusted_confidence = self._adjust_confidence_for_bbch(
+                            base_confidence,
+                            bbch_stage,
+                            susceptible_stages
+                        )
+
                         diagnosis = DiseaseDiagnosis(
                             disease_name=disease_data.get("name", "Unknown"),
                             scientific_name=disease_data.get("scientific_name"),
                             disease_type=DiseaseType(disease_data.get("disease_type", "unknown")),
-                            confidence=result["confidence_score"],
+                            confidence=adjusted_confidence,
                             severity=DiseaseSeverity(disease_data.get("severity_level", "moderate")),
                             symptoms_matched=result.get("matching_symptoms", []),
                             treatment_recommendations=disease_data.get("treatment_options", []),
                             prevention_measures=disease_data.get("prevention_methods", []),
                             eppo_code=disease_data.get("eppo_code"),
-                            susceptible_bbch_stages=disease_data.get("susceptible_bbch_stages"),
+                            susceptible_bbch_stages=susceptible_stages,
                             favorable_conditions=disease_data.get("favorable_conditions"),
                             economic_impact=disease_data.get("economic_impact"),
                             spread_rate=disease_data.get("spread_rate")
@@ -195,7 +403,7 @@ class DiagnoseDiseaseService:
                 if not diagnoses:
                     data_source = "legacy_hardcoded"
                     legacy_diagnoses = self._diagnose_from_legacy(
-                        crop_type, symptoms, conditions_dict
+                        crop_type, symptoms, conditions_dict, bbch_stage
                     )
                     diagnoses.extend(legacy_diagnoses)
                 
@@ -257,31 +465,59 @@ class DiagnoseDiseaseService:
         self,
         crop_type: str,
         symptoms: List[str],
-        conditions: Optional[Dict[str, Any]]
+        conditions: Optional[Dict[str, Any]],
+        bbch_stage: Optional[int] = None
     ) -> List[DiseaseDiagnosis]:
-        """Diagnose using legacy hardcoded knowledge"""
+        """
+        Diagnose using legacy hardcoded knowledge with improved matching.
+
+        Uses fuzzy symptom matching and proper environmental condition matching.
+        """
         diagnoses = []
-        
+
         crop_diseases = self.legacy_knowledge.get(crop_type, {})
-        
+
         for disease_name, disease_data in crop_diseases.items():
-            # Calculate confidence based on symptom matching
+            # Calculate confidence based on FUZZY symptom matching
             disease_symptoms = disease_data.get("symptoms", [])
-            matched_symptoms = [s for s in symptoms if any(ds in s or s in ds for ds in disease_symptoms)]
-            
+            matched_symptoms = []
+
+            for observed_symptom in symptoms:
+                for disease_symptom in disease_symptoms:
+                    if self._fuzzy_match_symptom(observed_symptom, disease_symptom, threshold=0.75):
+                        matched_symptoms.append(observed_symptom)
+                        break  # Don't match same symptom multiple times
+
             if not matched_symptoms:
                 continue
-            
+
+            # Symptom confidence: ratio of matched symptoms
             symptom_confidence = len(matched_symptoms) / len(symptoms) if symptoms else 0
-            
-            # Adjust confidence based on conditions
-            condition_match = 0.5  # Neutral
+
+            # Environmental condition matching using proper logic
+            condition_match = 0.5  # Neutral default
             if conditions and disease_data.get("conditions"):
-                # Simple condition matching
-                condition_match = 0.7  # Assume good match for legacy data
-            
-            confidence = (symptom_confidence * 0.7) + (condition_match * 0.3)
-            
+                # Convert dict to EnvironmentalConditions if needed
+                env_conditions = None
+                if isinstance(conditions, dict):
+                    try:
+                        env_conditions = EnvironmentalConditions(**conditions)
+                    except:
+                        pass
+
+                if env_conditions:
+                    condition_match = self._match_environmental_conditions(
+                        env_conditions,
+                        disease_data.get("conditions", {})
+                    )
+
+            # Calculate base confidence (60% symptoms, 40% conditions)
+            base_confidence = (symptom_confidence * 0.6) + (condition_match * 0.4)
+
+            # Adjust for BBCH stage if available (legacy data doesn't have susceptible stages)
+            # So we don't adjust for legacy, but keep the parameter for consistency
+            confidence = base_confidence
+
             if confidence >= 0.3:  # Minimum threshold
                 diagnosis = DiseaseDiagnosis(
                     disease_name=disease_name.replace("_", " ").title(),
@@ -294,7 +530,7 @@ class DiagnoseDiseaseService:
                     prevention_measures=disease_data.get("prevention", [])
                 )
                 diagnoses.append(diagnosis)
-        
+
         return sorted(diagnoses, key=lambda d: d.confidence, reverse=True)
     
     def _calculate_overall_confidence(self, diagnoses: List[DiseaseDiagnosis]) -> ConfidenceLevel:
