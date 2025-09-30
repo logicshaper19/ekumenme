@@ -47,8 +47,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         const token = localStorage.getItem('auth_token')
         if (token) {
-          // Validate token with backend
-          const response = await fetch('http://localhost:8000/api/v1/auth/me', {
+          // Validate token with backend (use relative URL for Vite proxy)
+          const response = await fetch('/api/v1/auth/me', {
             headers: {
               'Authorization': `Bearer ${token}`,
             },
@@ -79,8 +79,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, password: string) => {
     setIsLoading(true)
     try {
-      // Make actual API call to backend
-      const response = await fetch('http://localhost:8000/api/v1/auth/login', {
+      // Make actual API call to backend (use relative URL for Vite proxy)
+      const response = await fetch('/api/v1/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -99,7 +99,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const tokenData = await response.json()
 
       // Get user info with the token
-      const userResponse = await fetch('http://localhost:8000/api/v1/auth/me', {
+      const userResponse = await fetch('/api/v1/auth/me', {
         headers: {
           'Authorization': `Bearer ${tokenData.access_token}`,
         },
@@ -131,8 +131,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const register = async (userData: RegisterData) => {
     setIsLoading(true)
     try {
-      // Make actual API call to backend
-      const response = await fetch('http://localhost:8000/api/v1/auth/register', {
+      // Make actual API call to backend (use relative URL for Vite proxy)
+      const response = await fetch('/api/v1/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
