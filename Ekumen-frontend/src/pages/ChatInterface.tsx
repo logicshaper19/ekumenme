@@ -577,7 +577,7 @@ const ChatInterface: React.FC = () => {
                         {message.mode === 'supplier' ? (
                           <>
                             <Package className="h-3 w-3" />
-                            <span>Supplier Mode</span>
+                            <span>Mode Fournisseurs</span>
                           </>
                         ) : (
                           <>
@@ -687,7 +687,7 @@ const ChatInterface: React.FC = () => {
                   disabled={isLoading}
                 >
                   <Package className="h-4 w-4" />
-                  <span>Supplier Mode</span>
+                  <span>Mode Fournisseurs</span>
                 </button>
 
                 <button
