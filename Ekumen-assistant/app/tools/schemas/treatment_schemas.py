@@ -43,6 +43,21 @@ class TreatmentTiming(str, Enum):
     PREVENTIVE = "preventive"
 
 
+class BudgetStatus(str, Enum):
+    """Budget status"""
+    WITHIN_BUDGET = "within_budget"
+    OVER_BUDGET = "over_budget"
+    NO_BUDGET_SET = "no_budget_set"
+
+
+class EffectivenessRating(str, Enum):
+    """Treatment effectiveness rating"""
+    LOW = "low"
+    MODERATE = "moderate"
+    HIGH = "high"
+    VERY_HIGH = "very_high"
+
+
 class TreatmentPlanInput(BaseModel):
     """Input schema for treatment plan generation"""
 
@@ -75,15 +90,15 @@ class TreatmentPlanInput(BaseModel):
     )
     field_size_ha: Optional[float] = Field(
         default=None,
-        ge=0,
+        gt=0,
         le=10000,
-        description="Field size in hectares (max 10,000 ha)"
+        description="Field size in hectares (must be positive, max 10,000 ha)"
     )
     budget_constraint: Optional[float] = Field(
         default=None,
-        ge=0,
+        gt=0,
         le=1000000,
-        description="Budget constraint in euros (max 1M EUR)"
+        description="Budget constraint in euros (must be positive, max 1M EUR)"
     )
     organic_farming: Optional[bool] = Field(
         default=False,
@@ -96,7 +111,20 @@ class TreatmentPlanInput(BaseModel):
         if not v or not v.strip():
             raise ValueError("Crop type is required")
         return v.strip()
-    
+
+    @validator('nutrient_analysis')
+    def validate_at_least_one_analysis(cls, v, values):
+        """Ensure at least one analysis is provided"""
+        if not any([
+            values.get('disease_analysis'),
+            values.get('pest_analysis'),
+            v
+        ]):
+            raise ValueError(
+                "At least one analysis (disease, pest, or nutrient) is required"
+            )
+        return v
+
     class Config:
         use_enum_values = True
         arbitrary_types_allowed = True
@@ -129,9 +157,9 @@ class TreatmentStep(BaseModel):
         ge=0,
         description="Estimated cost in euros"
     )
-    effectiveness_rating: Optional[str] = Field(
+    effectiveness_rating: Optional[EffectivenessRating] = Field(
         default=None,
-        description="Expected effectiveness (low, moderate, high)"
+        description="Expected effectiveness rating"
     )
     safety_precautions: Optional[List[str]] = Field(
         default=None,
@@ -188,22 +216,43 @@ class CostAnalysis(BaseModel):
     cost_breakdown: Dict[str, float] = Field(
         description="Cost breakdown by category"
     )
-    budget_status: Optional[str] = Field(
+    budget_status: Optional[BudgetStatus] = Field(
         default=None,
-        description="Budget status (within_budget, over_budget, no_budget_set)"
+        description="Budget status"
     )
     cost_optimization_suggestions: Optional[List[str]] = Field(
         default=None,
         description="Suggestions for cost optimization"
     )
-    
+
+    @validator('cost_breakdown')
+    def validate_cost_breakdown(cls, v):
+        """Validate all costs are non-negative"""
+        for category, cost in v.items():
+            if cost < 0:
+                raise ValueError(f"Negative cost for {category}: {cost}")
+        return v
+
+    @validator('total_estimated_cost_eur')
+    def validate_total_cost(cls, v, values):
+        """Validate total matches breakdown sum"""
+        breakdown = values.get('cost_breakdown', {})
+        if breakdown:
+            breakdown_sum = sum(breakdown.values())
+            # Allow small floating-point differences
+            if abs(v - breakdown_sum) > 0.01:
+                raise ValueError(
+                    f"Total cost {v} doesn't match breakdown sum {breakdown_sum}"
+                )
+        return v
+
     class Config:
         use_enum_values = True
 
 
 class MonitoringPlan(BaseModel):
     """Monitoring plan for treatment effectiveness"""
-    
+
     monitoring_frequency: str = Field(
         description="How often to monitor (daily, weekly, etc.)"
     )
@@ -220,7 +269,41 @@ class MonitoringPlan(BaseModel):
         default=None,
         description="When to reassess treatment plan"
     )
-    
+
+    class Config:
+        use_enum_values = True
+
+
+class ExecutiveSummary(BaseModel):
+    """Executive summary of treatment plan"""
+
+    total_issues_identified: int = Field(
+        ge=0,
+        description="Total number of issues identified"
+    )
+    priority_level: TreatmentPriority = Field(
+        description="Overall priority level"
+    )
+    estimated_treatment_duration: str = Field(
+        description="Estimated duration for treatment plan"
+    )
+    has_disease_issues: bool = Field(
+        default=False,
+        description="Whether disease issues were identified"
+    )
+    has_pest_issues: bool = Field(
+        default=False,
+        description="Whether pest issues were identified"
+    )
+    has_nutrient_issues: bool = Field(
+        default=False,
+        description="Whether nutrient deficiency issues were identified"
+    )
+    key_recommendations: List[str] = Field(
+        default_factory=list,
+        description="Key recommendations summary"
+    )
+
     class Config:
         use_enum_values = True
 
@@ -237,13 +320,15 @@ class TreatmentPlanOutput(BaseModel):
     plan_metadata: Dict[str, Any] = Field(
         description="Plan metadata (generated_at, version, etc.)"
     )
-    executive_summary: Dict[str, Any] = Field(
+    executive_summary: ExecutiveSummary = Field(
         description="Executive summary of treatment plan"
     )
     treatment_steps: List[TreatmentStep] = Field(
+        default_factory=list,
         description="Detailed treatment steps"
     )
     treatment_schedule: List[TreatmentSchedule] = Field(
+        default_factory=list,
         description="Treatment schedule"
     )
     cost_analysis: CostAnalysis = Field(
@@ -253,6 +338,7 @@ class TreatmentPlanOutput(BaseModel):
         description="Monitoring plan"
     )
     prevention_measures: List[str] = Field(
+        default_factory=list,
         description="Long-term prevention measures"
     )
     total_steps: int = Field(
@@ -265,7 +351,7 @@ class TreatmentPlanOutput(BaseModel):
         description="Estimated treatment duration in days"
     )
     timestamp: datetime = Field(
-        default_factory=datetime.now,
+        default_factory=lambda: datetime.now(),
         description="Plan generation timestamp"
     )
     error: Optional[str] = Field(
@@ -280,7 +366,27 @@ class TreatmentPlanOutput(BaseModel):
         default=None,
         description="Warning messages"
     )
-    
+
+    @validator('treatment_steps')
+    def validate_steps_if_success(cls, v, values):
+        """Validate treatment steps if plan succeeded"""
+        if values.get('success') and len(v) == 0:
+            raise ValueError("Successful plan must have at least one treatment step")
+        return v
+
+    @validator('prevention_measures')
+    def ensure_unique_measures(cls, v):
+        """Remove duplicates while preserving order"""
+        if len(v) != len(set(v)):
+            seen = set()
+            unique = []
+            for item in v:
+                if item not in seen:
+                    seen.add(item)
+                    unique.append(item)
+            return unique
+        return v
+
     class Config:
         use_enum_values = True
         arbitrary_types_allowed = True
