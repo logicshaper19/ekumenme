@@ -408,13 +408,14 @@ class EnhancedEnvironmentalRegulationsService:
         Maximum total reduction: 66% (cannot exceed 2/3)
         """
         # Drinking water sources: NO reduction allowed
+        # Note: is_compliant will be properly set by caller based on actual_distance
         if water_body_type == WaterBodyType.DRINKING_WATER_SOURCE:
             return ZNTCompliance(
                 required_znt_m=max(base_znt_m, 200),
                 reduction_possible=False,
                 minimum_absolute_znt_m=200,
                 water_body_type=water_body_type,
-                is_compliant=False,  # Will be updated by caller
+                is_compliant=True,  # Placeholder - caller will override with actual check
                 znt_type="drinking_water"
             )
 
@@ -449,6 +450,12 @@ class EnhancedEnvironmentalRegulationsService:
         }
 
         min_znt = min_znt_by_type.get(water_body_type, 5.0)
+
+        # Apply minimum cap with explicit logging
+        if reduced_znt < min_znt:
+            logger.debug(
+                f"ZNT reduction capped: {reduced_znt:.1f}m → {min_znt}m (minimum for {water_body_type.value})"
+            )
         final_znt = max(reduced_znt, min_znt)
 
         # Build reduction conditions
@@ -495,6 +502,10 @@ class EnhancedEnvironmentalRegulationsService:
     ) -> WaterBodyClassification:
         """
         HIGH PRIORITY #3: Classify water body and determine protection requirements
+
+        Note: water_body_width_m can affect ZNT categories in some regions.
+        Large rivers (>7.5m) may have different requirements than small streams.
+        Currently using type-based rules; width-based adjustments can be added later.
         """
         # Water body type-specific rules
         water_body_rules = {
@@ -1026,9 +1037,25 @@ class EnhancedEnvironmentalRegulationsService:
                     "🐝 Période de floraison: Reporter le traitement ou utiliser des produits non toxiques pour les abeilles"
                 )
 
+            # Weather recommendations (ENHANCED)
             if impact_data.wind_speed_kmh and impact_data.wind_speed_kmh > 15:
                 recommendations.append(
                     f"💨 Vent trop fort ({impact_data.wind_speed_kmh} km/h): Reporter le traitement (max 19 km/h)"
+                )
+
+            if impact_data.temperature_c is not None and impact_data.temperature_c > 25:
+                recommendations.append(
+                    f"🌡️ Température élevée ({impact_data.temperature_c}°C): Traiter tôt le matin ou en soirée"
+                )
+
+            if impact_data.humidity_percent is not None and impact_data.humidity_percent < 50:
+                recommendations.append(
+                    f"💧 Humidité faible ({impact_data.humidity_percent}%): Augmenter le volume de bouillie pour limiter la dérive"
+                )
+
+            if impact_data.rain_forecast_48h:
+                recommendations.append(
+                    "🌧️ Pluie prévue: Attendre une fenêtre météo stable (48-72h sans pluie)"
                 )
 
             if impact_data.sensitive_area:
@@ -1070,9 +1097,35 @@ class EnhancedEnvironmentalRegulationsService:
                     "🚫 INTERDICTION: Distance au cours d'eau < 5m - Traitement INTERDIT"
                 )
 
+            # Weather-based restrictions (ENHANCED)
             if impact_data.wind_speed_kmh and impact_data.wind_speed_kmh > 19:
                 warnings.append(
                     "🚫 INTERDICTION: Vent > 19 km/h - Traitement INTERDIT (risque de dérive)"
+                )
+
+            if impact_data.temperature_c is not None:
+                if impact_data.temperature_c > 25:
+                    warnings.append(
+                        f"⚠️ TEMPÉRATURE ÉLEVÉE: {impact_data.temperature_c}°C - Risque d'évaporation et efficacité réduite"
+                    )
+                elif impact_data.temperature_c < 10:
+                    warnings.append(
+                        f"⚠️ TEMPÉRATURE BASSE: {impact_data.temperature_c}°C - Efficacité réduite (vérifier étiquette produit)"
+                    )
+
+            if impact_data.humidity_percent is not None and impact_data.humidity_percent < 30:
+                warnings.append(
+                    f"⚠️ HUMIDITÉ FAIBLE: {impact_data.humidity_percent}% - Risque de dérive accru"
+                )
+
+            if impact_data.rain_forecast_48h:
+                warnings.append(
+                    "⚠️ PLUIE PRÉVUE (48h): Risque de ruissellement - Reporter le traitement"
+                )
+
+            if impact_data.temperature_inversion:
+                warnings.append(
+                    "🚫 INTERDICTION: Inversion de température - Risque de dérive MAJEUR - Traitement INTERDIT"
                 )
 
             if impact_data.sensitive_area and environmental_risk.non_compliant_count > 0:
