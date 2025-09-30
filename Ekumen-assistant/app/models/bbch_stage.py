@@ -29,16 +29,11 @@ class BBCHStage(Base):
     """
     
     __tablename__ = "bbch_stages"
-    
-    # Primary key
-    id = Column(Integer, primary_key=True, index=True)
-    
-    # Crop identification
-    crop_type = Column(String(50), nullable=False, index=True)
-    
-    # BBCH codes
+
+    # BBCH codes (bbch_code is the primary key in the database)
     bbch_code = Column(
         Integer,
+        primary_key=True,
         nullable=False,
         index=True,
         doc="BBCH decimal code (0-99)"
@@ -48,6 +43,15 @@ class BBCHStage(Base):
         nullable=False,
         index=True,
         doc="Principal growth stage (0-9): 0=germination, 1=leaf, 2=tillering, 3=stem, 4=vegetative, 5=heading, 6=flowering, 7=fruit, 8=ripening, 9=senescence"
+    )
+
+    # Crop identification
+    crop_type = Column(String(50), nullable=True, index=True)
+    crop_eppo_code = Column(
+        String(6),
+        nullable=True,
+        index=True,
+        doc="EPPO code for crop (e.g., TRZAX for wheat) - links to crops table"
     )
     
     # Descriptions
@@ -62,7 +66,7 @@ class BBCHStage(Base):
         doc="English description of growth stage"
     )
     
-    # Agricultural parameters
+    # Agricultural parameters (optional - may not be populated)
     typical_duration_days = Column(
         Integer,
         nullable=True,
@@ -87,10 +91,10 @@ class BBCHStage(Base):
     
     # Constraints
     __table_args__ = (
-        UniqueConstraint('crop_type', 'bbch_code', name='uq_crop_bbch'),
         CheckConstraint('bbch_code >= 0 AND bbch_code <= 99', name='ck_bbch_code_range'),
         CheckConstraint('principal_stage >= 0 AND principal_stage <= 9', name='ck_principal_stage_range'),
         CheckConstraint('kc_value IS NULL OR (kc_value >= 0 AND kc_value <= 2.0)', name='ck_kc_value_range'),
+        Index('ix_bbch_crop_type', 'crop_type'),
         Index('ix_bbch_crop_code', 'crop_type', 'bbch_code'),
         Index('ix_bbch_principal', 'crop_type', 'principal_stage'),
     )
@@ -160,11 +164,11 @@ class BBCHStage(Base):
     def to_dict(self) -> dict:
         """Convert to dictionary for API responses"""
         return {
-            "id": self.id,
-            "crop_type": self.crop_type,
             "bbch_code": self.bbch_code,
             "principal_stage": self.principal_stage,
             "principal_stage_name": self.principal_stage_name,
+            "crop_type": self.crop_type,
+            "crop_eppo_code": self.crop_eppo_code,
             "description_fr": self.description_fr,
             "description_en": self.description_en,
             "typical_duration_days": self.typical_duration_days,
