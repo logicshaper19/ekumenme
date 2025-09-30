@@ -88,13 +88,28 @@ class ComplianceInput(BaseModel):
         default=None,
         description="AMM codes of products to check"
     )
-    
-    @field_validator('products_used', 'equipment_available')
+    check_types: Optional[List[str]] = Field(
+        default=None,
+        description="Specific check types to perform: 'product', 'timing', 'equipment', 'environmental', 'znt', 'dose'. If None, all checks are performed."
+    )
+
+    @field_validator('products_used', 'equipment_available', 'check_types')
     @classmethod
     def validate_lists(cls, v):
         """Ensure lists are not empty if provided"""
         if v is not None and len(v) == 0:
             return None
+        return v
+
+    @field_validator('check_types')
+    @classmethod
+    def validate_check_types(cls, v):
+        """Validate check types"""
+        if v is not None:
+            valid_types = {'product', 'timing', 'equipment', 'environmental', 'znt', 'dose'}
+            for check_type in v:
+                if check_type not in valid_types:
+                    raise ValueError(f"Invalid check_type: {check_type}. Must be one of {valid_types}")
         return v
 
 

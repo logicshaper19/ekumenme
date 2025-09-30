@@ -17,6 +17,7 @@ Improvements:
 """
 
 import logging
+import asyncio
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from pydantic import ValidationError
@@ -64,7 +65,8 @@ class EnhancedComplianceService:
         field_size_ha: Optional[float] = None,
         bbch_stage: Optional[int] = None,
         eppo_code: Optional[str] = None,
-        amm_codes: Optional[List[str]] = None
+        amm_codes: Optional[List[str]] = None,
+        check_types: Optional[List[str]] = None
     ) -> ComplianceOutput:
         """
         Check regulatory compliance for agricultural practices.
@@ -95,8 +97,13 @@ class EnhancedComplianceService:
                 field_size_ha=field_size_ha,
                 bbch_stage=bbch_stage,
                 eppo_code=eppo_code,
-                amm_codes=amm_codes
+                amm_codes=amm_codes,
+                check_types=check_types
             )
+
+            # Determine which checks to perform
+            all_check_types = {'product', 'timing', 'equipment', 'environmental'}
+            checks_to_perform = set(check_types) if check_types else all_check_types
             
             # Get compliance rules from configuration
             compliance_rules = self._get_compliance_rules(practice_type)
@@ -121,37 +128,57 @@ class EnhancedComplianceService:
                     total_checks=0
                 )
             
-            # Perform compliance checks with DATABASE INTEGRATION
+            # Perform compliance checks with PARALLEL EXECUTION for performance
             compliance_checks = []
+            check_tasks = []
 
-            # Check product compliance using EPHY database
-            if products_used:
-                async with AsyncSessionLocal() as db:
-                    product_check = await self._check_product_compliance_db(
-                        db, products_used, crop_type, compliance_rules
+            # Prepare async tasks for parallel execution
+            async with AsyncSessionLocal() as db:
+                # Product compliance check (async, database)
+                if 'product' in checks_to_perform and products_used:
+                    check_tasks.append(
+                        self._check_product_compliance_db(db, products_used, crop_type, compliance_rules)
                     )
-                    compliance_checks.append(product_check)
-            
-            # Check timing compliance
-            if timing:
-                timing_check = self._check_timing_compliance(
-                    timing, compliance_rules
-                )
-                compliance_checks.append(timing_check)
-            
-            # Check equipment compliance
-            if equipment_available is not None:
-                equipment_check = self._check_equipment_compliance(
-                    equipment_available, compliance_rules
-                )
-                compliance_checks.append(equipment_check)
-            
-            # Check environmental compliance
-            if weather_conditions:
-                env_check = self._check_environmental_compliance(
-                    weather_conditions, practice_type, compliance_rules
-                )
-                compliance_checks.append(env_check)
+
+                # Timing compliance check (sync, wrapped in async)
+                if 'timing' in checks_to_perform and timing:
+                    async def timing_check():
+                        return self._check_timing_compliance(timing, compliance_rules)
+                    check_tasks.append(timing_check())
+
+                # Equipment compliance check (sync, wrapped in async)
+                if 'equipment' in checks_to_perform and equipment_available is not None:
+                    async def equipment_check():
+                        return self._check_equipment_compliance(equipment_available, compliance_rules)
+                    check_tasks.append(equipment_check())
+
+                # Environmental compliance check (sync, wrapped in async)
+                if 'environmental' in checks_to_perform and weather_conditions:
+                    async def env_check():
+                        return self._check_environmental_compliance(weather_conditions, practice_type, compliance_rules)
+                    check_tasks.append(env_check())
+
+                # Execute all checks in parallel with error isolation
+                if check_tasks:
+                    results = await asyncio.gather(*check_tasks, return_exceptions=True)
+
+                    # Process results and handle exceptions
+                    for result in results:
+                        if isinstance(result, Exception):
+                            logger.error(f"Check failed with exception: {result}")
+                            # Add error as a failed check
+                            compliance_checks.append(
+                                ComplianceCheckDetail(
+                                    regulation_type=RegulationType.PRODUCT_COMPLIANCE,
+                                    compliance_status=ComplianceStatus.UNKNOWN,
+                                    compliance_score=0.0,
+                                    violations=[f"Erreur lors de la vérification: {str(result)}"],
+                                    recommendations=["Réessayer la vérification"],
+                                    penalties=[]
+                                )
+                            )
+                        else:
+                            compliance_checks.append(result)
             
             # Calculate overall compliance
             overall_compliance = self._calculate_overall_compliance(compliance_checks)
@@ -533,10 +560,11 @@ async def check_regulatory_compliance_async(
     field_size_ha: Optional[float] = None,
     bbch_stage: Optional[int] = None,
     eppo_code: Optional[str] = None,
-    amm_codes: Optional[List[str]] = None
+    amm_codes: Optional[List[str]] = None,
+    check_types: Optional[List[str]] = None
 ) -> str:
     """
-    Check regulatory compliance for agricultural practices with DATABASE INTEGRATION.
+    Check regulatory compliance for agricultural practices with DATABASE INTEGRATION and PARALLEL EXECUTION.
 
     Args:
         practice_type: Type of practice (spraying, fertilization, irrigation, etc.)
@@ -550,6 +578,8 @@ async def check_regulatory_compliance_async(
         bbch_stage: BBCH growth stage (0-99) for validation
         eppo_code: EPPO code for crop identification
         amm_codes: AMM codes of products to check in EPHY database
+        check_types: Specific checks to perform ['product', 'timing', 'equipment', 'environmental'].
+                     If None, all checks are performed. Use this for faster, targeted compliance checks.
 
     Returns:
         JSON string with compliance analysis including database-verified product info
@@ -565,7 +595,8 @@ async def check_regulatory_compliance_async(
         field_size_ha=field_size_ha,
         bbch_stage=bbch_stage,
         eppo_code=eppo_code,
-        amm_codes=amm_codes
+        amm_codes=amm_codes,
+        check_types=check_types
     )
     return result.model_dump_json()
 
@@ -575,12 +606,14 @@ check_regulatory_compliance_tool = StructuredTool.from_function(
     coroutine=check_regulatory_compliance_async,
     name="check_regulatory_compliance",
     description=(
-        "Vérifie la conformité réglementaire des pratiques agricoles avec INTÉGRATION BASE DE DONNÉES. "
+        "Vérifie la conformité réglementaire des pratiques agricoles avec INTÉGRATION BASE DE DONNÉES et EXÉCUTION PARALLÈLE. "
         "Interroge la base EPHY pour vérifier les produits (AMM), la base BBCH pour les stades de croissance, "
         "et la base EPPO pour l'identification des cultures. "
         "Analyse les produits utilisés, les conditions météo, l'équipement, et les restrictions temporelles. "
         "Retourne un score de conformité avec violations, recommandations, pénalités potentielles, "
-        "et références légales (Code rural, arrêtés ZNT, etc.)."
+        "et références légales (Code rural, arrêtés ZNT, etc.). "
+        "Supporte les vérifications ciblées via check_types=['product', 'timing', 'equipment', 'environmental'] "
+        "pour des analyses plus rapides et spécifiques."
     ),
     handle_validation_error=False
 )
