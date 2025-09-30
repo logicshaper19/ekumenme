@@ -225,9 +225,25 @@ class CheckCropFeasibilityTool(BaseTool):
                 },
                 "alternatives": alternatives,
                 "indoor_cultivation": feasibility_analysis["indoor_possible"],
-                "recommendations": feasibility_analysis["recommendations"]
+                "recommendations": feasibility_analysis["recommendations"],
+                "sources": [
+                    {
+                        "title": f"Base de données climatique - {location.title()}",
+                        "url": "#climate-database",
+                        "snippet": f"Zone de rusticité: {climate_data.get('hardiness_zone', 'N/A')}, Température: {climate_data.get('temp_min_annual', 'N/A')}-{climate_data.get('temp_max_annual', 'N/A')}°C, Saison de croissance: {climate_data.get('growing_season_days', 'N/A')} jours",
+                        "relevance": 1.0,
+                        "type": "database"
+                    },
+                    {
+                        "title": f"Exigences culturales - {crop.title()}",
+                        "url": "#crop-requirements",
+                        "snippet": f"Température optimale: {requirements.get('temp_optimal_min', 'N/A')}-{requirements.get('temp_optimal_max', 'N/A')}°C, Climat: {requirements.get('climate', 'N/A')}, Zone de rusticité: {requirements.get('hardiness_zone', 'N/A')}",
+                        "relevance": 1.0,
+                        "type": "database"
+                    }
+                ]
             }
-            
+
             return json.dumps(result, ensure_ascii=False, indent=2)
             
         except Exception as e:
