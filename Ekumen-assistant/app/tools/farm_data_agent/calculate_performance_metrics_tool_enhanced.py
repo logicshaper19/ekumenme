@@ -92,84 +92,155 @@ class EnhancedPerformanceMetricsService:
             raise ValueError(f"Erreur lors du calcul des métriques: {str(e)}")
 
     def _calculate_overall_metrics(self, records: List[Any]) -> OverallMetrics:
-        """Calculate overall performance metrics"""
+        """
+        Calculate overall performance metrics from REAL intervention data.
+
+        Uses intervention_summary from each record to extract:
+        - Real yield data from harvest interventions
+        - Real cost data from input costs (when available)
+        - Returns None for missing data instead of mock values
+        """
         if not records:
             raise ValueError("No records provided")
-        
+
         total_surface = sum(r.surface_ha for r in records)
         if total_surface == 0:
             raise ValueError("Total surface is zero")
-        
-        # For now, use mock yield/cost/quality data
-        # TODO: Get actual yield/cost/quality from interventions
-        total_yield = total_surface * 70  # Mock: 70 q/ha average
-        average_yield = total_yield / total_surface
-        
-        total_cost = total_surface * 450  # Mock: 450 EUR/ha average
-        average_cost = total_cost / total_surface
-        
-        average_quality = 7.5  # Mock quality score
-        
-        # Calculate yield trend (mock for now)
-        yield_trend = TrendDirection.STABLE
-        
+
+        # Extract real data from intervention summaries
+        total_yield_q = 0.0
+        total_cost_eur = 0.0
+        records_with_yield = 0
+        records_with_cost = 0
+
+        for record in records:
+            if record.intervention_summary:
+                summary = record.intervention_summary
+
+                # Use real yield data if available
+                if summary.average_yield_q_ha is not None:
+                    total_yield_q += summary.average_yield_q_ha * record.surface_ha
+                    records_with_yield += 1
+
+                # Use real cost data if available
+                if summary.total_cost_eur is not None:
+                    total_cost_eur += summary.total_cost_eur
+                    records_with_cost += 1
+
+        # Calculate averages only if we have real data
+        average_yield_q_ha = None
+        if records_with_yield > 0:
+            average_yield_q_ha = round(total_yield_q / total_surface, 2)
+
+        average_cost_eur_ha = None
+        if records_with_cost > 0:
+            average_cost_eur_ha = round(total_cost_eur / total_surface, 2)
+
+        # Quality score not available from current data
+        # TODO: Add quality tracking to interventions
+        average_quality_score = None
+
+        # Yield trend not calculable without historical data
+        yield_trend = TrendDirection.INSUFFICIENT_DATA
+
         return OverallMetrics(
             total_surface_ha=round(total_surface, 2),
-            average_yield_q_ha=round(average_yield, 2),
-            total_cost_eur=round(total_cost, 2),
-            average_cost_eur_ha=round(average_cost, 2),
-            average_quality_score=round(average_quality, 2),
+            average_yield_q_ha=average_yield_q_ha,
+            total_cost_eur=round(total_cost_eur, 2) if records_with_cost > 0 else None,
+            average_cost_eur_ha=average_cost_eur_ha,
+            average_quality_score=average_quality_score,
             yield_trend=yield_trend,
             record_count=len(records)
         )
 
     def _calculate_crop_metrics(self, records: List[Any]) -> Dict[str, CropMetrics]:
-        """Calculate metrics by crop"""
+        """
+        Calculate metrics by crop using REAL intervention data.
+
+        Returns None for metrics where no real data is available.
+        """
         crop_data: Dict[str, List[Any]] = {}
-        
+
         for record in records:
             for culture in record.cultures:
                 if culture not in crop_data:
                     crop_data[culture] = []
                 crop_data[culture].append(record)
-        
+
         crop_metrics = {}
         for crop, crop_records in crop_data.items():
             total_surface = sum(r.surface_ha for r in crop_records)
-            
-            # Mock data for now
-            # TODO: Get actual yield/cost/quality from interventions
-            average_yield = 70.0  # Mock
-            average_cost = 450.0  # Mock
-            average_quality = 7.5  # Mock
-            
+
+            # Extract real data from intervention summaries
+            total_yield_q = 0.0
+            total_cost_eur = 0.0
+            records_with_yield = 0
+            records_with_cost = 0
+
+            for record in crop_records:
+                if record.intervention_summary:
+                    summary = record.intervention_summary
+
+                    if summary.average_yield_q_ha is not None:
+                        total_yield_q += summary.average_yield_q_ha * record.surface_ha
+                        records_with_yield += 1
+
+                    if summary.total_cost_eur is not None:
+                        total_cost_eur += summary.total_cost_eur
+                        records_with_cost += 1
+
+            # Calculate averages only if we have real data
+            average_yield = None
+            if records_with_yield > 0 and total_surface > 0:
+                average_yield = round(total_yield_q / total_surface, 2)
+
+            average_cost = None
+            if records_with_cost > 0 and total_surface > 0:
+                average_cost = round(total_cost_eur / total_surface, 2)
+
+            # Quality not available
+            average_quality = None
+
             crop_metrics[crop] = CropMetrics(
                 total_surface=round(total_surface, 2),
-                average_yield=round(average_yield, 2),
-                average_cost=round(average_cost, 2),
-                average_quality=round(average_quality, 2),
+                average_yield=average_yield,
+                average_cost=average_cost,
+                average_quality=average_quality,
                 record_count=len(crop_records)
             )
         
         return crop_metrics
 
     def _calculate_parcel_metrics(self, records: List[Any]) -> Dict[str, CropMetrics]:
-        """Calculate metrics by parcel"""
+        """
+        Calculate metrics by parcel using REAL intervention data.
+
+        Returns None for metrics where no real data is available.
+        """
         parcel_metrics = {}
-        
+
         for record in records:
             parcel = record.parcel
-            
-            # Mock data for now
-            # TODO: Get actual yield/cost/quality from interventions
+
+            # Extract real data from intervention summary
+            average_yield = None
+            average_cost = None
+            average_quality = None
+
+            if record.intervention_summary:
+                summary = record.intervention_summary
+                average_yield = summary.average_yield_q_ha
+                average_cost = summary.average_cost_eur_ha
+                # Quality not available
+
             parcel_metrics[parcel] = CropMetrics(
                 total_surface=round(record.surface_ha, 2),
-                average_yield=70.0,  # Mock
-                average_cost=450.0,  # Mock
-                average_quality=7.5,  # Mock
+                average_yield=average_yield,
+                average_cost=average_cost,
+                average_quality=average_quality,
                 record_count=1
             )
-        
+
         return parcel_metrics
 
 
