@@ -74,6 +74,20 @@ class ComplianceInput(BaseModel):
         ge=0,
         description="Field size in hectares"
     )
+    bbch_stage: Optional[int] = Field(
+        default=None,
+        ge=0,
+        le=99,
+        description="BBCH growth stage (0-99)"
+    )
+    eppo_code: Optional[str] = Field(
+        default=None,
+        description="EPPO code for crop identification"
+    )
+    amm_codes: Optional[List[str]] = Field(
+        default=None,
+        description="AMM codes of products to check"
+    )
     
     @field_validator('products_used', 'equipment_available')
     @classmethod
