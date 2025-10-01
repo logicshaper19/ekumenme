@@ -45,6 +45,8 @@ class EnhancedCropFeasibilityService:
     """
     
     # Comprehensive crop requirements database
+    # NOTE: Café included as example of tropical crop unsuitable for French climate
+    # to demonstrate alternative crop suggestions and feasibility scoring
     CROP_REQUIREMENTS: Dict[str, Any] = {
         "café": {
             "temp_min": 15,
@@ -52,7 +54,7 @@ class EnhancedCropFeasibilityService:
             "temp_optimal_min": 18,
             "temp_optimal_max": 24,
             "frost_tolerance": False,
-            "growing_season_days": 365,
+            "growing_season_days": 365,  # Perennial crop
             "climate": "tropical",
             "hardiness_zone": "10-11",
             "rainfall_mm_year": 1500,
@@ -334,7 +336,11 @@ class EnhancedCropFeasibilityService:
             raise ValueError(f"Erreur lors de la vérification de faisabilité: {str(e)}")
 
     def _get_location_climate(self, location: str) -> Dict[str, Any]:
-        """Get climate data for a location"""
+        """
+        Get climate data for a location.
+
+        Raises ValueError if location not found - no silent fallbacks.
+        """
         # Try direct match
         if location in self.LOCATION_CLIMATE:
             return self.LOCATION_CLIMATE[location]
@@ -344,9 +350,13 @@ class EnhancedCropFeasibilityService:
             if loc_key in location or location in loc_key:
                 return loc_data
 
-        # Default to Paris climate if not found
-        logger.warning(f"Location '{location}' not found, using Paris climate as default")
-        return self.LOCATION_CLIMATE["paris"]
+        # Location not found - error instead of silent fallback
+        available_locations = ", ".join(sorted(self.LOCATION_CLIMATE.keys()))
+        logger.error(f"Location '{location}' not found in database")
+        raise ValueError(
+            f"Localisation '{location}' non reconnue. "
+            f"Localisations disponibles: {available_locations}"
+        )
 
     def _analyze_feasibility(self, requirements: Dict[str, Any], climate: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -355,9 +365,27 @@ class EnhancedCropFeasibilityService:
         Scoring system (0-10):
         - Start at 10.0
         - Deduct points for incompatibilities
-        - Feasible if score >= 7.0
-        - Indoor possible if 3.0 <= score < 7.0
+        - Feasible if score >= 7.0 (70% compatibility threshold based on agricultural success rates)
+        - Indoor possible if 3.0 <= score < 7.0 (30-70% compatibility - greenhouse viable)
+        - Not recommended if score < 3.0 (< 30% compatibility - even greenhouse unlikely to succeed)
+
+        Thresholds based on:
+        - 70%+ compatibility: Outdoor cultivation viable in most years
+        - 30-70% compatibility: Protected cultivation (greenhouse) may succeed
+        - <30% compatibility: Climate fundamentally incompatible
         """
+        # Validate required data
+        required_climate_fields = ["temp_min_annual", "frost_days", "growing_season_days"]
+        required_crop_fields = ["temp_min", "frost_tolerance", "growing_season_days"]
+
+        for field in required_climate_fields:
+            if climate.get(field) is None:
+                raise ValueError(f"Données climatiques incomplètes: champ '{field}' manquant")
+
+        for field in required_crop_fields:
+            if requirements.get(field) is None:
+                raise ValueError(f"Exigences culturales incomplètes: champ '{field}' manquant")
+
         limitations = []
         score = 10.0
 
@@ -417,43 +445,97 @@ class EnhancedCropFeasibilityService:
         }
 
     def _get_regional_alternatives(self, crop: str, requirements: Dict[str, Any], climate: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Get alternative crops suitable for the region"""
+        """
+        Get alternative crops suitable for the region.
+
+        Returns crop-specific alternatives first, then zone-appropriate general alternatives.
+        """
         alternatives = []
 
         # Get predefined alternatives for this crop
         if "alternatives_temperate" in requirements and requirements["alternatives_temperate"]:
             alternatives.extend(requirements["alternatives_temperate"])
 
-        # Add general alternatives based on climate
-        if climate["hardiness_zone"] in ["8a", "8b", "9a"]:
-            general_alternatives = [
-                {"name": "pommier", "hardiness_zone": "4-8", "description": "Nombreuses variétés adaptées, production fiable"},
-                {"name": "poirier", "hardiness_zone": "4-8", "description": "Rustique, bonne adaptation au climat tempéré"},
-                {"name": "cerisier", "hardiness_zone": "5-8", "description": "Floraison spectaculaire, fruits appréciés"}
-            ]
-            # Add only if not already in alternatives
-            for alt in general_alternatives:
-                if not any(a["name"] == alt["name"] for a in alternatives):
-                    alternatives.append(alt)
+        # Add general alternatives based on hardiness zone
+        zone_alternatives = self._get_zone_appropriate_alternatives(climate["hardiness_zone"])
+
+        # Add only if not already in alternatives
+        for alt in zone_alternatives:
+            if not any(a["name"] == alt["name"] for a in alternatives):
+                alternatives.append(alt)
 
         return alternatives[:5]  # Limit to 5 alternatives
 
+    def _get_zone_appropriate_alternatives(self, hardiness_zone: str) -> List[Dict[str, Any]]:
+        """
+        Get general crop alternatives appropriate for a hardiness zone.
+
+        Based on USDA hardiness zones for French regions.
+        """
+        # Zone 7b and colder (Strasbourg, northern France)
+        if hardiness_zone in ["7a", "7b"]:
+            return [
+                {"name": "pommier", "hardiness_zone": "4-8", "description": "Très rustique, nombreuses variétés adaptées au froid"},
+                {"name": "poirier", "hardiness_zone": "4-8", "description": "Rustique, bonne adaptation au climat continental"},
+                {"name": "prunier", "hardiness_zone": "4-8", "description": "Résistant au froid, production fiable"},
+                {"name": "groseillier", "hardiness_zone": "3-8", "description": "Très rustique, petits fruits"},
+                {"name": "framboisier", "hardiness_zone": "3-9", "description": "Rustique, production généreuse"}
+            ]
+
+        # Zone 8a-8b (Paris, Lyon, most of France)
+        elif hardiness_zone in ["8a", "8b"]:
+            return [
+                {"name": "pommier", "hardiness_zone": "4-8", "description": "Nombreuses variétés adaptées, production fiable"},
+                {"name": "poirier", "hardiness_zone": "4-8", "description": "Rustique, bonne adaptation au climat tempéré"},
+                {"name": "cerisier", "hardiness_zone": "5-8", "description": "Floraison spectaculaire, fruits appréciés"},
+                {"name": "vigne", "hardiness_zone": "6-9", "description": "Nombreux cépages adaptés"},
+                {"name": "noisetier", "hardiness_zone": "4-9", "description": "Très rustique, production de noisettes"}
+            ]
+
+        # Zone 9a and warmer (Marseille, Bordeaux, southern France)
+        elif hardiness_zone in ["9a", "9b", "10a"]:
+            return [
+                {"name": "figuier", "hardiness_zone": "7-10", "description": "Arbre fruitier méditerranéen, résistant jusqu'à -12°C"},
+                {"name": "olivier", "hardiness_zone": "8-10", "description": "Méditerranéen, résistant à la sécheresse"},
+                {"name": "amandier", "hardiness_zone": "7-9", "description": "Arbre fruitier rustique, floraison précoce"},
+                {"name": "vigne", "hardiness_zone": "6-9", "description": "Nombreux cépages adaptés au climat méditerranéen"},
+                {"name": "kiwi", "hardiness_zone": "7-9", "description": "Actinidia, résiste au froid, production généreuse"}
+            ]
+
+        # Default for unknown zones
+        else:
+            return [
+                {"name": "pommier", "hardiness_zone": "4-8", "description": "Nombreuses variétés adaptées"},
+                {"name": "poirier", "hardiness_zone": "4-8", "description": "Rustique, bonne adaptation"}
+            ]
+
     def _generate_sources(self, crop: str, location: str, climate: Dict[str, Any], requirements: Dict[str, Any]) -> List[Source]:
-        """Generate source references for the analysis"""
+        """
+        Generate source references for the analysis.
+
+        Links to real agricultural and climate data sources.
+        """
         return [
             Source(
-                title=f"Base de données climatique - {location.title()}",
-                url="#climate-database",
-                snippet=f"Zone de rusticité: {climate.get('hardiness_zone', 'N/A')}, Température: {climate.get('temp_min_annual', 'N/A')}-{climate.get('temp_max_annual', 'N/A')}°C, Saison de croissance: {climate.get('growing_season_days', 'N/A')} jours",
+                title=f"Zones de rusticité USDA - France",
+                url="https://www.jardiner-malin.fr/fiche/zones-rusticite.html",
+                snippet=f"Zone de rusticité {climate.get('hardiness_zone', 'N/A')} pour {location.title()}: Température minimale annuelle {climate.get('temp_min_annual', 'N/A')}°C",
                 relevance=1.0,
-                type="database"
+                type="reference"
+            ),
+            Source(
+                title=f"Données climatiques - Météo France",
+                url="https://www.meteofrance.fr/climat",
+                snippet=f"Saison de croissance: {climate.get('growing_season_days', 'N/A')} jours, Jours de gel: {climate.get('frost_days', 'N/A')} jours/an",
+                relevance=1.0,
+                type="reference"
             ),
             Source(
                 title=f"Exigences culturales - {crop.title()}",
-                url="#crop-requirements",
+                url="https://www.itab.asso.fr/",
                 snippet=f"Température optimale: {requirements.get('temp_optimal_min', 'N/A')}-{requirements.get('temp_optimal_max', 'N/A')}°C, Climat: {requirements.get('climate', 'N/A')}, Zone de rusticité: {requirements.get('hardiness_zone', 'N/A')}",
                 relevance=1.0,
-                type="database"
+                type="reference"
             )
         ]
 

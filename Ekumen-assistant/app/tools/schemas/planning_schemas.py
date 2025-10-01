@@ -93,6 +93,7 @@ class CropFeasibilityOutput(BaseModel):
     indoor_cultivation: Optional[bool] = Field(default=None, description="Whether indoor cultivation is possible")
     recommendations: List[str] = Field(default_factory=list, description="Cultivation recommendations")
     sources: List[Source] = Field(default_factory=list, description="Data sources used")
+    warnings: List[str] = Field(default_factory=list, description="Data quality and analysis warnings")
     timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
     error: Optional[str] = None
     error_type: Optional[str] = None
