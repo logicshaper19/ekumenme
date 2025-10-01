@@ -129,14 +129,12 @@ class EnhancedBiodiversityService:
             
             # Generate recommendations
             recommendations = self._generate_recommendations(
-                indicator_scores,
-                input_data
+                indicator_scores
             )
             
             # Calculate potential improvement
             potential_score = self._calculate_potential_score(
-                indicator_scores,
-                input_data
+                indicator_scores
             )
             
             logger.info(
@@ -163,37 +161,24 @@ class EnhancedBiodiversityService:
     def _score_crop_rotation(self, crops: int, years: int) -> BiodiversityScore:
         """
         Score crop rotation diversity.
-        
+
         Research shows:
         - 1-2 crops: monoculture/simple rotation (poor biodiversity)
         - 3-4 crops: moderate diversity
         - 5+ crops: good diversity
         - Longer rotations (4+ years) better than short
+
+        Scoring: 70% crop diversity, 30% rotation duration
         """
-        # Base score from number of crops
-        if crops >= 5:
-            crop_score = 10.0
-        elif crops >= 4:
-            crop_score = 7.5
-        elif crops >= 3:
-            crop_score = 5.0
-        elif crops >= 2:
-            crop_score = 3.0
-        else:
-            crop_score = 1.0
-        
-        # Bonus for longer rotations
-        if years >= 5:
-            rotation_bonus = 2.0
-        elif years >= 4:
-            rotation_bonus = 1.0
-        elif years >= 3:
-            rotation_bonus = 0.5
-        else:
-            rotation_bonus = 0.0
-        
-        score = min(crop_score + rotation_bonus, 10.0)
-        
+        # Crop diversity component (70% weight, max 7 points)
+        crop_component = min((crops / 5.0) * 7.0, 7.0)
+
+        # Rotation duration component (30% weight, max 3 points)
+        duration_component = min((years / 5.0) * 3.0, 3.0)
+
+        # Combined score
+        score = min(crop_component + duration_component, 10.0)
+
         if score >= 8:
             status = "excellent"
             description = f"Rotation diversifiée ({crops} cultures, {years} ans) - Excellent pour biodiversité"
@@ -206,7 +191,7 @@ class EnhancedBiodiversityService:
         else:
             status = "poor"
             description = f"Rotation faible ({crops} cultures, {years} ans) - Risque pour biodiversité"
-        
+
         return BiodiversityScore(
             indicator=BiodiversityIndicator.CROP_ROTATION,
             score=round(score, 1),
@@ -279,13 +264,22 @@ class EnhancedBiodiversityService:
         )
     
     def _score_water_features(self, has_water: bool) -> BiodiversityScore:
-        """Score water features (ponds, streams, wetlands)"""
+        """
+        Score water features (ponds, streams, wetlands).
+
+        LIMITATION: Binary scoring (yes/no). Actual biodiversity value varies:
+        - Small pond vs large wetland
+        - Drainage ditch vs natural stream
+        - Single feature vs multiple features
+
+        Future enhancement: water_feature_count, water_area_m2, buffer_width_m
+        """
         if has_water:
             return BiodiversityScore(
                 indicator=BiodiversityIndicator.WATER_FEATURES,
                 score=10.0,
                 status="excellent",
-                impact_description="Points d'eau présents - Biodiversité aquatique et amphibiens"
+                impact_description="Points d'eau présents - Biodiversité aquatique et amphibiens (valeur réelle varie selon type/taille)"
             )
         else:
             return BiodiversityScore(
@@ -296,28 +290,47 @@ class EnhancedBiodiversityService:
             )
     
     def _score_organic_practices(self, is_organic: bool) -> BiodiversityScore:
-        """Score organic certification"""
+        """
+        Score organic certification.
+
+        NOTE: Focuses on organic practices BEYOND pesticide use (already scored separately).
+        Organic certification implies:
+        - Organic fertilizers (compost, manure)
+        - Biological pest control
+        - Heritage/diverse varieties
+        - Soil health focus
+
+        Non-organic farms can still score well on pesticide use if they use IPM.
+        """
         if is_organic:
             return BiodiversityScore(
                 indicator=BiodiversityIndicator.ORGANIC_PRACTICES,
                 score=10.0,
                 status="excellent",
-                impact_description="Agriculture biologique - Pas de pesticides synthétiques"
+                impact_description="Agriculture biologique - Pratiques holistiques favorables biodiversité"
             )
         else:
             return BiodiversityScore(
                 indicator=BiodiversityIndicator.ORGANIC_PRACTICES,
                 score=5.0,
                 status="moderate",
-                impact_description="Agriculture conventionnelle - Potentiel d'amélioration"
+                impact_description="Agriculture conventionnelle - Pratiques biologiques possibles sans certification"
             )
     
     def _score_pesticide_use(self, applications: int) -> BiodiversityScore:
         """
         Score pesticide use intensity.
-        
+
         Lower is better for biodiversity.
         Target: <5 applications/year (HVE level 3)
+
+        LIMITATION: Scoring based on application count, not toxicity or type.
+        Actual biodiversity impact varies significantly:
+        - Herbicide vs broad-spectrum insecticide
+        - Timing (flowering vs pre-emergence)
+        - Application method (spot vs broadcast)
+
+        This provides a rough proxy - fewer applications generally = less impact.
         """
         if applications == 0:
             score = 10.0
@@ -326,11 +339,11 @@ class EnhancedBiodiversityService:
         elif applications <= 3:
             score = 8.0
             status = "good"
-            description = f"Usage pesticides faible ({applications}/an) - Bon pour biodiversité"
+            description = f"Usage pesticides faible ({applications}/an) - Bon pour biodiversité (impact réel varie selon type)"
         elif applications <= 6:
             score = 5.0
             status = "moderate"
-            description = f"Usage pesticides modéré ({applications}/an) - Impact modéré"
+            description = f"Usage pesticides modéré ({applications}/an) - Impact modéré (impact réel varie selon type)"
         elif applications <= 10:
             score = 3.0
             status = "poor"
@@ -339,7 +352,7 @@ class EnhancedBiodiversityService:
             score = 1.0
             status = "poor"
             description = f"Usage pesticides très élevé ({applications}/an) - Impact fort"
-        
+
         return BiodiversityScore(
             indicator=BiodiversityIndicator.PESTICIDE_USE,
             score=round(score, 1),
@@ -377,8 +390,7 @@ class EnhancedBiodiversityService:
     
     def _generate_recommendations(
         self,
-        scores: List[BiodiversityScore],
-        input_data: BiodiversityInput
+        scores: List[BiodiversityScore]
     ) -> List[str]:
         """Generate prioritized recommendations"""
         recommendations = []
@@ -422,21 +434,43 @@ class EnhancedBiodiversityService:
     
     def _calculate_potential_score(
         self,
-        scores: List[BiodiversityScore],
-        input_data: BiodiversityInput
+        scores: List[BiodiversityScore]
     ) -> float:
-        """Calculate potential score if recommendations implemented"""
+        """
+        Calculate potential score if recommendations implemented.
+
+        Improvement potential varies by indicator:
+        - Cover crops: 80% (easy, one season)
+        - Pesticide use: 60% (moderate, requires training/IPM)
+        - Field margins: 70% (moderate, one season)
+        - Crop rotation: 50% (takes years to implement)
+        - Hedgerows: 30% (very slow, 5-10 years to mature)
+        - Water features: 20% (often not feasible, expensive)
+        - Organic practices: 40% (3-year transition period)
+        """
+        # Realistic improvement potential by indicator
+        IMPROVEMENT_POTENTIAL = {
+            BiodiversityIndicator.HABITAT_DIVERSITY: 0.8,  # Cover crops - easy
+            BiodiversityIndicator.PESTICIDE_USE: 0.6,  # Moderate effort
+            BiodiversityIndicator.FIELD_MARGINS: 0.7,  # Moderate, one season
+            BiodiversityIndicator.CROP_ROTATION: 0.5,  # Takes years
+            BiodiversityIndicator.HEDGEROWS: 0.3,  # Very slow
+            BiodiversityIndicator.WATER_FEATURES: 0.2,  # Often not feasible
+            BiodiversityIndicator.ORGANIC_PRACTICES: 0.4,  # 3-year transition
+        }
+
         potential_scores = []
-        
+
         for score in scores:
             if score.score < 7.0:
-                # Assume 50% improvement possible for weak indicators
-                potential = min(score.score + (10.0 - score.score) * 0.5, 10.0)
+                # Use indicator-specific improvement potential
+                improvement_rate = IMPROVEMENT_POTENTIAL.get(score.indicator, 0.5)
+                potential = min(score.score + (10.0 - score.score) * improvement_rate, 10.0)
             else:
                 # Already good, minor improvement
                 potential = min(score.score + 0.5, 10.0)
             potential_scores.append(potential)
-        
+
         return sum(potential_scores) / len(potential_scores)
 
 
