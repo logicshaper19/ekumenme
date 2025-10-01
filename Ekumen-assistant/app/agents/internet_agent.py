@@ -20,7 +20,7 @@ class InternetAgent:
         self.tavily = get_tavily_service()
         self.agent_type = "internet"
         self.name = "Agent Internet"
-        logger.info("✅ Internet Agent initialized")
+        logger.info("Internet Agent initialized")
     
     async def process(
         self,
@@ -37,12 +37,12 @@ class InternetAgent:
         Returns:
             Dict with search results formatted for chat response
         """
-        logger.info(f"🌐 Internet Agent processing: {query}")
-        
+        logger.info(f"Internet Agent processing: {query}")
+
         if not self.tavily.is_available():
             return {
                 "success": False,
-                "response": "❌ Le service de recherche Internet n'est pas disponible actuellement. Veuillez réessayer plus tard.",
+                "response": "Le service de recherche Internet n'est pas disponible actuellement. Veuillez réessayer plus tard.",
                 "agent": self.agent_type
             }
         
@@ -77,10 +77,10 @@ class InternetAgent:
             return self._format_general_response(result)
             
         except Exception as e:
-            logger.error(f"❌ Internet Agent error: {str(e)}")
+            logger.error(f"Internet Agent error: {str(e)}")
             return {
                 "success": False,
-                "response": f"❌ Erreur lors de la recherche: {str(e)}",
+                "response": f"Erreur lors de la recherche: {str(e)}",
                 "agent": self.agent_type
             }
     
@@ -113,12 +113,12 @@ class InternetAgent:
         if not result.get("success"):
             return {
                 "success": False,
-                "response": f"❌ Erreur: {result.get('error', 'Erreur inconnue')}",
+                "response": f"Erreur: {result.get('error', 'Erreur inconnue')}",
                 "agent": self.agent_type
             }
 
         # Build response with AI summary (without inline sources)
-        response = f"🌐 **Recherche Internet**\n\n"
+        response = "**Recherche Internet**\n\n"
 
         # Add AI-generated answer if available
         if result.get("answer"):
@@ -153,11 +153,11 @@ class InternetAgent:
         if not result.get("success"):
             return {
                 "success": False,
-                "response": f"❌ Erreur: {result.get('error', 'Erreur inconnue')}",
+                "response": f"Erreur: {result.get('error', 'Erreur inconnue')}",
                 "agent": self.agent_type
             }
 
-        response = f"💰 **Prix du marché - {result.get('commodity', 'Produit')}**\n\n"
+        response = f"**Prix du marché - {result.get('commodity', 'Produit')}**\n\n"
 
         # Add AI summary
         if result.get("summary"):
@@ -192,11 +192,11 @@ class InternetAgent:
         if not result.get("success"):
             return {
                 "success": False,
-                "response": f"❌ Erreur: {result.get('error', 'Erreur inconnue')}",
+                "response": f"Erreur: {result.get('error', 'Erreur inconnue')}",
                 "agent": self.agent_type
             }
 
-        response = f"📰 **Actualités agricoles**\n\n"
+        response = "**Actualités agricoles**\n\n"
 
         # Add summary
         if result.get("summary"):

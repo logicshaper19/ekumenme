@@ -51,21 +51,21 @@ class DynamicExampleConfig:
 class DynamicFewShotManager:
     """
     Manager for dynamic few-shot example injection.
-    
+
     Job: Provide relevant few-shot examples for each prompt type.
     Input: Prompt type, context, and configuration
     Output: Dynamically selected and formatted examples
     """
-    
+
     def __init__(self):
         self.examples: Dict[str, List[FewShotExample]] = {}
         self.configs: Dict[str, DynamicExampleConfig] = {}
         self._initialize_example_library()
         self._initialize_configs()
-    
+
     def _initialize_example_library(self):
         """Initialize the library of few-shot examples."""
-        
+
         # Farm Data Examples
         self.examples["FARM_DATA_CHAT_PROMPT"] = [
             FewShotExample(
@@ -91,7 +91,7 @@ class DynamicFewShotManager:
                 created_at=datetime.now()
             )
         ]
-        
+
         # Regulatory Examples
         self.examples["AMM_LOOKUP_PROMPT"] = [
             FewShotExample(
@@ -117,8 +117,8 @@ class DynamicFewShotManager:
                 created_at=datetime.now()
             )
         ]
-        
-        # Weather Examples
+
+        # Weather Examples (Old specialized prompt - kept for reference)
         self.examples["WEATHER_FORECAST_PROMPT"] = [
             FewShotExample(
                 prompt_type="WEATHER_FORECAST_PROMPT",
@@ -143,8 +143,299 @@ class DynamicFewShotManager:
                 created_at=datetime.now()
             )
         ]
-        
-        # Crop Health Examples
+
+        # ========================================
+        # 🎯 POC: Weather ReAct Examples
+        # ========================================
+        # These are the ACTUAL examples used by the Weather Agent
+        # with get_weather_react_prompt() - showing ReAct format with tool usage
+
+        self.examples["WEATHER_REACT_PROMPT"] = [
+            # Example 1: Basic weather forecast with get_weather_data tool
+            FewShotExample(
+                prompt_type="WEATHER_REACT_PROMPT",
+                example_type=ExampleType.BASIC,
+                user_query="Quel temps fera-t-il cette semaine?",
+                context="Exploitation à Chartres, traitement fongicide prévu",
+                expected_response="""Question: Quel temps fera-t-il cette semaine?
+Thought: Je dois obtenir les prévisions météo précises pour Chartres sur 7 jours pour conseiller sur le traitement
+Action: get_weather_data
+Action Input: {"location": "Chartres", "days": 7}
+Observation: Prévisions reçues - Lundi: 12-18°C, vent 10km/h, humidité 65%, Mardi: 8-14°C, vent 15km/h, humidité 70%, Mercredi: 6-12°C, pluie 5mm, vent 20km/h, Jeudi: 10-16°C, vent 8km/h, humidité 60%, Vendredi: 14-20°C, vent 12km/h
+Thought: J'ai les données météo complètes. Je peux maintenant analyser les conditions favorables pour le traitement fongicide
+Final Answer: **Prévisions météo Chartres - Semaine du 15 au 21 mars:**
+
+**Lundi 15 mars:**
+- Température: 12-18°C ✅
+- Vent: 10 km/h ✅
+- Humidité: 65% ✅
+- **Statut: FAVORABLE** pour traitement
+
+**Mardi 16 mars:**
+- Température: 8-14°C ✅
+- Vent: 15 km/h ✅
+- Humidité: 70% ⚠️
+- **Statut: FAVORABLE** (humidité limite)
+
+**Mercredi 17 mars:**
+- Température: 6-12°C ⚠️
+- Pluie: 5mm ❌
+- Vent: 20 km/h ❌
+- **Statut: DÉFAVORABLE** (pluie + vent fort)
+
+**Jeudi 18 mars:**
+- Température: 10-16°C ✅
+- Vent: 8 km/h ✅
+- Humidité: 60% ✅
+- **Statut: FAVORABLE**
+
+**Vendredi 19 mars:**
+- Température: 14-20°C ✅
+- Vent: 12 km/h ✅
+- **Statut: FAVORABLE**
+
+**Recommandation traitement fongicide:**
+- **Créneaux optimaux:** Lundi, jeudi ou vendredi
+- **Meilleur choix:** Jeudi (conditions idéales)
+- **À éviter:** Mercredi (pluie prévue)""",
+                reasoning="Utilise get_weather_data pour obtenir prévisions réelles, puis analyse conditions pour traitement",
+                confidence=0.95,
+                tags=["prévisions", "tool_usage", "get_weather_data", "traitement"],
+                created_at=datetime.now()
+            ),
+
+            # Example 2: Intervention window with identify_intervention_windows tool
+            FewShotExample(
+                prompt_type="WEATHER_REACT_PROMPT",
+                example_type=ExampleType.COMPLEX,
+                user_query="Quand puis-je traiter mes céréales cette semaine?",
+                context="Blé tendre, stade épi 1cm, fongicide à appliquer, région Beauce",
+                expected_response="""Question: Quand puis-je traiter mes céréales cette semaine?
+Thought: Je dois identifier les fenêtres d'intervention optimales pour un traitement fongicide sur blé au stade épi 1cm
+Action: identify_intervention_windows
+Action Input: {"location": "Beauce", "intervention_type": "fongicide", "crop": "blé", "growth_stage": "épi 1cm", "days": 7}
+Observation: Fenêtres identifiées - Lundi 15/03 6h-10h (confiance: 0.92, temp: 12-16°C, vent: <15km/h, humidité: 65%), Jeudi 18/03 7h-11h (confiance: 0.88, temp: 14-18°C, vent: <18km/h, humidité: 62%), Vendredi 19/03 6h-9h (confiance: 0.85, temp: 13-17°C, vent: <12km/h)
+Thought: J'ai identifié 3 créneaux favorables. Je dois expliquer pourquoi ces fenêtres sont optimales et donner des recommandations précises
+Final Answer: **Fenêtres de traitement fongicide blé - Stade épi 1cm:**
+
+**Lundi 15 mars - 6h à 10h** (Confiance: 92%)
+- Température: 12-16°C ✅ (optimal pour fongicide)
+- Vent: <15 km/h ✅ (pas de dérive)
+- Humidité: 65% ✅ (bonne pénétration)
+- Pas de pluie prévue 24h ✅
+- **Recommandation: EXCELLENT créneau**
+
+**Jeudi 18 mars - 7h à 11h** (Confiance: 88%)
+- Température: 14-18°C ✅
+- Vent: <18 km/h ✅
+- Humidité: 62% ✅
+- **Recommandation: TRÈS BON créneau**
+
+**Vendredi 19 mars - 6h à 9h** (Confiance: 85%)
+- Température: 13-17°C ✅
+- Vent: <12 km/h ✅
+- Fenêtre plus courte ⚠️
+- **Recommandation: BON créneau (si lundi/jeudi impossible)**
+
+**Conseil prioritaire:**
+Privilégier **lundi matin 6h-10h** pour conditions optimales et stade cultural idéal.
+
+**Précautions:**
+- Vérifier météo locale le matin même
+- Éviter si rosée importante
+- Respecter ZNT et délais avant récolte""",
+                reasoning="Utilise identify_intervention_windows pour obtenir créneaux précis avec scores de confiance, puis priorise et explique",
+                confidence=0.93,
+                tags=["intervention", "fenêtre", "tool_usage", "identify_intervention_windows", "fongicide"],
+                created_at=datetime.now()
+            ),
+
+            # Example 3: Weather risk analysis with analyze_weather_risks tool
+            FewShotExample(
+                prompt_type="WEATHER_REACT_PROMPT",
+                example_type=ExampleType.EDGE_CASE,
+                user_query="Y a-t-il un risque de gel pour mes jeunes maïs?",
+                context="Maïs semé il y a 5 jours, stade levée, région Centre",
+                expected_response="""Question: Y a-t-il un risque de gel pour mes jeunes maïs?
+Thought: Je dois analyser les risques météo spécifiquement pour le gel sur maïs en levée, stade très sensible
+Action: analyze_weather_risks
+Action Input: {"location": "Centre", "risk_type": "gel", "crop": "maïs", "growth_stage": "levée", "days": 3}
+Observation: Risque de gel ÉLEVÉ détecté - Température minimale -2°C prévue nuit du 3 au 4 avril, gelée blanche probable, vent faible 5km/h, ciel dégagé favorisant rayonnement nocturne, risque de dégâts sur jeunes pousses estimé à 70%
+Thought: Risque confirmé et élevé. Je dois donner une alerte claire avec actions de protection immédiates
+Final Answer: **⚠️ ALERTE GEL - Risque ÉLEVÉ**
+
+**Prévisions critiques - Nuit du 3 au 4 avril:**
+- Température minimale: **-2°C** ❌
+- Gelée blanche: **Probable** ❌
+- Vent: 5 km/h (faible, aggrave le gel)
+- Ciel: Dégagé (rayonnement nocturne fort)
+
+**Impact sur maïs en levée:**
+- **Risque de dégâts: 70%** ⚠️
+- Stade critique: levée récente (5 jours)
+- Jeunes pousses très sensibles au gel
+- Dégâts possibles: nécrose, arrêt croissance, mortalité
+
+**Actions IMMÉDIATES recommandées:**
+
+1. **Protection active (si possible):**
+   - Irrigation nocturne (libération chaleur latente)
+   - Brassage d'air si équipement disponible
+
+2. **Surveillance obligatoire:**
+   - Contrôle matinal dès 7h
+   - Évaluation des dégâts sur 10 zones minimum
+   - Photos pour suivi
+
+3. **Plan de contingence:**
+   - Si dégâts >30%: prévoir resemis partiel
+   - Si dégâts >50%: resemis complet à envisager
+   - Contacter assurance si souscrite
+
+**Suivi:**
+- Nouvelle évaluation demain 8h
+- Surveillance températures 3 prochaines nuits
+- Décision resemis dans 48-72h
+
+**Prévention future:**
+- Semer après date de dernières gelées (15 avril en Centre)
+- Variétés plus tolérantes au froid
+- Surveillance météo renforcée""",
+                reasoning="Utilise analyze_weather_risks pour alerte gel spécifique, donne actions protection immédiates et plan contingence",
+                confidence=0.96,
+                tags=["risque", "gel", "alerte", "tool_usage", "analyze_weather_risks", "protection"],
+                created_at=datetime.now()
+            ),
+
+            # Example 4: Evapotranspiration calculation with calculate_evapotranspiration tool
+            FewShotExample(
+                prompt_type="WEATHER_REACT_PROMPT",
+                example_type=ExampleType.COMPLEX,
+                user_query="Dois-je irriguer mon maïs cette semaine?",
+                context="Maïs grain, stade floraison, dernière irrigation il y a 7 jours, région Beauce",
+                expected_response="""Question: Dois-je irriguer mon maïs cette semaine?
+Thought: Je dois calculer l'évapotranspiration et les besoins en eau du maïs en floraison pour décider de l'irrigation
+Action: calculate_evapotranspiration
+Action Input: {"crop": "maïs", "growth_stage": "floraison", "location": "Beauce", "days": 7}
+Observation: Calcul ETc réalisé - ETc moyenne: 6.5 mm/jour, cumul 7 jours: 45.5 mm, réserve utile sol estimée: 25 mm, déficit hydrique calculé: -20.5 mm, stress hydrique: MODÉRÉ, Kc floraison: 1.15, ET0 moyenne: 5.7 mm/jour
+Thought: Déficit hydrique de -20.5mm confirmé, stade floraison très sensible au stress. Irrigation nécessaire rapidement
+Final Answer: **Analyse irrigation maïs - Stade floraison:**
+
+**Besoins en eau calculés:**
+- **ETc actuelle:** 6.5 mm/jour (stade floraison)
+- **Cumul 7 jours:** 45.5 mm
+- **Réserve utile sol:** 25 mm
+- **Coefficient cultural (Kc):** 1.15 (floraison)
+
+**Bilan hydrique:**
+- **Déficit calculé:** -20.5 mm ⚠️
+- **Stress hydrique:** MODÉRÉ
+- **Tendance:** Aggravation si pas d'irrigation
+
+**Impact stade floraison:**
+- Stade **CRITIQUE** pour rendement
+- Stress hydrique = perte pollinisation
+- Impact rendement potentiel: -15 à -25%
+- Fenêtre sensible: 10-15 jours
+
+**RECOMMANDATION: IRRIGUER RAPIDEMENT**
+
+**Paramètres irrigation:**
+- **Dose recommandée:** 25-30 mm
+- **Timing:** Dans les 48h maximum
+- **Objectif:** Reconstituer réserve utile
+- **Méthode:** Aspersion ou pivot selon équipement
+
+**Planification:**
+- **Prochaine irrigation:** Dans 5-6 jours
+- **Surveillance:** Tensiomètre ou sonde capacitive
+- **Ajustement:** Selon météo et stade
+
+**Conditions d'irrigation:**
+- Éviter heures chaudes (12h-16h)
+- Privilégier nuit ou tôt matin
+- Vérifier vent <15 km/h (aspersion)
+
+**Suivi recommandé:**
+- Contrôle humidité sol 24h après irrigation
+- Observation plantes (enroulement feuilles)
+- Calcul ETc quotidien jusqu'à maturité""",
+                reasoning="Utilise calculate_evapotranspiration pour calcul précis besoins eau, analyse déficit et recommande irrigation avec paramètres",
+                confidence=0.91,
+                tags=["irrigation", "evapotranspiration", "tool_usage", "calculate_evapotranspiration", "maïs"],
+                created_at=datetime.now()
+            )
+        ]
+
+        # ========================================
+        # 🌾 Crop Health ReAct Examples
+        # ========================================
+        # These are the ACTUAL examples used by the Crop Health Agent
+        # with get_crop_health_react_prompt() - showing ReAct format with tool usage
+
+        self.examples["CROP_HEALTH_REACT_PROMPT"] = [
+            # Example 1: Disease diagnosis with diagnose_disease tool
+            FewShotExample(
+                prompt_type="CROP_HEALTH_REACT_PROMPT",
+                example_type=ExampleType.BASIC,
+                user_query="J'observe des taches brunes sur les feuilles de mon blé",
+                context="Blé tendre, stade montaison, région Centre",
+                expected_response="""Question: J'observe des taches brunes sur les feuilles de mon blé
+Thought: Je dois diagnostiquer la maladie en analysant les symptômes
+Action: diagnose_disease
+Action Input: {"crop": "blé", "symptoms": "taches brunes sur feuilles", "location": "feuilles"}
+Observation: Septoriose du blé (Septoria tritici) - Maladie fongique, sévérité moyenne
+Thought: J'ai identifié la maladie, je peux maintenant recommander un traitement
+Final Answer: **Diagnostic: Septoriose du blé** (Septoria tritici)
+
+**Symptômes:** Taches brunes sur feuilles - typique de cette maladie fongique
+
+**Sévérité:** Moyenne - intervention recommandée
+
+**Recommandations:**
+- Traitement fongicide si >20% de surface foliaire atteinte
+- Privilégier les triazoles ou strobilurines
+- Intervenir avant montaison pour meilleure efficacité
+- Surveiller l'évolution et conditions météo""",
+                reasoning="Utilise diagnose_disease pour identifier la maladie, puis recommande traitement basé sur sévérité",
+                confidence=0.94,
+                tags=["diagnostic", "maladie", "tool_usage", "diagnose_disease", "septoriose"],
+                created_at=datetime.now()
+            ),
+
+            # Example 2: Pest identification with identify_pest tool
+            FewShotExample(
+                prompt_type="CROP_HEALTH_REACT_PROMPT",
+                example_type=ExampleType.COMPLEX,
+                user_query="Des pucerons sur mon colza, dois-je traiter?",
+                context="Colza d'hiver, stade rosette, automne, région Beauce",
+                expected_response="""Question: Des pucerons sur mon colza, dois-je traiter?
+Thought: Je dois identifier le ravageur et évaluer le seuil d'intervention
+Action: identify_pest
+Action Input: {"crop": "colza", "pest_description": "pucerons", "infestation_level": "présence observée"}
+Observation: Pucerons cendrés du chou - Seuil: 2 pucerons/plante en automne
+Thought: J'ai l'identification, je dois maintenant évaluer si le seuil est atteint
+Final Answer: **Ravageur identifié: Pucerons cendrés du chou**
+
+**Seuil d'intervention:** 2 pucerons/plante en automne
+
+**Évaluation nécessaire:**
+1. Comptez le nombre de pucerons par plante (10 plantes minimum)
+2. Si <2 pucerons/plante: surveillance uniquement
+3. Si >2 pucerons/plante: traitement recommandé
+
+**Options de traitement:**
+- Privilégier les auxiliaires (coccinelles, syrphes)
+- Traitement insecticide si seuil dépassé et absence d'auxiliaires
+- Produits autorisés: pyréthrinoïdes, néonicotinoïdes (selon réglementation)""",
+                reasoning="Utilise identify_pest pour identification précise, évalue seuil d'intervention, recommande surveillance avant traitement",
+                confidence=0.92,
+                tags=["ravageur", "pucerons", "seuil", "tool_usage", "identify_pest"],
+                created_at=datetime.now()
+            )
+        ]
+
+        # Crop Health Examples (Old specialized prompts - kept for reference)
         self.examples["DISEASE_DIAGNOSIS_PROMPT"] = [
             FewShotExample(
                 prompt_type="DISEASE_DIAGNOSIS_PROMPT",
@@ -169,7 +460,7 @@ class DynamicFewShotManager:
                 created_at=datetime.now()
             )
         ]
-        
+
         # Planning Examples
         self.examples["TASK_PLANNING_PROMPT"] = [
             FewShotExample(
@@ -184,7 +475,7 @@ class DynamicFewShotManager:
                 created_at=datetime.now()
             )
         ]
-        
+
         # Sustainability Examples
         self.examples["CARBON_FOOTPRINT_PROMPT"] = [
             FewShotExample(
@@ -199,10 +490,10 @@ class DynamicFewShotManager:
                 created_at=datetime.now()
             )
         ]
-    
+
     def _initialize_configs(self):
         """Initialize configurations for dynamic example injection."""
-        
+
         # Farm Data Config
         self.configs["FARM_DATA_CHAT_PROMPT"] = DynamicExampleConfig(
             prompt_type="FARM_DATA_CHAT_PROMPT",
@@ -212,7 +503,7 @@ class DynamicFewShotManager:
             include_reasoning=True,
             include_confidence=True
         )
-        
+
         # Regulatory Config
         self.configs["AMM_LOOKUP_PROMPT"] = DynamicExampleConfig(
             prompt_type="AMM_LOOKUP_PROMPT",
@@ -222,7 +513,7 @@ class DynamicFewShotManager:
             include_reasoning=True,
             include_confidence=True
         )
-        
+
         # Weather Config
         self.configs["WEATHER_FORECAST_PROMPT"] = DynamicExampleConfig(
             prompt_type="WEATHER_FORECAST_PROMPT",
@@ -232,8 +523,28 @@ class DynamicFewShotManager:
             include_reasoning=True,
             include_confidence=True
         )
-        
-        # Crop Health Config
+
+        # Weather ReAct Config
+        self.configs["WEATHER_REACT_PROMPT"] = DynamicExampleConfig(
+            prompt_type="WEATHER_REACT_PROMPT",
+            max_examples=2,
+            example_types=[ExampleType.BASIC, ExampleType.COMPLEX, ExampleType.EDGE_CASE],
+            priority_order=[ExampleType.BASIC, ExampleType.COMPLEX, ExampleType.EDGE_CASE],
+            include_reasoning=True,
+            include_confidence=True
+        )
+
+        # Crop Health ReAct Config
+        self.configs["CROP_HEALTH_REACT_PROMPT"] = DynamicExampleConfig(
+            prompt_type="CROP_HEALTH_REACT_PROMPT",
+            max_examples=2,
+            example_types=[ExampleType.BASIC, ExampleType.COMPLEX],
+            priority_order=[ExampleType.BASIC, ExampleType.COMPLEX],
+            include_reasoning=True,
+            include_confidence=True
+        )
+
+        # Crop Health Config (Old specialized prompts)
         self.configs["DISEASE_DIAGNOSIS_PROMPT"] = DynamicExampleConfig(
             prompt_type="DISEASE_DIAGNOSIS_PROMPT",
             max_examples=2,
@@ -242,7 +553,7 @@ class DynamicFewShotManager:
             include_reasoning=True,
             include_confidence=True
         )
-        
+
         # Planning Config
         self.configs["TASK_PLANNING_PROMPT"] = DynamicExampleConfig(
             prompt_type="TASK_PLANNING_PROMPT",
@@ -252,7 +563,7 @@ class DynamicFewShotManager:
             include_reasoning=True,
             include_confidence=True
         )
-        
+
         # Sustainability Config
         self.configs["CARBON_FOOTPRINT_PROMPT"] = DynamicExampleConfig(
             prompt_type="CARBON_FOOTPRINT_PROMPT",
@@ -262,43 +573,43 @@ class DynamicFewShotManager:
             include_reasoning=True,
             include_confidence=True
         )
-    
-    def get_dynamic_examples(self, prompt_type: str, context: str = "", 
+
+    def get_dynamic_examples(self, prompt_type: str, context: str = "",
                            user_query: str = "") -> str:
         """
         Get dynamically selected examples for a prompt type.
-        
+
         Args:
             prompt_type: Type of prompt
             context: Additional context
             user_query: User query for relevance matching
-            
+
         Returns:
             Formatted few-shot examples string
         """
         if prompt_type not in self.examples:
             return ""
-        
+
         config = self.configs.get(prompt_type)
         if not config:
             return ""
-        
+
         # Get available examples
         available_examples = self.examples[prompt_type]
-        
+
         # Filter by example types in config
         filtered_examples = [
-            ex for ex in available_examples 
+            ex for ex in available_examples
             if ex.example_type in config.example_types
         ]
-        
+
         # Sort by priority order
         type_priority = {t: i for i, t in enumerate(config.priority_order)}
         filtered_examples.sort(key=lambda x: type_priority.get(x.example_type, 999))
-        
+
         # Select top examples
         selected_examples = filtered_examples[:config.max_examples]
-        
+
         # Format examples
         formatted_examples = []
         for i, example in enumerate(selected_examples, 1):
@@ -306,38 +617,38 @@ class DynamicFewShotManager:
             example_text += f"**Question:** {example.user_query}\n"
             example_text += f"**Contexte:** {example.context}\n"
             example_text += f"**Réponse:**\n{example.expected_response}\n"
-            
+
             if config.include_reasoning:
                 example_text += f"**Raisonnement:** {example.reasoning}\n"
-            
+
             if config.include_confidence:
                 example_text += f"**Confiance:** {example.confidence:.2f}\n"
-            
+
             formatted_examples.append(example_text)
-        
+
         if formatted_examples:
             return "\n\n".join(formatted_examples)
-        
+
         return ""
-    
+
     def add_example(self, example: FewShotExample) -> bool:
         """Add a new few-shot example."""
         try:
             if example.prompt_type not in self.examples:
                 self.examples[example.prompt_type] = []
-            
+
             self.examples[example.prompt_type].append(example)
             logger.info(f"Added example for {example.prompt_type}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Error adding example: {e}")
             return False
-    
+
     def get_examples_for_prompt(self, prompt_type: str) -> List[FewShotExample]:
         """Get all examples for a specific prompt type."""
         return self.examples.get(prompt_type, [])
-    
+
     def get_example_stats(self) -> Dict[str, Any]:
         """Get statistics about the example library."""
         stats = {}
@@ -357,7 +668,7 @@ def get_dynamic_examples(prompt_type: str, context: str = "", user_query: str = 
     """Get dynamically selected examples for a prompt type."""
     return dynamic_examples_manager.get_dynamic_examples(prompt_type, context, user_query)
 
-def add_few_shot_example(prompt_type: str, example_type: ExampleType, 
+def add_few_shot_example(prompt_type: str, example_type: ExampleType,
                         user_query: str, context: str, expected_response: str,
                         reasoning: str, confidence: float, tags: List[str]) -> bool:
     """Add a new few-shot example."""

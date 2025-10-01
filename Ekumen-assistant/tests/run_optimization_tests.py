@@ -5,7 +5,7 @@ Run all tests with:
     python tests/run_optimization_tests.py
 
 Run specific test file:
-    pytest tests/test_unified_router_service.py -v
+    pytest tests/test_parallel_executor_service.py -v
 
 Run with coverage:
     pytest tests/ --cov=app/services --cov-report=html
@@ -19,7 +19,6 @@ def run_all_tests():
     """Run all optimization service tests"""
     
     test_files = [
-        "tests/test_unified_router_service.py",
         "tests/test_parallel_executor_service.py",
         "tests/test_smart_tool_selector_service.py",
     ]

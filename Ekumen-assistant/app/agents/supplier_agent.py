@@ -21,7 +21,7 @@ class SupplierAgent:
         self.tavily = get_tavily_service()
         self.agent_type = "supplier"
         self.name = "Agent Fournisseurs"
-        logger.info("✅ Supplier Agent initialized")
+        logger.info("Supplier Agent initialized")
     
     async def process(
         self,
@@ -38,12 +38,12 @@ class SupplierAgent:
         Returns:
             Dict with supplier results formatted for chat response
         """
-        logger.info(f"🎁 Supplier Agent processing: {query}")
-        
+        logger.info(f"Supplier Agent processing: {query}")
+
         if not self.tavily.is_available():
             return {
                 "success": False,
-                "response": "❌ Le service de recherche de fournisseurs n'est pas disponible actuellement. Veuillez réessayer plus tard.",
+                "response": "Le service de recherche de fournisseurs n'est pas disponible actuellement. Veuillez réessayer plus tard.",
                 "agent": self.agent_type
             }
         
@@ -67,10 +67,10 @@ class SupplierAgent:
             return self._format_supplier_response(result, query)
             
         except Exception as e:
-            logger.error(f"❌ Supplier Agent error: {str(e)}")
+            logger.error(f"Supplier Agent error: {str(e)}")
             return {
                 "success": False,
-                "response": f"❌ Erreur lors de la recherche de fournisseurs: {str(e)}",
+                "response": f"Erreur lors de la recherche de fournisseurs: {str(e)}",
                 "agent": self.agent_type
             }
     
@@ -122,11 +122,11 @@ class SupplierAgent:
         if not result.get("success"):
             return {
                 "success": False,
-                "response": f"❌ Erreur: {result.get('error', 'Erreur inconnue')}",
+                "response": f"Erreur: {result.get('error', 'Erreur inconnue')}",
                 "agent": self.agent_type
             }
 
-        response = f"🎁 **Recherche de fournisseurs**\n\n"
+        response = "**Recherche de fournisseurs**\n\n"
 
         # Add AI summary if available
         if result.get("summary"):
@@ -148,7 +148,7 @@ class SupplierAgent:
                     "type": "web"
                 })
         else:
-            response += "❌ Aucun fournisseur trouvé pour cette recherche.\n\n"
+            response += "Aucun fournisseur trouvé pour cette recherche.\n\n"
             response += "**Suggestions:**\n"
             response += "- Essayez d'élargir votre recherche\n"
             response += "- Vérifiez l'orthographe du produit\n"
@@ -156,7 +156,7 @@ class SupplierAgent:
 
         # Add helpful tips
         if suppliers:
-            response += "\n💡 **Conseils:**\n"
+            response += "\n**Conseils:**\n"
             response += "- Contactez plusieurs fournisseurs pour comparer les prix\n"
             response += "- Vérifiez les certifications et autorisations\n"
             response += "- Demandez les délais de livraison\n"

@@ -53,10 +53,22 @@ class LCELChatService:
             )
             
             # Initialize vector store (will be populated with agricultural knowledge)
-            self.vectorstore = Chroma(
-                embedding_function=self.embeddings,
-                persist_directory="./chroma_db"
-            )
+            # Using langchain-chroma for updated API
+            try:
+                from langchain_chroma import Chroma as ChromaNew
+                self.vectorstore = ChromaNew(
+                    embedding_function=self.embeddings,
+                    persist_directory="./chroma_db"
+                )
+                logger.info("✅ Using updated langchain-chroma package")
+            except ImportError:
+                # Fallback to deprecated version if new package not installed
+                from langchain.vectorstores import Chroma
+                self.vectorstore = Chroma(
+                    embedding_function=self.embeddings,
+                    persist_directory="./chroma_db"
+                )
+                logger.warning("⚠️  Using deprecated Chroma - install langchain-chroma: pip install langchain-chroma")
             
             logger.info("✅ LCEL Chat Service initialized successfully")
             

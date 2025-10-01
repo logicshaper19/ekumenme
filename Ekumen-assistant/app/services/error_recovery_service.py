@@ -380,23 +380,13 @@ class ErrorRecoveryService:
             )
 
     async def _execute_basic_orchestrator_fallback(self, context: ErrorContext) -> Dict[str, Any]:
-        """Execute basic orchestrator as fallback"""
+        """Execute basic error response as final fallback"""
         try:
-            from app.services.agent_orchestrator import AgentOrchestrator
-            orchestrator = AgentOrchestrator()
-
-            result = orchestrator.process_message(
-                message=context.query or "Demande d'assistance agricole",
-                user_id=context.user_id or "unknown",
-                farm_id=None,
-                context=context.context or {}
-            )
-
             return {
-                "response": result.get("response", "Service de base activé"),
-                "agent_type": result.get("agent", "basic_orchestrator"),
-                "confidence": 0.4,
-                "processing_method": "basic_orchestrator_fallback",
+                "response": "Je suis désolé, je rencontre des difficultés techniques. Veuillez réessayer dans quelques instants.",
+                "agent_type": "error_fallback",
+                "confidence": 0.0,
+                "processing_method": "error_fallback",
                 "metadata": {
                     "fallback_reason": "Advanced service failure",
                     "original_error": context.error_message

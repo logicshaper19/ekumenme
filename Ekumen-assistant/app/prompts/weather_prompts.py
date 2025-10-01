@@ -219,91 +219,113 @@ def get_weather_react_prompt(include_examples: bool = True) -> ChatPromptTemplat
     Returns:
         ChatPromptTemplate configured for ReAct agent with weather expertise
     """
+    from langchain_core.prompts import MessagesPlaceholder
+    from .dynamic_examples import get_dynamic_examples
 
-    # Build examples section if requested
+    # Build examples section using dynamic examples system
     examples_section = ""
     if include_examples:
-        examples_section = """
+        dynamic_examples = get_dynamic_examples("WEATHER_REACT_PROMPT")
+        if dynamic_examples:
+            examples_section = f"""
 
-EXEMPLES DE RAISONNEMENT RÉUSSI:
+EXEMPLES DE RAISONNEMENT:
+{dynamic_examples}
 
-Exemple 1 - Prévisions météo:
-Question: Quelles sont les prévisions météo pour la semaine?
-Thought: Je dois obtenir les prévisions météo précises pour la localisation de l'agriculteur
+---
+"""
+
+    # Build concrete example showing multi-step reasoning
+    concrete_example = """
+EXEMPLE CONCRET DE RAISONNEMENT MULTI-ÉTAPES:
+
+Question: Puis-je traiter mes céréales cette semaine sachant qu'il risque de pleuvoir?
+Thought: Je dois d'abord obtenir les prévisions météo détaillées pour identifier les fenêtres sans pluie.
 Action: get_weather_data
-Action Input: {{"location": "Paris", "days": 7}}
-Observation: Prévisions reçues - Lundi: 12-18°C, vent 10km/h, Mardi: 8-14°C, vent 15km/h...
-Thought: J'ai les données météo, je peux maintenant analyser les conditions favorables
-Final Answer: **Prévisions météo - Semaine du 15 au 21 mars:**
-
-**Lundi 15:** ☀️ 12-18°C, vent 10 km/h - **FAVORABLE**
-**Mardi 16:** ☁️ 8-14°C, vent 15 km/h - **FAVORABLE**
-**Mercredi 17:** 🌧️ 6-12°C, pluie 5mm - **DÉFAVORABLE**
-
-**Recommandation:** Traitement optimal lundi ou mardi
-
-Exemple 2 - Fenêtre d'intervention:
-Question: Quand puis-je traiter mes céréales cette semaine?
-Thought: Je dois identifier les fenêtres d'intervention optimales pour traitement
+Action Input: {"location": "exploitation", "days": 7}
+Observation: Lundi: sec, 15°C, vent 12km/h. Mardi: pluie 8mm. Mercredi-Jeudi: sec, 18°C, vent 10km/h. Vendredi: averses.
+Thought: J'ai les prévisions. Maintenant je dois identifier précisément les fenêtres d'intervention optimales.
 Action: identify_intervention_windows
-Action Input: {{"location": "Beauce", "intervention_type": "traitement", "crop": "blé", "days": 7}}
-Observation: Fenêtres identifiées - Lundi 6h-10h (confiance: 0.9), Jeudi 7h-11h (confiance: 0.85)
-Thought: J'ai les créneaux optimaux, je dois expliquer pourquoi ces fenêtres sont favorables
-Final Answer: **Fenêtres de traitement optimales:**
+Action Input: {"location": "exploitation", "intervention_type": "traitement phytosanitaire", "crop": "blé", "days": 7}
+Observation: Fenêtres optimales: Lundi 7h-11h (confiance 0.92), Mercredi 6h-12h (confiance 0.95), Jeudi 7h-10h (confiance 0.88).
+Thought: Excellent. Je dois maintenant analyser les risques pour chaque fenêtre.
+Action: analyze_weather_risks
+Action Input: {"location": "exploitation", "days": 7, "crop": "blé", "growth_stage": "épiaison"}
+Observation: Lundi: risque faible. Mardi: risque élevé (lessivage). Mercredi-Jeudi: risque très faible, conditions idéales.
+Thought: J'ai toutes les informations pour une recommandation complète et sécurisée.
+Final Answer: **Fenêtres de traitement optimales cette semaine:**
 
-**Lundi 15 mars - 6h à 10h** (Confiance: 90%)
-- Température: 12-16°C ✅
-- Vent: <15 km/h ✅
-- Humidité: 65% ✅
+**🟢 RECOMMANDÉ - Mercredi 6h à 12h** (Confiance: 95%)
+- Conditions: Sec, 18°C, vent 10 km/h
+- Pas de pluie prévue dans les 48h suivantes
+- Hygrométrie optimale pour efficacité du traitement
+- Risque: Très faible
 
-**Jeudi 18 mars - 7h à 11h** (Confiance: 85%)
-- Température: 14-18°C ✅
-- Vent: <18 km/h ✅
+**🟡 ACCEPTABLE - Lundi 7h à 11h** (Confiance: 92%)
+- Conditions: Sec, 15°C, vent 12 km/h
+- Attention: Pluie prévue mardi (risque de lessivage si traitement tardif)
+- Fenêtre plus courte
+- Risque: Faible
 
-**Recommandation:** Privilégier lundi matin pour conditions optimales"""
+**🔴 À ÉVITER:**
+- Mardi: Pluie 8mm (lessivage du traitement)
+- Vendredi: Averses (conditions défavorables)
 
-    # Enhanced system prompt with ReAct format
+**Recommandation finale:** Privilégier mercredi matin pour sécurité maximale. Si impossible, lundi matin en terminant avant 11h.
+
+---
+"""
+
+    # Enhanced system prompt with proper ReAct format
     react_system_prompt = f"""{WEATHER_SYSTEM_PROMPT}
 
-Tu as accès à ces outils pour obtenir des données précises:
+OUTILS DISPONIBLES:
+Tu as accès aux outils suivants pour obtenir des données météo précises:
 {{tools}}
 
-Noms des outils disponibles: {{tool_names}}
+Utilise les noms d'outils EXACTS tels qu'ils apparaissent dans la liste ci-dessus.
 
-UTILISATION DES OUTILS:
-Utilise TOUJOURS les outils pour obtenir des données réelles plutôt que de deviner.
-- Pour les prévisions météo: utilise get_weather_data
-- Pour les risques climatiques: utilise analyze_weather_risks
-- Pour les fenêtres d'intervention: utilise identify_intervention_windows
-- Pour l'évapotranspiration: utilise calculate_evapotranspiration
+IMPORTANT: Ne devine JAMAIS les données météo - utilise TOUJOURS les outils pour obtenir des données réelles.
 
-FORMAT REACT OBLIGATOIRE:
-Tu dois suivre ce format de raisonnement:
+FORMAT DE RAISONNEMENT ReAct:
+Pour répondre, suis EXACTEMENT ce processus:
 
-Question: la question de l'utilisateur
-Thought: [analyse de ce que tu dois faire et quel outil utiliser]
-Action: [nom exact de l'outil à utiliser]
-Action Input: [paramètres de l'outil au format JSON]
-Observation: [résultat retourné par l'outil]
-... (répète Thought/Action/Action Input/Observation autant de fois que nécessaire)
-Thought: je connais maintenant la réponse finale avec toutes les données nécessaires
-Final Answer: [réponse complète en français avec toutes les recommandations]
+Thought: [Analyse de la situation et décision sur l'action à prendre]
+Action: [nom_exact_de_l_outil]
+Action Input: {{"param1": "value1", "param2": "value2"}}
+
+Le système te retournera automatiquement:
+Observation: [résultat de l'outil]
+
+Tu peux répéter ce cycle Thought/Action/Action Input plusieurs fois jusqu'à avoir toutes les informations nécessaires.
+
+Quand tu as suffisamment d'informations:
+Thought: J'ai maintenant toutes les informations nécessaires pour répondre
+Final Answer: [Ta réponse complète et structurée en français]
+
+{concrete_example}
 {examples_section}
 
-IMPORTANT:
-- Utilise TOUJOURS les outils pour obtenir des données réelles
-- Ne devine JAMAIS les données météo
+RÈGLES CRITIQUES:
+- N'invente JAMAIS "Observation:" - le système le génère automatiquement
+- Écris "Thought:", "Action:", "Action Input:", "Final Answer:" exactement comme indiqué
+- Action Input doit TOUJOURS être un JSON valide avec des guillemets doubles
+- Ne devine JAMAIS les données météo sans utiliser les outils
+- Si un outil échoue, réfléchis à une approche alternative ou demande plus d'informations
 - Fournis des recommandations précises avec dates et heures
-- Mentionne les risques et précautions
-- Suis EXACTEMENT le format ReAct ci-dessus"""
+- Mentionne toujours les risques et précautions
+- Adapte tes recommandations au contexte spécifique de l'exploitation
+
+GESTION DES RAISONNEMENTS LONGS:
+- Si tu as déjà fait plusieurs actions, résume brièvement ce que tu as appris avant de continuer
+- Exemple: "Thought: J'ai les prévisions météo. Maintenant je dois identifier les fenêtres d'intervention..."
+- Garde tes pensées concises et orientées vers l'action suivante"""
 
     # Create ChatPromptTemplate with ReAct format
     return ChatPromptTemplate.from_messages([
         ("system", react_system_prompt),
-        ("human", """{{context}}
-
-Question: {{input}}"""),
-        ("ai", "{agent_scratchpad}")
+        ("human", "{input}"),
+        MessagesPlaceholder(variable_name="agent_scratchpad"),
     ])
 
 

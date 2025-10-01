@@ -29,6 +29,7 @@ from .base_prompts import (
 # Farm Data Agent Prompts
 from .farm_data_prompts import (
     FARM_DATA_SYSTEM_PROMPT,
+    get_farm_data_react_prompt,
     FARM_DATA_CHAT_PROMPT,
     PARCEL_ANALYSIS_PROMPT,
     PERFORMANCE_METRICS_PROMPT,
@@ -40,6 +41,7 @@ from .farm_data_prompts import (
 # Regulatory Agent Prompts
 from .regulatory_prompts import (
     REGULATORY_SYSTEM_PROMPT,
+    get_regulatory_react_prompt,
     REGULATORY_CHAT_PROMPT,
     AMM_LOOKUP_PROMPT,
     USAGE_CONDITIONS_PROMPT,
@@ -52,6 +54,7 @@ from .regulatory_prompts import (
 # Weather Agent Prompts
 from .weather_prompts import (
     WEATHER_SYSTEM_PROMPT,
+    get_weather_react_prompt,
     WEATHER_CHAT_PROMPT,
     WEATHER_FORECAST_PROMPT,
     INTERVENTION_WINDOW_PROMPT,
@@ -64,19 +67,18 @@ from .weather_prompts import (
 # Crop Health Agent Prompts
 from .crop_health_prompts import (
     CROP_HEALTH_SYSTEM_PROMPT,
+    get_crop_health_react_prompt,
     CROP_HEALTH_CHAT_PROMPT,
     DISEASE_DIAGNOSIS_PROMPT,
     PEST_IDENTIFICATION_PROMPT,
     NUTRIENT_DEFICIENCY_PROMPT,
     TREATMENT_PLAN_PROMPT,
-    RESISTANCE_MANAGEMENT_PROMPT,
-    BIOLOGICAL_CONTROL_PROMPT,
-    THRESHOLD_MANAGEMENT_PROMPT
 )
 
 # Planning Agent Prompts
 from .planning_prompts import (
     PLANNING_SYSTEM_PROMPT,
+    get_planning_react_prompt,
     PLANNING_CHAT_PROMPT,
     TASK_PLANNING_PROMPT,
     RESOURCE_OPTIMIZATION_PROMPT,
@@ -84,12 +86,12 @@ from .planning_prompts import (
     WEATHER_DEPENDENT_PLANNING_PROMPT,
     COST_OPTIMIZATION_PROMPT,
     EMERGENCY_PLANNING_PROMPT,
-    WORKFLOW_OPTIMIZATION_PROMPT
 )
 
 # Sustainability Agent Prompts
 from .sustainability_prompts import (
     SUSTAINABILITY_SYSTEM_PROMPT,
+    get_sustainability_react_prompt,
     SUSTAINABILITY_CHAT_PROMPT,
     CARBON_FOOTPRINT_PROMPT,
     BIODIVERSITY_ASSESSMENT_PROMPT,
@@ -104,66 +106,38 @@ from .sustainability_prompts import (
 # Orchestrator Prompts
 from .orchestrator_prompts import (
     ORCHESTRATOR_SYSTEM_PROMPT,
-    ORCHESTRATOR_ROUTING_PROMPT,
+    get_orchestrator_react_prompt,
+    ORCHESTRATOR_CHAT_PROMPT,
     AGENT_SELECTION_PROMPT,
     RESPONSE_SYNTHESIS_PROMPT,
     CONFLICT_RESOLUTION_PROMPT,
-    QUALITY_ASSURANCE_PROMPT,
-    PERFORMANCE_MONITORING_PROMPT,
-    ERROR_HANDLING_PROMPT,
-    LOAD_BALANCING_PROMPT
 )
 
-# Prompt Management
-from .prompt_manager import (
-    PromptManager,
-    PromptVersion,
-    PromptMetrics,
-    PromptConfig,
-    prompt_manager,
-    get_prompt,
-    update_prompt_version,
-    log_prompt_performance,
-    select_prompt_semantic,
-    get_prompt_semantic,
-    set_routing_method,
-    get_routing_method,
-    add_intent_example,
-    get_semantic_analytics
+# Prompt Registry (Simplified)
+from .prompt_registry import (
+    PromptRegistry,
+    get_agent_prompt,
+    list_available_agents,
+    is_agent_available,
 )
 
-# Semantic Routing
-from .semantic_routing import (
-    SemanticIntentClassifier,
-    IntentType,
-    IntentExample,
-    IntentClassification,
-    semantic_classifier,
-    classify_intent,
-    get_prompt_for_query
-)
+# Simple Router - DELETED (routing now handled by orchestrator)
+# The orchestrator agent uses ReAct reasoning to decide which agents to invoke
 
-# Embedding System
-from .embedding_system import (
-    EmbeddingPromptMatcher,
-    PromptEmbedding,
-    PromptMatch,
-    embedding_matcher,
-    find_best_prompt,
-    find_prompt_by_intent,
-    get_prompt_name_for_query
-)
+# Embedding System (Optional - for advanced use cases)
+# Commented out as it depends on deleted semantic_routing
+# from .embedding_system import (
+#     EmbeddingPromptMatcher,
+#     PromptEmbedding,
+#     PromptMatch,
+#     embedding_matcher,
+#     find_best_prompt,
+#     find_prompt_by_intent,
+#     get_prompt_name_for_query
+# )
 
-# Semantic Orchestrator Prompts
-from .semantic_orchestrator_prompts import (
-    SEMANTIC_ORCHESTRATOR_SYSTEM_PROMPT,
-    SEMANTIC_INTENT_CLASSIFICATION_PROMPT,
-    SEMANTIC_AGENT_SELECTION_PROMPT,
-    SEMANTIC_RESPONSE_SYNTHESIS_PROMPT,
-    SEMANTIC_CONFLICT_RESOLUTION_PROMPT,
-    SEMANTIC_QUALITY_ASSURANCE_PROMPT,
-    SEMANTIC_PERFORMANCE_MONITORING_PROMPT
-)
+# Semantic Orchestrator Prompts - DELETED (use orchestrator_prompts.py instead)
+# This file duplicated the refactored orchestrator_prompts.py and has been removed
 
 # Dynamic Examples System
 from .dynamic_examples import (
@@ -265,20 +239,9 @@ __all__ = [
     "ERROR_HANDLING_PROMPT",
     "LOAD_BALANCING_PROMPT",
     
-    # Prompt Management
-    "PromptManager",
-    "PromptVersion",
-    "PromptMetrics",
-    "PromptConfig",
-    "prompt_manager",
-    "get_prompt",
-    "update_prompt_version",
-    "log_prompt_performance",
-    "select_prompt_semantic",
-    "get_prompt_semantic",
-    "set_routing_method",
-    "get_routing_method",
-    "add_intent_example",
+    # Prompt Management (using prompt_registry now)
+    "get_agent_prompt",
+    "get_orchestrator_prompt",
     "get_semantic_analytics",
     
     # Semantic Routing

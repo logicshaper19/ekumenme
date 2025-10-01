@@ -39,7 +39,57 @@ class AgriculturalWorkflowState(TypedDict):
 
 class LangGraphWorkflowService:
     """Advanced workflow orchestration using LangGraph"""
-    
+
+    # Response templates
+    SIMPLE_TEMPLATE = """Tu es un conseiller agricole expert. Réponds de manière CONCISE et DIRECTE.
+
+QUESTION: {query}
+DONNÉES: {data_summary}
+
+INSTRUCTIONS:
+- Réponds DIRECTEMENT (3-5 phrases maximum)
+- Utilise les données réelles fournies
+- Pas d'emoji, ton professionnel
+- **Gras** pour les points clés
+- Chiffres précis avec unités
+
+Réponds maintenant:"""
+
+    MEDIUM_TEMPLATE = """Tu es un conseiller agricole expert. Réponds de manière STRUCTURÉE mais CONCISE.
+
+QUESTION: {query}
+DONNÉES: {data_summary}
+
+INSTRUCTIONS:
+- 1-2 paragraphes (8-10 phrases max)
+- **Titre en Gras:** pour le titre principal
+- Listes à puces pour recommandations
+- Chiffres précis, pas d'emoji
+- Termine par une recommandation claire
+
+Réponds maintenant:"""
+
+    COMPLEX_TEMPLATE = """Tu es un conseiller agricole expert français avec 20 ans d'expérience.
+
+QUESTION: {query}
+DONNÉES: {data_summary}
+LOCALISATION: {location}
+
+INSTRUCTIONS - Structure complète:
+1. **Analyse de la Situation:** Contexte et données clés
+2. **Recommandations Principales:** Actions prioritaires avec listes à puces
+3. **Considérations Techniques:** Détails pratiques (doses, timing, conditions)
+4. **Points de Vigilance:** Risques et précautions
+5. **Prochaines Étapes:** Actions concrètes à court terme
+
+STYLE:
+- Professionnel et précis
+- Chiffres avec unités (°C, mm, jours, €, kg/ha)
+- Pas d'emoji
+- Actionnable et pratique
+
+Réponds maintenant:"""
+
     def __init__(self):
         self.llm = None
         self.regulatory_service = UnifiedRegulatoryService()
@@ -480,16 +530,22 @@ class LangGraphWorkflowService:
             )
 
             # STEP 3: Select appropriate response template based on complexity
-            from app.prompts.response_templates import get_response_template
+            complexity = classification["complexity"]
 
-            synthesis_prompt = get_response_template(
-                complexity=classification["complexity"],
+            if complexity == "simple":
+                template = self.SIMPLE_TEMPLATE
+            elif complexity == "medium":
+                template = self.MEDIUM_TEMPLATE
+            else:
+                template = self.COMPLEX_TEMPLATE
+
+            synthesis_prompt = template.format(
                 query=state["query"],
                 data_summary=data_summary,
                 location=location
             )
 
-            logger.info(f"Using {classification['complexity']} response template")
+            logger.info(f"Using {complexity} response template")
 
             # Generate response using LLM
             response = await self.llm.ainvoke([HumanMessage(content=synthesis_prompt)])
