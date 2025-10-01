@@ -252,6 +252,92 @@ Question spécifique: {input}"""),
 ])
 
 # Export all prompts
+
+# ReAct-compatible prompt template for Sustainability Agent
+def get_sustainability_react_prompt(include_examples: bool = False) -> ChatPromptTemplate:
+    """
+    Get ReAct-compatible ChatPromptTemplate for Sustainability Intelligence Agent.
+    
+    This combines the sophisticated sustainability expertise with ReAct format
+    for tool-using agents.
+    
+    Args:
+        include_examples: Whether to include few-shot examples (default False for token optimization)
+        
+    Returns:
+        ChatPromptTemplate configured for ReAct agent with sustainability expertise
+    """
+    
+    # Build examples section if requested
+    examples_section = ""
+    if include_examples:
+        examples_section = """
+
+EXEMPLES DE RAISONNEMENT RÉUSSI:
+
+Exemple 1 - Empreinte carbone:
+Question: Calcule l'empreinte carbone de mon exploitation
+Thought: Je dois calculer l'empreinte carbone
+Action: calculate_carbon_footprint
+Action Input: {{"farm_id": "FARM123", "year": 2023}}
+Observation: Empreinte: 450 tCO2eq/an, moyenne: 500 tCO2eq/an
+Thought: L'empreinte est calculée, je peux analyser
+Final Answer: **Empreinte Carbone 2023:**
+Total: 450 tCO2eq/an
+✅ 10% en dessous de la moyenne
+
+Exemple 2 - Biodiversité:
+Question: Évalue l'impact sur la biodiversité
+Thought: Je dois évaluer l'impact biodiversité
+Action: assess_biodiversity_impact
+Action Input: {{"farm_id": "FARM123"}}
+Observation: Score biodiversité: 7/10 - Bon niveau
+Final Answer: Score biodiversité: 7/10 ✅"""
+    
+    # Enhanced system prompt with ReAct format
+    react_system_prompt = f"""{SUSTAINABILITY_SYSTEM_PROMPT}
+
+Tu as accès à ces outils pour obtenir des données précises:
+{{tools}}
+
+Noms des outils disponibles: {{tool_names}}
+
+UTILISATION DES OUTILS:
+Utilise TOUJOURS les outils pour évaluer la durabilité.
+- Pour l'empreinte carbone: utilise calculate_carbon_footprint
+- Pour la biodiversité: utilise assess_biodiversity_impact
+- Pour l'eau: utilise evaluate_water_usage
+- Pour le sol: utilise analyze_soil_health
+
+FORMAT REACT OBLIGATOIRE:
+Tu dois suivre ce format de raisonnement:
+
+Question: la question de l'utilisateur
+Thought: [analyse de ce que tu dois faire et quel outil utiliser]
+Action: [nom exact de l'outil à utiliser]
+Action Input: [paramètres de l'outil au format JSON]
+Observation: [résultat retourné par l'outil]
+... (répète Thought/Action/Action Input/Observation autant de fois que nécessaire)
+Thought: je connais maintenant la réponse finale avec toutes les données nécessaires
+Final Answer: [réponse complète en français avec toutes les analyses]
+{examples_section}
+
+IMPORTANT:
+- Utilise TOUJOURS les outils pour obtenir des données précises
+- Ne devine JAMAIS les informations
+- Fournis des analyses précises avec chiffres et recommandations
+- Suis EXACTEMENT le format ReAct ci-dessus"""
+
+    # Create ChatPromptTemplate with ReAct format
+    return ChatPromptTemplate.from_messages([
+        ("system", react_system_prompt),
+        ("human", """{{context}}
+
+Question: {{input}}"""),
+        ("ai", "{agent_scratchpad}")
+    ])
+
+
 __all__ = [
     "SUSTAINABILITY_SYSTEM_PROMPT",
     "SUSTAINABILITY_CHAT_PROMPT",
@@ -263,4 +349,6 @@ __all__ = [
     "CERTIFICATION_SUPPORT_PROMPT",
     "CIRCULAR_ECONOMY_PROMPT",
     "CLIMATE_ADAPTATION_PROMPT"
+,
+    "get_sustainability_react_prompt"
 ]

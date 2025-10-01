@@ -200,6 +200,91 @@ Question spécifique: {input}"""),
 ])
 
 # Export all prompts
+
+# ReAct-compatible prompt template for Regulatory Agent
+def get_regulatory_react_prompt(include_examples: bool = False) -> ChatPromptTemplate:
+    """
+    Get ReAct-compatible ChatPromptTemplate for Regulatory Intelligence Agent.
+    
+    This combines the sophisticated regulatory expertise with ReAct format
+    for tool-using agents.
+    
+    Args:
+        include_examples: Whether to include few-shot examples (default False for token optimization)
+        
+    Returns:
+        ChatPromptTemplate configured for ReAct agent with regulatory expertise
+    """
+    
+    # Build examples section if requested
+    examples_section = ""
+    if include_examples:
+        examples_section = """
+
+EXEMPLES DE RAISONNEMENT RÉUSSI:
+
+Exemple 1 - Vérification produit:
+Question: Puis-je utiliser ce produit sur mon blé?
+Thought: Je dois vérifier l'autorisation du produit
+Action: check_product_authorization
+Action Input: {{"product_amm": "2020001", "crop": "blé"}}
+Observation: Produit autorisé - Usage autorisé sur blé, dose max 1.5L/ha
+Thought: Le produit est autorisé, je peux confirmer
+Final Answer: ✅ Produit autorisé sur blé
+Dose maximale: 1.5L/ha
+
+Exemple 2 - Délai de rentrée:
+Question: Quel est le délai de rentrée?
+Thought: Je dois vérifier le délai réglementaire
+Action: check_reentry_period
+Action Input: {{"product_amm": "2020001"}}
+Observation: Délai de rentrée: 48 heures
+Final Answer: Délai de rentrée: 48 heures"""
+    
+    # Enhanced system prompt with ReAct format
+    react_system_prompt = f"""{REGULATORY_SYSTEM_PROMPT}
+
+Tu as accès à ces outils pour obtenir des données précises:
+{{tools}}
+
+Noms des outils disponibles: {{tool_names}}
+
+UTILISATION DES OUTILS:
+Utilise TOUJOURS les outils pour vérifier la conformité réglementaire.
+- Pour vérifier un produit: utilise check_product_authorization
+- Pour les délais: utilise check_reentry_period
+- Pour les doses: utilise validate_application_rate
+- Pour les restrictions: utilise check_usage_restrictions
+
+FORMAT REACT OBLIGATOIRE:
+Tu dois suivre ce format de raisonnement:
+
+Question: la question de l'utilisateur
+Thought: [analyse de ce que tu dois faire et quel outil utiliser]
+Action: [nom exact de l'outil à utiliser]
+Action Input: [paramètres de l'outil au format JSON]
+Observation: [résultat retourné par l'outil]
+... (répète Thought/Action/Action Input/Observation autant de fois que nécessaire)
+Thought: je connais maintenant la réponse finale avec toutes les données nécessaires
+Final Answer: [réponse complète en français avec toutes les analyses]
+{examples_section}
+
+IMPORTANT:
+- Utilise TOUJOURS les outils pour obtenir des données précises
+- Ne devine JAMAIS les informations
+- Fournis des analyses précises avec chiffres et recommandations
+- Suis EXACTEMENT le format ReAct ci-dessus"""
+
+    # Create ChatPromptTemplate with ReAct format
+    return ChatPromptTemplate.from_messages([
+        ("system", react_system_prompt),
+        ("human", """{{context}}
+
+Question: {{input}}"""),
+        ("ai", "{agent_scratchpad}")
+    ])
+
+
 __all__ = [
     "REGULATORY_SYSTEM_PROMPT",
     "REGULATORY_CHAT_PROMPT",
@@ -209,4 +294,6 @@ __all__ = [
     "PRODUCT_SUBSTITUTION_PROMPT",
     "COMPLIANCE_CHECK_PROMPT",
     "ENVIRONMENTAL_REGULATIONS_PROMPT"
+,
+    "get_regulatory_react_prompt"
 ]

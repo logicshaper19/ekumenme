@@ -187,6 +187,113 @@ Question spécifique: {input}"""),
 ])
 
 # Export all prompts
+# ReAct-compatible prompt template for Farm Data Agent
+def get_farm_data_react_prompt(include_examples: bool = False) -> ChatPromptTemplate:
+    """
+    Get ReAct-compatible ChatPromptTemplate for Farm Data Intelligence Agent.
+
+    This combines the sophisticated farm data expertise with ReAct format
+    for tool-using agents.
+
+    Args:
+        include_examples: Whether to include few-shot examples (default False for token optimization)
+
+    Returns:
+        ChatPromptTemplate configured for ReAct agent with farm data expertise
+    """
+
+    # Build examples section if requested
+    examples_section = ""
+    if include_examples:
+        examples_section = """
+
+EXEMPLES DE RAISONNEMENT RÉUSSI:
+
+Exemple 1 - Analyse de parcelle:
+Question: Analyse les données de ma parcelle BLE-001
+Thought: Je dois récupérer les données complètes de la parcelle BLE-001
+Action: get_farm_data
+Action Input: {{"data_type": "parcel", "parcel_id": "BLE-001"}}
+Observation: Parcelle BLE-001 - 15ha, blé tendre, rendement 2023: 72 q/ha, 3 interventions
+Thought: J'ai les données, je peux maintenant analyser la performance
+Final Answer: **Analyse Parcelle BLE-001:**
+
+**Caractéristiques:**
+- Surface: 15 hectares
+- Culture: Blé tendre
+- Rendement 2023: 72 q/ha ✅ (bon rendement)
+
+**Interventions:** 3 traitements réalisés
+**Performance:** Rendement supérieur à la moyenne régionale (68 q/ha)
+
+**Recommandation:** Maintenir les pratiques actuelles
+
+Exemple 2 - Métriques de performance:
+Question: Calcule les métriques de performance pour mon exploitation
+Thought: Je dois calculer les métriques globales de l'exploitation
+Action: calculate_performance_metrics
+Action Input: {{"farm_id": "FARM123", "year": 2023}}
+Observation: Métriques calculées - Rendement moyen: 70 q/ha, Marge brute: 850€/ha, Coûts: 450€/ha
+Thought: J'ai les métriques, je peux les présenter avec analyse
+Final Answer: **Métriques de Performance 2023:**
+
+**Rendements:**
+- Moyenne exploitation: 70 q/ha
+- Référence régionale: 68 q/ha ✅ +3%
+
+**Économie:**
+- Marge brute: 850€/ha
+- Coûts intrants: 450€/ha
+- Ratio marge/coûts: 1.89 ✅
+
+**Analyse:** Performance économique solide, rendements au-dessus de la moyenne"""
+
+    # Enhanced system prompt with ReAct format
+    react_system_prompt = f"""{FARM_DATA_SYSTEM_PROMPT}
+
+Tu as accès à ces outils pour obtenir des données précises:
+{{tools}}
+
+Noms des outils disponibles: {{tool_names}}
+
+UTILISATION DES OUTILS:
+Utilise TOUJOURS les outils pour obtenir des données réelles plutôt que de deviner.
+- Pour les données d'exploitation: utilise get_farm_data
+- Pour les métriques de performance: utilise calculate_performance_metrics
+- Pour l'analyse de tendances: utilise analyze_trends
+- Pour le benchmarking: utilise benchmark_crop_performance
+
+FORMAT REACT OBLIGATOIRE:
+Tu dois suivre ce format de raisonnement:
+
+Question: la question de l'utilisateur
+Thought: [analyse de ce que tu dois faire et quel outil utiliser]
+Action: [nom exact de l'outil à utiliser]
+Action Input: [paramètres de l'outil au format JSON]
+Observation: [résultat retourné par l'outil]
+... (répète Thought/Action/Action Input/Observation autant de fois que nécessaire)
+Thought: je connais maintenant la réponse finale avec toutes les données nécessaires
+Final Answer: [réponse complète en français avec toutes les analyses]
+{examples_section}
+
+IMPORTANT:
+- Utilise TOUJOURS les outils pour obtenir des données réelles
+- Ne devine JAMAIS les données d'exploitation
+- Vérifie la conformité réglementaire avec les codes AMM
+- Fournis des analyses précises avec chiffres et comparaisons
+- Mentionne les anomalies et opportunités d'amélioration
+- Suis EXACTEMENT le format ReAct ci-dessus"""
+
+    # Create ChatPromptTemplate with ReAct format
+    return ChatPromptTemplate.from_messages([
+        ("system", react_system_prompt),
+        ("human", """{{context}}
+
+Question: {{input}}"""),
+        ("ai", "{agent_scratchpad}")
+    ])
+
+
 __all__ = [
     "FARM_DATA_SYSTEM_PROMPT",
     "FARM_DATA_CHAT_PROMPT",
@@ -194,5 +301,6 @@ __all__ = [
     "PERFORMANCE_METRICS_PROMPT",
     "INTERVENTION_TRACKING_PROMPT",
     "COST_ANALYSIS_PROMPT",
-    "TREND_ANALYSIS_PROMPT"
+    "TREND_ANALYSIS_PROMPT",
+    "get_farm_data_react_prompt"
 ]

@@ -235,6 +235,114 @@ Question spécifique: {input}"""),
 ])
 
 # Export all prompts
+# ReAct-compatible prompt template for Crop Health Agent
+def get_crop_health_react_prompt(include_examples: bool = False) -> ChatPromptTemplate:
+    """
+    Get ReAct-compatible ChatPromptTemplate for Crop Health Intelligence Agent.
+
+    This combines the sophisticated crop health expertise with ReAct format
+    for tool-using agents.
+
+    Args:
+        include_examples: Whether to include few-shot examples (default False for token optimization)
+
+    Returns:
+        ChatPromptTemplate configured for ReAct agent with crop health expertise
+    """
+
+    # Build examples section if requested
+    examples_section = ""
+    if include_examples:
+        examples_section = """
+
+EXEMPLES DE RAISONNEMENT RÉUSSI:
+
+Exemple 1 - Diagnostic de maladie:
+Question: J'observe des taches brunes sur les feuilles de mon blé
+Thought: Je dois diagnostiquer la maladie en analysant les symptômes
+Action: diagnose_disease
+Action Input: {{"crop": "blé", "symptoms": "taches brunes sur feuilles", "location": "feuilles"}}
+Observation: Septoriose du blé (Septoria tritici) - Maladie fongique, sévérité moyenne
+Thought: J'ai identifié la maladie, je peux maintenant recommander un traitement
+Final Answer: **Diagnostic: Septoriose du blé** (Septoria tritici)
+
+**Symptômes:** Taches brunes sur feuilles - typique de cette maladie fongique
+
+**Sévérité:** Moyenne - intervention recommandée
+
+**Recommandations:**
+- Traitement fongicide si >20% de surface foliaire atteinte
+- Privilégier les triazoles ou strobilurines
+- Intervenir avant montaison pour meilleure efficacité
+- Surveiller l'évolution et conditions météo
+
+Exemple 2 - Identification de ravageur:
+Question: Des pucerons sur mon colza, dois-je traiter?
+Thought: Je dois identifier le ravageur et évaluer le seuil d'intervention
+Action: identify_pest
+Action Input: {{"crop": "colza", "pest_description": "pucerons", "infestation_level": "présence observée"}}
+Observation: Pucerons cendrés du chou - Seuil: 2 pucerons/plante en automne
+Thought: J'ai l'identification, je dois maintenant évaluer si le seuil est atteint
+Final Answer: **Ravageur identifié: Pucerons cendrés du chou**
+
+**Seuil d'intervention:** 2 pucerons/plante en automne
+
+**Évaluation nécessaire:**
+1. Comptez le nombre de pucerons par plante (10 plantes minimum)
+2. Si <2 pucerons/plante: surveillance uniquement
+3. Si >2 pucerons/plante: traitement recommandé
+
+**Options de traitement:**
+- Privilégier les auxiliaires (coccinelles, syrphes)
+- Traitement insecticide si seuil dépassé et absence d'auxiliaires
+- Produits autorisés: pyréthrinoïdes, néonicotinoïdes (selon réglementation)"""
+
+    # Enhanced system prompt with ReAct format
+    react_system_prompt = f"""{CROP_HEALTH_SYSTEM_PROMPT}
+
+Tu as accès à ces outils pour obtenir des diagnostics précis:
+{{tools}}
+
+Noms des outils disponibles: {{tool_names}}
+
+UTILISATION DES OUTILS:
+Utilise TOUJOURS les outils pour obtenir des diagnostics précis plutôt que de deviner.
+- Pour diagnostiquer une maladie: utilise diagnose_disease
+- Pour identifier un ravageur: utilise identify_pest
+- Pour analyser une carence: utilise analyze_nutrient_deficiency
+- Pour générer un plan de traitement: utilise generate_treatment_plan
+
+FORMAT REACT OBLIGATOIRE:
+Tu dois suivre ce format de raisonnement:
+
+Question: la question de l'utilisateur
+Thought: [analyse de ce que tu dois faire et quel outil utiliser]
+Action: [nom exact de l'outil à utiliser]
+Action Input: [paramètres de l'outil au format JSON]
+Observation: [résultat retourné par l'outil]
+... (répète Thought/Action/Action Input/Observation autant de fois que nécessaire)
+Thought: je connais maintenant la réponse finale avec toutes les données nécessaires
+Final Answer: [réponse complète en français avec diagnostic et recommandations]
+{examples_section}
+
+IMPORTANT:
+- Utilise TOUJOURS les outils pour obtenir des diagnostics précis
+- Ne devine JAMAIS les maladies ou ravageurs
+- Vérifie les seuils d'intervention avant de recommander un traitement
+- Privilégie les méthodes de protection intégrée
+- Mentionne les précautions d'emploi et conditions météo
+- Suis EXACTEMENT le format ReAct ci-dessus"""
+
+    # Create ChatPromptTemplate with ReAct format
+    return ChatPromptTemplate.from_messages([
+        ("system", react_system_prompt),
+        ("human", """{{context}}
+
+Question: {{input}}"""),
+        ("ai", "{agent_scratchpad}")
+    ])
+
+
 __all__ = [
     "CROP_HEALTH_SYSTEM_PROMPT",
     "CROP_HEALTH_CHAT_PROMPT",
@@ -244,5 +352,6 @@ __all__ = [
     "TREATMENT_PLAN_PROMPT",
     "RESISTANCE_MANAGEMENT_PROMPT",
     "BIOLOGICAL_CONTROL_PROMPT",
-    "THRESHOLD_MANAGEMENT_PROMPT"
+    "THRESHOLD_MANAGEMENT_PROMPT",
+    "get_crop_health_react_prompt"
 ]

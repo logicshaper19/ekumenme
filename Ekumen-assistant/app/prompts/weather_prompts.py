@@ -205,6 +205,108 @@ Question spécifique: {input}"""),
     ("ai", "{agent_scratchpad}")
 ])
 
+# ReAct-compatible prompt template for Weather Agent
+def get_weather_react_prompt(include_examples: bool = True) -> ChatPromptTemplate:
+    """
+    Get ReAct-compatible ChatPromptTemplate for Weather Intelligence Agent.
+
+    This combines the sophisticated weather expertise with ReAct format
+    for tool-using agents.
+
+    Args:
+        include_examples: Whether to include few-shot examples in the prompt
+
+    Returns:
+        ChatPromptTemplate configured for ReAct agent with weather expertise
+    """
+
+    # Build examples section if requested
+    examples_section = ""
+    if include_examples:
+        examples_section = """
+
+EXEMPLES DE RAISONNEMENT RÉUSSI:
+
+Exemple 1 - Prévisions météo:
+Question: Quelles sont les prévisions météo pour la semaine?
+Thought: Je dois obtenir les prévisions météo précises pour la localisation de l'agriculteur
+Action: get_weather_data
+Action Input: {{"location": "Paris", "days": 7}}
+Observation: Prévisions reçues - Lundi: 12-18°C, vent 10km/h, Mardi: 8-14°C, vent 15km/h...
+Thought: J'ai les données météo, je peux maintenant analyser les conditions favorables
+Final Answer: **Prévisions météo - Semaine du 15 au 21 mars:**
+
+**Lundi 15:** ☀️ 12-18°C, vent 10 km/h - **FAVORABLE**
+**Mardi 16:** ☁️ 8-14°C, vent 15 km/h - **FAVORABLE**
+**Mercredi 17:** 🌧️ 6-12°C, pluie 5mm - **DÉFAVORABLE**
+
+**Recommandation:** Traitement optimal lundi ou mardi
+
+Exemple 2 - Fenêtre d'intervention:
+Question: Quand puis-je traiter mes céréales cette semaine?
+Thought: Je dois identifier les fenêtres d'intervention optimales pour traitement
+Action: identify_intervention_windows
+Action Input: {{"location": "Beauce", "intervention_type": "traitement", "crop": "blé", "days": 7}}
+Observation: Fenêtres identifiées - Lundi 6h-10h (confiance: 0.9), Jeudi 7h-11h (confiance: 0.85)
+Thought: J'ai les créneaux optimaux, je dois expliquer pourquoi ces fenêtres sont favorables
+Final Answer: **Fenêtres de traitement optimales:**
+
+**Lundi 15 mars - 6h à 10h** (Confiance: 90%)
+- Température: 12-16°C ✅
+- Vent: <15 km/h ✅
+- Humidité: 65% ✅
+
+**Jeudi 18 mars - 7h à 11h** (Confiance: 85%)
+- Température: 14-18°C ✅
+- Vent: <18 km/h ✅
+
+**Recommandation:** Privilégier lundi matin pour conditions optimales"""
+
+    # Enhanced system prompt with ReAct format
+    react_system_prompt = f"""{WEATHER_SYSTEM_PROMPT}
+
+Tu as accès à ces outils pour obtenir des données précises:
+{{tools}}
+
+Noms des outils disponibles: {{tool_names}}
+
+UTILISATION DES OUTILS:
+Utilise TOUJOURS les outils pour obtenir des données réelles plutôt que de deviner.
+- Pour les prévisions météo: utilise get_weather_data
+- Pour les risques climatiques: utilise analyze_weather_risks
+- Pour les fenêtres d'intervention: utilise identify_intervention_windows
+- Pour l'évapotranspiration: utilise calculate_evapotranspiration
+
+FORMAT REACT OBLIGATOIRE:
+Tu dois suivre ce format de raisonnement:
+
+Question: la question de l'utilisateur
+Thought: [analyse de ce que tu dois faire et quel outil utiliser]
+Action: [nom exact de l'outil à utiliser]
+Action Input: [paramètres de l'outil au format JSON]
+Observation: [résultat retourné par l'outil]
+... (répète Thought/Action/Action Input/Observation autant de fois que nécessaire)
+Thought: je connais maintenant la réponse finale avec toutes les données nécessaires
+Final Answer: [réponse complète en français avec toutes les recommandations]
+{examples_section}
+
+IMPORTANT:
+- Utilise TOUJOURS les outils pour obtenir des données réelles
+- Ne devine JAMAIS les données météo
+- Fournis des recommandations précises avec dates et heures
+- Mentionne les risques et précautions
+- Suis EXACTEMENT le format ReAct ci-dessus"""
+
+    # Create ChatPromptTemplate with ReAct format
+    return ChatPromptTemplate.from_messages([
+        ("system", react_system_prompt),
+        ("human", """{{context}}
+
+Question: {{input}}"""),
+        ("ai", "{agent_scratchpad}")
+    ])
+
+
 # Export all prompts
 __all__ = [
     "WEATHER_SYSTEM_PROMPT",
@@ -214,5 +316,6 @@ __all__ = [
     "WEATHER_RISK_ANALYSIS_PROMPT",
     "IRRIGATION_PLANNING_PROMPT",
     "EVAPOTRANSPIRATION_PROMPT",
-    "CLIMATE_ADAPTATION_PROMPT"
+    "CLIMATE_ADAPTATION_PROMPT",
+    "get_weather_react_prompt"  # NEW: ReAct-compatible function
 ]
