@@ -193,19 +193,25 @@ class EnhancedBenchmarkService:
         )
 
     def _calculate_performance_rank(self, metrics: PerformanceMetrics) -> PerformanceRank:
-        """Calculate performance rank based on overall performance"""
+        """
+        Calculate performance rank based on overall performance.
+
+        NOTE: These ranks are based on % of national average, NOT percentile ranks.
+        Being 110% of average does NOT mean top 10% of farms - it depends on distribution.
+        These are simplified categories for quick assessment.
+        """
         overall = metrics.overall_performance_percent
-        
+
         if overall > 110:
-            return PerformanceRank.TOP_10_PERCENT
+            return PerformanceRank.EXCEPTIONAL  # >110% of average
         elif overall > 100:
-            return PerformanceRank.TOP_25_PERCENT
+            return PerformanceRank.EXCELLENT  # >100% of average
         elif overall > 90:
-            return PerformanceRank.ABOVE_AVERAGE
+            return PerformanceRank.ABOVE_AVERAGE  # >90% of average
         elif overall > 80:
-            return PerformanceRank.AVERAGE
+            return PerformanceRank.AVERAGE  # 80-90% of average
         else:
-            return PerformanceRank.BELOW_AVERAGE
+            return PerformanceRank.BELOW_AVERAGE  # <80% of average
 
     def _generate_benchmark_insights(
         self,
@@ -213,25 +219,36 @@ class EnhancedBenchmarkService:
         rank: PerformanceRank,
         crop: str
     ) -> List[str]:
-        """Generate benchmark insights"""
+        """
+        Generate benchmark insights with proper None handling.
+
+        CRITICAL: quality_perf can be None when quality data is unavailable.
+        All comparisons must check for None before using operators.
+        """
         insights = []
-        
+
         overall = metrics.overall_performance_percent
         yield_perf = metrics.yield_performance_percent
-        quality_perf = metrics.quality_performance_percent
-        
-        # Overall performance insights
+        quality_perf = metrics.quality_performance_percent  # Can be None!
+
+        # Disclaimer about ranking methodology
+        insights.append(
+            "ℹ️ Note: Classement basé sur % de la moyenne nationale, "
+            "pas sur percentiles réels. Consulter un expert pour comparaison précise."
+        )
+
+        # Overall performance insights (updated to match new enum values)
         if overall > 110:
-            insights.append(f"🏆 Performance exceptionnelle pour {crop} - Top 10% de l'industrie")
+            insights.append(f"🏆 Performance exceptionnelle pour {crop} - >110% de la moyenne nationale")
         elif overall > 100:
-            insights.append(f"🥇 Performance excellente pour {crop} - Top 25% de l'industrie")
+            insights.append(f"🥇 Performance excellente pour {crop} - >100% de la moyenne nationale")
         elif overall > 90:
             insights.append(f"✅ Performance au-dessus de la moyenne pour {crop}")
         elif overall > 80:
             insights.append(f"📊 Performance dans la moyenne pour {crop}")
         else:
             insights.append(f"⚠️ Performance en dessous de la moyenne pour {crop} - Amélioration nécessaire")
-        
+
         # Yield-specific insights
         if yield_perf > 110:
             insights.append("🌾 Rendement exceptionnel - Dépassement des standards de +10%")
@@ -239,24 +256,30 @@ class EnhancedBenchmarkService:
             insights.append("🌾 Rendement excellent - Au-dessus des standards")
         elif yield_perf < 80:
             insights.append("🌾 Rendement faible - Optimisation des pratiques culturales recommandée")
-        
-        # Quality-specific insights
-        if quality_perf > 110:
-            insights.append("⭐ Qualité exceptionnelle - Standards dépassés de +10%")
-        elif quality_perf > 100:
-            insights.append("⭐ Qualité excellente - Au-dessus des standards")
-        elif quality_perf < 80:
-            insights.append("⭐ Qualité faible - Amélioration de la qualité recommandée")
-        
-        # Balanced performance insights
-        if abs(yield_perf - quality_perf) > 20:
-            if yield_perf > quality_perf:
-                insights.append("⚖️ Déséquilibre: Rendement élevé mais qualité à améliorer")
-            else:
-                insights.append("⚖️ Déséquilibre: Qualité élevée mais rendement à améliorer")
+
+        # Quality-specific insights (ONLY if quality data available)
+        if quality_perf is not None:
+            if quality_perf > 110:
+                insights.append("⭐ Qualité exceptionnelle - Standards dépassés de +10%")
+            elif quality_perf > 100:
+                insights.append("⭐ Qualité excellente - Au-dessus des standards")
+            elif quality_perf < 80:
+                insights.append("⭐ Qualité faible - Amélioration de la qualité recommandée")
         else:
-            insights.append("⚖️ Performance équilibrée entre rendement et qualité")
-        
+            insights.append("ℹ️ Données de qualité non disponibles pour ce benchmark")
+
+        # Balanced performance insights (ONLY if quality data available)
+        if quality_perf is not None:
+            if abs(yield_perf - quality_perf) > 20:
+                if yield_perf > quality_perf:
+                    insights.append("⚖️ Déséquilibre: Rendement élevé mais qualité à améliorer")
+                else:
+                    insights.append("⚖️ Déséquilibre: Qualité élevée mais rendement à améliorer")
+            else:
+                insights.append("⚖️ Performance équilibrée entre rendement et qualité")
+        else:
+            insights.append("📊 Benchmark basé uniquement sur le rendement")
+
         return insights
 
 

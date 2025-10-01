@@ -35,12 +35,18 @@ class TrendDirection(str, Enum):
 
 
 class PerformanceRank(str, Enum):
-    """Performance ranking"""
-    TOP_10_PERCENT = "top_10_percent"
-    TOP_25_PERCENT = "top_25_percent"
-    ABOVE_AVERAGE = "above_average"
-    AVERAGE = "average"
-    BELOW_AVERAGE = "below_average"
+    """
+    Performance ranking based on % of national average.
+
+    WARNING: These are NOT percentile ranks!
+    Being 110% of average ≠ top 10% of farms.
+    Actual percentile depends on distribution variance.
+    """
+    EXCEPTIONAL = "exceptional"          # >110% of average
+    EXCELLENT = "excellent"              # >100% of average
+    ABOVE_AVERAGE = "above_average"      # >90% of average
+    AVERAGE = "average"                  # 80-90% of average
+    BELOW_AVERAGE = "below_average"      # <80% of average
 
 
 # ============================================================================
