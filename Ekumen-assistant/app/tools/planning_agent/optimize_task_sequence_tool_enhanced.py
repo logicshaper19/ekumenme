@@ -26,6 +26,11 @@ from app.core.cache import redis_cache
 logger = logging.getLogger(__name__)
 
 
+# Type alias for clarity
+DependencyGraph = Dict[str, List[str]]  # task_id -> list of tasks it depends on
+ReverseDependencyGraph = Dict[str, List[str]]  # task_id -> list of tasks that depend on it
+
+
 class EnhancedTaskSequenceService:
     """
     Service for optimizing task sequences with caching.
@@ -63,15 +68,25 @@ class EnhancedTaskSequenceService:
             
             # Extract task information
             tasks = input_data.tasks
-            
+
             # Validate tasks have required fields
-            for task in tasks:
+            for idx, task in enumerate(tasks):
                 if 'task_id' not in task or 'task_name' not in task:
-                    raise ValueError("Chaque tâche doit avoir 'task_id' et 'task_name'")
+                    raise ValueError(f"Tâche {idx}: doit avoir 'task_id' et 'task_name'")
+
+                # Validate duration
+                duration = task.get('estimated_duration_days', 1)
+                if not isinstance(duration, (int, float)) or duration <= 0:
+                    raise ValueError(f"Tâche '{task['task_name']}': durée invalide ({duration})")
+
+                # Validate dependencies is a list
+                dependencies = task.get('dependencies', [])
+                if not isinstance(dependencies, list):
+                    raise ValueError(f"Tâche '{task['task_name']}': dependencies doit être une liste")
             
-            # Build dependency graph
-            dependency_graph = self._build_dependency_graph(tasks)
-            
+            # Build dependency graphs (both forward and reverse)
+            dependency_graph, reverse_graph = self._build_dependency_graphs(tasks)
+
             # Detect cycles
             if self._has_cycle(dependency_graph):
                 return TaskSequenceOutput(
@@ -80,41 +95,52 @@ class EnhancedTaskSequenceService:
                     error="Dépendances circulaires détectées dans les tâches",
                     error_type="circular_dependency"
                 )
-            
+
             # Perform topological sort
             sorted_task_ids = self._topological_sort(dependency_graph, tasks, input_data.optimization_goal)
-            
+
+            # Build transitive closure for efficient parallel task identification
+            transitive_closure = self._build_transitive_closure(dependency_graph)
+
             # Identify parallel tasks
-            parallel_groups = self._identify_parallel_tasks(dependency_graph, sorted_task_ids)
+            parallel_groups = self._identify_parallel_tasks(transitive_closure, sorted_task_ids)
             
             # Calculate start/end days
-            optimized_tasks = self._calculate_schedule(
+            optimized_tasks, truncation_count = self._calculate_schedule(
                 tasks,
                 sorted_task_ids,
                 parallel_groups,
                 dependency_graph
             )
-            
+
+            # Add warning if parallel tasks were truncated
+            if truncation_count > 0:
+                warnings.append(f"ℹ️ {truncation_count} tâche(s) parallèle(s) supplémentaire(s) non affichée(s)")
+
             # Calculate total duration
             total_duration = max(task.end_day for task in optimized_tasks) if optimized_tasks else 0
-            
-            # Calculate efficiency gain vs sequential
-            sequential_duration = sum(
-                task.get('estimated_duration_days', 1) for task in tasks
-            )
+
+            # Calculate efficiency gain vs critical path without parallelization
+            # (not vs sum of all durations, which is misleading)
+            critical_path_duration = self._calculate_critical_path_duration(dependency_graph, tasks)
             efficiency_gain = None
-            if sequential_duration > 0:
+            if critical_path_duration > 0 and total_duration < critical_path_duration:
                 efficiency_gain = round(
-                    ((sequential_duration - total_duration) / sequential_duration) * 100,
+                    ((critical_path_duration - total_duration) / critical_path_duration) * 100,
                     1
                 )
-                if efficiency_gain > 0:
-                    warnings.append(f"✅ Gain d'efficacité: {efficiency_gain}% vs séquence linéaire")
+                warnings.append(f"✅ Gain d'efficacité: {efficiency_gain}% vs chemin critique séquentiel")
             
             # Add warnings for constraints
             if input_data.constraints:
                 warnings.append(f"ℹ️ Contraintes appliquées: {', '.join(input_data.constraints)}")
-            
+
+            # Add warnings for unimplemented optimization goals
+            if input_data.optimization_goal == OptimizationConstraint.COST:
+                warnings.append("⚠️ Optimisation par coût simplifiée - Données de coût détaillées non disponibles")
+            elif input_data.optimization_goal == OptimizationConstraint.WEATHER:
+                warnings.append("⚠️ Optimisation météo simplifiée - Prévisions météo non intégrées")
+
             logger.info(f"✅ Optimized {len(tasks)} tasks, duration: {total_duration} days")
             
             return TaskSequenceOutput(
@@ -130,33 +156,44 @@ class EnhancedTaskSequenceService:
             logger.error(f"Task sequence optimization error: {e}", exc_info=True)
             raise ValueError(f"Erreur lors de l'optimisation de la séquence: {str(e)}")
     
-    def _build_dependency_graph(self, tasks: List[Dict[str, Any]]) -> Dict[str, List[str]]:
+    def _build_dependency_graphs(
+        self,
+        tasks: List[Dict[str, Any]]
+    ) -> Tuple[DependencyGraph, ReverseDependencyGraph]:
         """
-        Build dependency graph from tasks.
-        
-        Returns dict mapping task_id -> list of task_ids it depends on
+        Build both forward and reverse dependency graphs.
+
+        Forward graph: task_id -> list of task_ids it depends on (prerequisites)
+        Reverse graph: task_id -> list of task_ids that depend on it (dependents)
+
+        Returns:
+            (forward_graph, reverse_graph)
         """
-        graph = defaultdict(list)
+        forward_graph = defaultdict(list)
+        reverse_graph = defaultdict(list)
         task_names_to_ids = {}
-        
+
         # Build name to ID mapping
         for task in tasks:
             task_names_to_ids[task['task_name']] = task['task_id']
-        
-        # Build dependency graph
+
+        # Build both graphs
         for task in tasks:
             task_id = task['task_id']
             dependencies = task.get('dependencies', [])
-            
+
             # Convert dependency names to IDs
             for dep_name in dependencies:
                 dep_id = task_names_to_ids.get(dep_name)
                 if dep_id:
-                    graph[task_id].append(dep_id)
+                    # Forward: task depends on dep_id
+                    forward_graph[task_id].append(dep_id)
+                    # Reverse: dep_id is depended on by task
+                    reverse_graph[dep_id].append(task_id)
                 else:
                     logger.warning(f"Task '{task['task_name']}' has unknown dependency: '{dep_name}'")
-        
-        return dict(graph)
+
+        return dict(forward_graph), dict(reverse_graph)
     
     def _has_cycle(self, graph: Dict[str, List[str]]) -> bool:
         """
@@ -236,87 +273,100 @@ class EnhancedTaskSequenceService:
         
         return sorted_tasks
     
-    def _get_priority_key(self, task: Dict[str, Any], goal: OptimizationConstraint) -> Tuple:
+    def _get_priority_key(self, task: Dict[str, Any], goal: OptimizationConstraint) -> Tuple[int, int]:
         """
         Get priority key for sorting based on optimization goal.
-        
+
         Returns tuple for sorting (lower is higher priority).
+
+        Note: COST and WEATHER optimizations are simplified.
+        Full implementation would require cost data and weather forecasts.
         """
         priority_map = {'critical': 0, 'high': 1, 'medium': 2, 'low': 3}
         priority = priority_map.get(task.get('priority', 'medium'), 2)
-        
+
         if goal == OptimizationConstraint.TIME:
             # Prioritize shorter tasks
             return (priority, task.get('estimated_duration_days', 1))
         elif goal == OptimizationConstraint.COST:
-            # Prioritize by priority only (cost optimization happens elsewhere)
+            # TODO: Implement cost-based optimization when cost data available
+            # For now, prioritize by priority only
             return (priority, 0)
         elif goal == OptimizationConstraint.RESOURCES:
             # Prioritize tasks with fewer resource requirements
             resources = len(task.get('resources_required', []))
             return (priority, resources)
         else:
-            # Default: priority only
+            # WEATHER and default: priority only
+            # TODO: Implement weather-based optimization with forecast data
             return (priority, 0)
+
+    def _build_transitive_closure(self, graph: DependencyGraph) -> Dict[str, Set[str]]:
+        """
+        Build transitive closure of dependency graph.
+
+        For each task, finds all tasks it transitively depends on.
+        This enables O(1) dependency checks for parallel task identification.
+
+        Returns:
+            Dict mapping task_id -> set of all task_ids it depends on (directly or transitively)
+        """
+        closure = defaultdict(set)
+
+        # For each node, do DFS to find all reachable nodes
+        for start_node in graph:
+            visited = set()
+            stack = [start_node]
+
+            while stack:
+                current = stack.pop()
+                if current in visited:
+                    continue
+
+                visited.add(current)
+
+                # Add all dependencies
+                for dep in graph.get(current, []):
+                    stack.append(dep)
+
+            # Remove self from closure
+            visited.discard(start_node)
+            closure[start_node] = visited
+
+        return dict(closure)
 
     def _identify_parallel_tasks(
         self,
-        graph: Dict[str, List[str]],
+        transitive_closure: Dict[str, Set[str]],
         sorted_task_ids: List[str]
     ) -> Dict[str, List[str]]:
         """
-        Identify tasks that can run in parallel.
+        Identify tasks that can run in parallel using transitive closure.
 
         Tasks can run in parallel if:
-        1. They have no dependency relationship
+        1. Neither task depends on the other (directly or transitively)
         2. They don't share critical resources (future enhancement)
+
+        Complexity: O(n²) using precomputed transitive closure
+        (vs O(n³) with repeated path searches)
 
         Returns dict mapping task_id -> list of parallel task_ids
         """
         parallel_groups = defaultdict(list)
 
         for i, task_id in enumerate(sorted_task_ids):
+            task_deps = transitive_closure.get(task_id, set())
+
             # Check all subsequent tasks
             for j in range(i + 1, len(sorted_task_ids)):
                 other_task_id = sorted_task_ids[j]
+                other_deps = transitive_closure.get(other_task_id, set())
 
-                # Check if there's a dependency relationship
-                if not self._has_dependency_path(graph, task_id, other_task_id) and \
-                   not self._has_dependency_path(graph, other_task_id, task_id):
+                # Tasks are parallel if neither depends on the other
+                if task_id not in other_deps and other_task_id not in task_deps:
                     parallel_groups[task_id].append(other_task_id)
 
         return dict(parallel_groups)
-
-    def _has_dependency_path(
-        self,
-        graph: Dict[str, List[str]],
-        from_task: str,
-        to_task: str
-    ) -> bool:
-        """
-        Check if there's a dependency path from from_task to to_task.
-
-        Uses BFS to find path.
-        """
-        if from_task == to_task:
-            return True
-
-        visited = set()
-        queue = deque([from_task])
-
-        while queue:
-            current = queue.popleft()
-            if current in visited:
-                continue
-
-            visited.add(current)
-
-            for dep in graph.get(current, []):
-                if dep == to_task:
-                    return True
-                queue.append(dep)
-
-        return False
 
     def _calculate_schedule(
         self,
@@ -324,15 +374,19 @@ class EnhancedTaskSequenceService:
         sorted_task_ids: List[str],
         parallel_groups: Dict[str, List[str]],
         graph: Dict[str, List[str]]
-    ) -> List[OptimizedTask]:
+    ) -> Tuple[List[OptimizedTask], int]:
         """
         Calculate start and end days for each task.
 
         Respects dependencies and identifies parallel execution opportunities.
+
+        Returns:
+            (optimized_tasks, truncation_count) - count of parallel tasks not shown
         """
         task_lookup = {task['task_id']: task for task in tasks}
         task_schedule = {}  # task_id -> (start_day, end_day)
         optimized_tasks = []
+        total_truncated = 0
 
         for sequence_order, task_id in enumerate(sorted_task_ids, start=1):
             task = task_lookup[task_id]
@@ -352,11 +406,17 @@ class EnhancedTaskSequenceService:
 
             task_schedule[task_id] = (start_day, end_day)
 
-            # Get parallel tasks (only those that haven't been scheduled yet)
+            # Get parallel tasks (show up to 5, count the rest)
             parallel_task_names = []
-            for parallel_id in parallel_groups.get(task_id, []):
+            parallel_ids = parallel_groups.get(task_id, [])
+
+            for parallel_id in parallel_ids[:5]:  # Show max 5
                 if parallel_id in task_lookup:
                     parallel_task_names.append(task_lookup[parallel_id]['task_name'])
+
+            # Count truncated parallel tasks
+            if len(parallel_ids) > 5:
+                total_truncated += len(parallel_ids) - 5
 
             optimized_task = OptimizedTask(
                 task_id=task_id,
@@ -364,12 +424,54 @@ class EnhancedTaskSequenceService:
                 sequence_order=sequence_order,
                 start_day=start_day,
                 end_day=end_day,
-                parallel_tasks=parallel_task_names[:3]  # Limit to 3 for readability
+                parallel_tasks=parallel_task_names
             )
 
             optimized_tasks.append(optimized_task)
 
-        return optimized_tasks
+        return optimized_tasks, total_truncated
+
+    def _calculate_critical_path_duration(
+        self,
+        graph: DependencyGraph,
+        tasks: List[Dict[str, Any]]
+    ) -> int:
+        """
+        Calculate critical path duration (longest path through dependency graph).
+
+        This is the baseline for efficiency gain calculation.
+        """
+        task_lookup = {task['task_id']: task for task in tasks}
+        memo = {}
+
+        def longest_path(task_id: str) -> int:
+            """Calculate longest path from task_id to end"""
+            if task_id in memo:
+                return memo[task_id]
+
+            task = task_lookup.get(task_id)
+            if not task:
+                return 0
+
+            duration = task.get('estimated_duration_days', 1)
+
+            # Find longest path through dependencies
+            max_dep_path = 0
+            for dep_id in graph.get(task_id, []):
+                dep_path = longest_path(dep_id)
+                max_dep_path = max(max_dep_path, dep_path)
+
+            result = duration + max_dep_path
+            memo[task_id] = result
+            return result
+
+        # Find maximum path from any task
+        max_path = 0
+        for task in tasks:
+            path_length = longest_path(task['task_id'])
+            max_path = max(max_path, path_length)
+
+        return max_path
 
 
 async def optimize_task_sequence_enhanced(
