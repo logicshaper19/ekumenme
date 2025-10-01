@@ -67,21 +67,13 @@ class EnhancedResourceRequirementsService:
                     if not isinstance(task['resources_required'], list):
                         raise ValueError(f"Tâche '{task['task_name']}': resources_required doit être une liste")
 
-                    # Validate each resource string format
+                    # Validate each resource is a string (but don't enforce format - just warn)
                     for resource in task['resources_required']:
                         if not isinstance(resource, str):
                             raise ValueError(f"Tâche '{task['task_name']}': chaque ressource doit être une chaîne de caractères")
 
-                        # Check if resource has valid prefix
-                        valid_prefixes = ['Équipement:', 'Personnel:', 'Matériaux:']
-                        if not any(resource.startswith(prefix) for prefix in valid_prefixes):
-                            raise ValueError(
-                                f"Tâche '{task['task_name']}': ressource '{resource}' doit commencer par "
-                                f"'Équipement:', 'Personnel:', ou 'Matériaux:'"
-                            )
-
             # Extract resource requirements from tasks
-            resource_requirements = self._extract_resource_requirements(
+            resource_requirements, unknown_formats = self._extract_resource_requirements(
                 input_data.tasks,
                 input_data.surface_ha
             )
@@ -95,7 +87,8 @@ class EnhancedResourceRequirementsService:
             availability_warnings = self._generate_availability_warnings(
                 resource_requirements,
                 critical_resources,
-                input_data.surface_ha
+                input_data.surface_ha,
+                unknown_formats
             )
 
             logger.info(f"✅ Analyzed resources for {input_data.crop}: {len(resource_requirements)} resources identified")
@@ -121,18 +114,30 @@ class EnhancedResourceRequirementsService:
     ) -> List[ResourceRequirement]:
         """
         Extract resource requirements from tasks.
-        
+
         Parses resources_required field from each task.
+        Flexible parsing - warns about unknown formats instead of failing.
         """
         requirements = []
         resource_tracker = {}  # Track cumulative quantities
-        
+        unknown_formats = []  # Track unknown resource formats
+
         for task in tasks:
             task_name = task.get('task_name', '')
             resources = task.get('resources_required', [])
             duration_days = task.get('estimated_duration_days', 1)
 
             for resource_str in resources:
+                # Check for known prefixes (flexible - allows variations)
+                valid_prefixes = ['Équipement:', 'Personnel:', 'Matériaux:', 'Matériel:']
+                has_valid_prefix = any(prefix in resource_str for prefix in valid_prefixes)
+
+                if not has_valid_prefix:
+                    # Warn but don't fail - skip unknown formats
+                    if resource_str not in unknown_formats:
+                        logger.warning(f"Task '{task_name}': unknown resource format '{resource_str}' - skipping")
+                        unknown_formats.append(resource_str)
+                    continue
                 # Parse resource string (e.g., "Équipement: tracteur_120cv")
                 if 'Équipement:' in resource_str:
                     equipment_name = resource_str.split('Équipement:')[1].strip()
@@ -177,23 +182,28 @@ class EnhancedResourceRequirementsService:
                     resource_tracker[key]['quantity'] += labor_hours
                     resource_tracker[key]['timing'].append(task_name)
                 
-                elif 'Matériaux:' in resource_str:
-                    materials = resource_str.split('Matériaux:')[1].strip()
+                elif 'Matériaux:' in resource_str or 'Matériel:' in resource_str:
+                    # Extract material name
+                    if 'Matériaux:' in resource_str:
+                        materials = resource_str.split('Matériaux:')[1].strip()
+                    else:
+                        materials = resource_str.split('Matériel:')[1].strip()
 
-                    # Materials are per hectare - track total quantity needed
-                    # Assume each task needs materials for the full surface
+                    # Materials tracking limitation:
+                    # We track SURFACE TO TREAT (hectares), not actual quantities (kg, L)
+                    # Real quantities require task-specific data (seed density, fertilizer dose, etc.)
                     key = f"materials_{materials}"
                     if key not in resource_tracker:
                         resource_tracker[key] = {
                             'type': ResourceType.MATERIALS,
                             'name': materials,
                             'quantity': 0.0,
-                            'unit': 'unités',  # Generic unit (could be kg, L, etc.)
+                            'unit': 'hectares (zone à traiter)',  # Honest about limitation
                             'timing': [],
                             'critical': True  # Materials are often critical
                         }
 
-                    # Accumulate material needs (1 unit per hectare per task)
+                    # Accumulate surface area requiring this material
                     resource_tracker[key]['quantity'] += surface_ha
                     resource_tracker[key]['timing'].append(task_name)
         
@@ -202,7 +212,7 @@ class EnhancedResourceRequirementsService:
             timing_str = ', '.join(data['timing'][:3])  # Show first 3 tasks
             if len(data['timing']) > 3:
                 timing_str += f" (+{len(data['timing']) - 3} autres)"
-            
+
             requirements.append(ResourceRequirement(
                 resource_type=data['type'],
                 resource_name=data['name'],
@@ -211,8 +221,8 @@ class EnhancedResourceRequirementsService:
                 timing=timing_str,
                 critical=data['critical']
             ))
-        
-        return requirements
+
+        return requirements, unknown_formats
     
     def _extract_personnel_count(self, personnel_str: str) -> int:
         """Extract personnel count from string"""
@@ -272,7 +282,8 @@ class EnhancedResourceRequirementsService:
         self,
         requirements: List[ResourceRequirement],
         critical_resources: List[str],
-        surface_ha: float
+        surface_ha: float,
+        unknown_formats: List[str]
     ) -> List[str]:
         """
         Generate warnings about resource availability.
@@ -284,6 +295,20 @@ class EnhancedResourceRequirementsService:
         """
         warnings = []
         seasonal_warnings_added = set()  # Track to avoid duplicates
+
+        # CRITICAL WARNING: Materials quantities limitation
+        materials_reqs = [r for r in requirements if r.resource_type == ResourceType.MATERIALS]
+        if materials_reqs:
+            warnings.append(
+                "⚠️ LIMITATION: Quantités de matériaux exprimées en surface à traiter (hectares) - "
+                "Consulter fournisseurs pour quantités réelles (kg, L) selon densités de semis/doses d'application"
+            )
+
+        # Warn about unknown resource formats
+        if unknown_formats:
+            warnings.append(
+                f"ℹ️ {len(unknown_formats)} format(s) de ressource non reconnu(s) - ignoré(s) dans l'analyse"
+            )
 
         # Warn about critical resources
         if critical_resources:
