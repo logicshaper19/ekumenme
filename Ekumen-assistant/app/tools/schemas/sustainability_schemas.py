@@ -120,11 +120,14 @@ class CarbonFootprintInput(BaseModel):
 
 class CarbonFootprintOutput(BaseModel):
     """Output schema for calculate carbon footprint tool"""
-    
+
     success: bool = Field(default=True)
     crop: str
     surface_ha: float
-    total_emissions_kg_co2eq: float = Field(description="Total emissions in kg CO2eq")
+    total_emissions_kg_co2eq: float = Field(description="Total emissions in kg CO2eq (mid-range estimate)")
+    total_emissions_min_kg_co2eq: Optional[float] = Field(default=None, description="Minimum emissions (low emission factors)")
+    total_emissions_max_kg_co2eq: Optional[float] = Field(default=None, description="Maximum emissions (high emission factors)")
+    uncertainty_range_percent: Optional[float] = Field(default=None, description="Uncertainty range as % of mid-range")
     emissions_per_ha: float = Field(description="Emissions per hectare (kg CO2eq/ha)")
     emissions_by_source: List[CarbonEmission] = Field(default_factory=list)
     sequestration_potential_kg_co2eq: float = Field(default=0.0, description="Carbon sequestration potential")

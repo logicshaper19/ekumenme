@@ -56,14 +56,15 @@ class EnhancedCarbonFootprintService:
     """
     
     # Emission factors (kg CO2eq per unit) - ADEME 2023
+    # Using mid-range values with documented ranges for uncertainty
     EMISSION_FACTORS = {
-        "diesel": 2.68,  # kg CO2eq/L
-        "gasoline": 2.31,  # kg CO2eq/L
-        "nitrogen": 5.5,  # kg CO2eq/kg N (range: 5-11 depending on type and N2O emissions)
-        "phosphorus": 1.2,  # kg CO2eq/kg P2O5
-        "potassium": 0.6,  # kg CO2eq/kg K2O
-        "organic_fertilizer": 0.3,  # kg CO2eq/kg (much lower)
-        "pesticide": 15.0,  # kg CO2eq/kg active ingredient (average)
+        "diesel": {"value": 2.68, "min": 2.5, "max": 2.8, "source": "ADEME 2023"},
+        "gasoline": {"value": 2.31, "min": 2.2, "max": 2.4, "source": "ADEME 2023"},
+        "nitrogen": {"value": 5.5, "min": 5.0, "max": 11.0, "source": "ADEME 2023 (varies by type: urea vs ammonium nitrate, N2O emissions)"},
+        "phosphorus": {"value": 1.2, "min": 1.0, "max": 1.5, "source": "ADEME 2023"},
+        "potassium": {"value": 0.6, "min": 0.5, "max": 0.8, "source": "ADEME 2023"},
+        "organic_fertilizer": {"value": 0.3, "min": 0.1, "max": 0.5, "source": "ADEME 2023 (much lower than synthetic)"},
+        "pesticide": {"value": 15.0, "min": 10.0, "max": 20.0, "source": "ADEME 2023 (varies by class: herbicide vs insecticide)"},
     }
     
     # Sequestration potential (kg CO2eq/ha/year)
@@ -103,15 +104,28 @@ class EnhancedCarbonFootprintService:
             data_completeness_notes = []
 
             # Track emissions by source (calculate totals first, then create Pydantic objects)
+            # Also track min/max for uncertainty range
             fuel_emissions_total = 0.0
+            fuel_emissions_min = 0.0
+            fuel_emissions_max = 0.0
+
             fertilizer_emissions_total = 0.0
+            fertilizer_emissions_min = 0.0
+            fertilizer_emissions_max = 0.0
+
             pesticide_emissions_total = 0.0
+            pesticide_emissions_min = 0.0
+            pesticide_emissions_max = 0.0
 
             # Calculate fuel emissions (diesel + gasoline combined)
             if input_data.diesel_liters is not None and input_data.diesel_liters > 0:
-                fuel_emissions_total += input_data.diesel_liters * self.EMISSION_FACTORS["diesel"]
+                fuel_emissions_total += input_data.diesel_liters * self.EMISSION_FACTORS["diesel"]["value"]
+                fuel_emissions_min += input_data.diesel_liters * self.EMISSION_FACTORS["diesel"]["min"]
+                fuel_emissions_max += input_data.diesel_liters * self.EMISSION_FACTORS["diesel"]["max"]
             if input_data.gasoline_liters is not None and input_data.gasoline_liters > 0:
-                fuel_emissions_total += input_data.gasoline_liters * self.EMISSION_FACTORS["gasoline"]
+                fuel_emissions_total += input_data.gasoline_liters * self.EMISSION_FACTORS["gasoline"]["value"]
+                fuel_emissions_min += input_data.gasoline_liters * self.EMISSION_FACTORS["gasoline"]["min"]
+                fuel_emissions_max += input_data.gasoline_liters * self.EMISSION_FACTORS["gasoline"]["max"]
 
             if fuel_emissions_total == 0:
                 data_completeness_notes.append("Consommation carburant non fournie - émissions carburant non calculées")
@@ -120,13 +134,21 @@ class EnhancedCarbonFootprintService:
 
             # Calculate fertilizer emissions (all types combined)
             if input_data.nitrogen_kg is not None and input_data.nitrogen_kg > 0:
-                fertilizer_emissions_total += input_data.nitrogen_kg * self.EMISSION_FACTORS["nitrogen"]
+                fertilizer_emissions_total += input_data.nitrogen_kg * self.EMISSION_FACTORS["nitrogen"]["value"]
+                fertilizer_emissions_min += input_data.nitrogen_kg * self.EMISSION_FACTORS["nitrogen"]["min"]
+                fertilizer_emissions_max += input_data.nitrogen_kg * self.EMISSION_FACTORS["nitrogen"]["max"]
             if input_data.phosphorus_kg is not None and input_data.phosphorus_kg > 0:
-                fertilizer_emissions_total += input_data.phosphorus_kg * self.EMISSION_FACTORS["phosphorus"]
+                fertilizer_emissions_total += input_data.phosphorus_kg * self.EMISSION_FACTORS["phosphorus"]["value"]
+                fertilizer_emissions_min += input_data.phosphorus_kg * self.EMISSION_FACTORS["phosphorus"]["min"]
+                fertilizer_emissions_max += input_data.phosphorus_kg * self.EMISSION_FACTORS["phosphorus"]["max"]
             if input_data.potassium_kg is not None and input_data.potassium_kg > 0:
-                fertilizer_emissions_total += input_data.potassium_kg * self.EMISSION_FACTORS["potassium"]
+                fertilizer_emissions_total += input_data.potassium_kg * self.EMISSION_FACTORS["potassium"]["value"]
+                fertilizer_emissions_min += input_data.potassium_kg * self.EMISSION_FACTORS["potassium"]["min"]
+                fertilizer_emissions_max += input_data.potassium_kg * self.EMISSION_FACTORS["potassium"]["max"]
             if input_data.organic_fertilizer_kg is not None and input_data.organic_fertilizer_kg > 0:
-                fertilizer_emissions_total += input_data.organic_fertilizer_kg * self.EMISSION_FACTORS["organic_fertilizer"]
+                fertilizer_emissions_total += input_data.organic_fertilizer_kg * self.EMISSION_FACTORS["organic_fertilizer"]["value"]
+                fertilizer_emissions_min += input_data.organic_fertilizer_kg * self.EMISSION_FACTORS["organic_fertilizer"]["min"]
+                fertilizer_emissions_max += input_data.organic_fertilizer_kg * self.EMISSION_FACTORS["organic_fertilizer"]["max"]
 
             if fertilizer_emissions_total == 0:
                 data_completeness_notes.append("Quantités engrais non fournies - émissions fertilisation non calculées")
@@ -135,7 +157,9 @@ class EnhancedCarbonFootprintService:
 
             # Calculate pesticide emissions
             if input_data.pesticide_kg is not None and input_data.pesticide_kg > 0:
-                pesticide_emissions_total = input_data.pesticide_kg * self.EMISSION_FACTORS["pesticide"]
+                pesticide_emissions_total = input_data.pesticide_kg * self.EMISSION_FACTORS["pesticide"]["value"]
+                pesticide_emissions_min = input_data.pesticide_kg * self.EMISSION_FACTORS["pesticide"]["min"]
+                pesticide_emissions_max = input_data.pesticide_kg * self.EMISSION_FACTORS["pesticide"]["max"]
                 total_emissions += pesticide_emissions_total
             else:
                 data_completeness_notes.append("Quantités pesticides non fournies - émissions phyto non calculées")
@@ -148,6 +172,14 @@ class EnhancedCarbonFootprintService:
                 sequestration += self.SEQUESTRATION_FACTORS["reduced_tillage"] * input_data.surface_ha
             if input_data.organic_amendments:
                 sequestration += self.SEQUESTRATION_FACTORS["organic_amendments"] * input_data.surface_ha
+
+            # Calculate uncertainty range
+            total_emissions_min = fuel_emissions_min + fertilizer_emissions_min + pesticide_emissions_min
+            total_emissions_max = fuel_emissions_max + fertilizer_emissions_max + pesticide_emissions_max
+
+            uncertainty_range_percent = None
+            if total_emissions > 0:
+                uncertainty_range_percent = ((total_emissions_max - total_emissions_min) / total_emissions) * 100
 
             # Now create Pydantic emission objects with percentages calculated
             emissions_by_source = []
@@ -219,6 +251,9 @@ class EnhancedCarbonFootprintService:
                 crop=input_data.crop,
                 surface_ha=input_data.surface_ha,
                 total_emissions_kg_co2eq=round(total_emissions, 1),
+                total_emissions_min_kg_co2eq=round(total_emissions_min, 1) if total_emissions_min > 0 else None,
+                total_emissions_max_kg_co2eq=round(total_emissions_max, 1) if total_emissions_max > 0 else None,
+                uncertainty_range_percent=round(uncertainty_range_percent, 1) if uncertainty_range_percent else None,
                 emissions_per_ha=round(emissions_per_ha, 1),
                 emissions_by_source=emissions_by_source,
                 sequestration_potential_kg_co2eq=round(sequestration, 1),
@@ -317,7 +352,10 @@ class EnhancedCarbonFootprintService:
             "PÉRIMÈTRE: Inclut uniquement émissions opérationnelles directes (carburant véhicules ferme, intrants appliqués). "
             "NON INCLUS: transport intrants vers ferme, transport récolte vers marché, "
             "fabrication/amortissement équipement, émissions indirectes (scope 3). "
-            "Pour bilan carbone complet certifié, consulter expert agréé."
+            "\n\nINCERTITUDE: Facteurs d'émission varient selon type exact d'intrant "
+            "(ex: azote 5-11 kg CO2eq/kg selon urée vs nitrate d'ammonium, pesticides 10-20 kg CO2eq/kg selon classe). "
+            "Plages min/max fournies pour transparence. "
+            "\n\nPour bilan carbone complet certifié, consulter expert agréé."
         )
 
         return base_note
