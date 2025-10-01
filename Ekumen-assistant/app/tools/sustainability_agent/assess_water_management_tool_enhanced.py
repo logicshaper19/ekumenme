@@ -17,8 +17,8 @@ from langchain.tools import StructuredTool
 from app.tools.schemas.sustainability_schemas import (
     WaterManagementInput,
     WaterManagementOutput,
-    WaterEfficiencyScore,
-    IrrigationSystem
+    WaterIndicatorScore,
+    WaterManagementIndicator
 )
 from app.core.cache import redis_cache
 
@@ -56,10 +56,16 @@ class EnhancedWaterManagementService:
     
     # Irrigation system efficiency ranges (%)
     IRRIGATION_EFFICIENCY = {
-        IrrigationSystem.DRIP: {"min": 90, "max": 95, "typical": 92},
-        IrrigationSystem.SPRINKLER: {"min": 75, "max": 85, "typical": 80},
-        IrrigationSystem.FLOOD: {"min": 50, "max": 70, "typical": 60},
-        IrrigationSystem.CENTER_PIVOT: {"min": 85, "max": 90, "typical": 87},
+        "drip": {"min": 90, "max": 95, "typical": 92},
+        "goutte-à-goutte": {"min": 90, "max": 95, "typical": 92},  # French
+        "sprinkler": {"min": 75, "max": 85, "typical": 80},
+        "aspersion": {"min": 75, "max": 85, "typical": 80},  # French
+        "flood": {"min": 50, "max": 70, "typical": 60},
+        "gravitaire": {"min": 50, "max": 70, "typical": 60},  # French
+        "submersion": {"min": 50, "max": 70, "typical": 60},  # French
+        "center_pivot": {"min": 85, "max": 90, "typical": 87},
+        "pivot": {"min": 85, "max": 90, "typical": 87},  # French
+        "pivot_central": {"min": 85, "max": 90, "typical": 87},  # French
     }
     
     # Crop water requirements (m³/ha/year, temperate climate)
@@ -88,100 +94,141 @@ class EnhancedWaterManagementService:
             ValueError: If assessment fails
         """
         try:
+            indicator_scores = []
+
             # Calculate irrigation system efficiency
             irrigation_score = self._score_irrigation_system(
-                input_data.irrigation_system
+                input_data.irrigation_method
             )
-            
-            # Calculate water usage efficiency
-            usage_score = self._score_water_usage(
-                input_data.annual_water_usage_m3,
-                input_data.surface_ha,
-                input_data.crop
-            )
-            
+            indicator_scores.append(irrigation_score)
+
+            # Calculate water usage efficiency (if data available)
+            if input_data.annual_water_usage_m3:
+                usage_score = self._score_water_usage(
+                    input_data.annual_water_usage_m3,
+                    input_data.surface_ha,
+                    input_data.crop
+                )
+                indicator_scores.append(usage_score)
+
             # Calculate water conservation practices
             conservation_score = self._score_conservation_practices(
-                input_data.soil_moisture_sensors,
-                input_data.weather_based_scheduling,
-                input_data.rainwater_harvesting,
+                input_data.soil_moisture_monitoring,
+                input_data.weather_based_irrigation,
+                False,  # rainwater_harvesting not in schema
                 input_data.mulching_used
             )
-            
+            indicator_scores.append(conservation_score)
+
             # Overall efficiency score (weighted average)
-            overall_score = (
-                irrigation_score.score * 0.4 +  # 40% weight
-                usage_score.score * 0.35 +      # 35% weight
-                conservation_score.score * 0.25  # 25% weight
-            )
-            
+            # Weighting rationale:
+            # - System efficiency: 40% (foundational - bad system = 30-50% losses)
+            # - Usage optimization: 35% (direct consumption impact)
+            # - Conservation: 25% (supplementary practices)
+            if input_data.annual_water_usage_m3:
+                overall_score = (
+                    irrigation_score.score * 0.4 +  # 40% weight
+                    usage_score.score * 0.35 +      # 35% weight
+                    conservation_score.score * 0.25  # 25% weight
+                )
+            else:
+                # No usage data - weight irrigation and conservation only
+                overall_score = (
+                    irrigation_score.score * 0.6 +  # 60% weight
+                    conservation_score.score * 0.4  # 40% weight
+                )
+
             overall_status = self._determine_status(overall_score)
-            
+
             # Calculate water savings potential
             savings_potential = self._calculate_savings_potential(
                 input_data,
                 irrigation_score,
                 conservation_score
             )
-            
+
             # Generate recommendations
             recommendations = self._generate_recommendations(
                 input_data,
                 irrigation_score,
-                usage_score,
+                indicator_scores[1] if len(indicator_scores) > 1 else irrigation_score,
                 conservation_score
             )
-            
+
+            # Calculate water use efficiency (m³/ha)
+            water_use_efficiency = None
+            if input_data.annual_water_usage_m3:
+                water_use_efficiency = input_data.annual_water_usage_m3 / input_data.surface_ha
+
             logger.info(
                 f"✅ Water management assessed: {input_data.surface_ha} ha, "
                 f"score {overall_score:.1f}/10 ({overall_status})"
             )
-            
+
             return WaterManagementOutput(
                 success=True,
                 surface_ha=input_data.surface_ha,
                 crop=input_data.crop,
-                irrigation_system=input_data.irrigation_system,
-                overall_efficiency_score=round(overall_score, 1),
+                overall_water_score=round(overall_score, 1),
                 overall_status=overall_status,
-                irrigation_efficiency_score=irrigation_score,
-                water_usage_score=usage_score,
-                conservation_practices_score=conservation_score,
-                estimated_water_savings_m3=round(savings_potential, 0),
-                improvement_recommendations=recommendations
+                indicator_scores=indicator_scores,
+                water_use_efficiency=round(water_use_efficiency, 1) if water_use_efficiency else None,
+                estimated_water_savings_potential_m3=round(savings_potential, 0) if savings_potential > 0 else None,
+                improvement_recommendations=recommendations,
+                critical_issues=[]  # Could add critical issues logic later
             )
             
         except Exception as e:
             logger.error(f"Water management assessment error: {e}", exc_info=True)
             raise ValueError(f"Erreur lors de l'évaluation de la gestion de l'eau: {str(e)}")
     
-    def _score_irrigation_system(self, system: IrrigationSystem) -> WaterEfficiencyScore:
+    def _score_irrigation_system(self, system: Optional[str]) -> WaterIndicatorScore:
         """
         Score irrigation system efficiency.
-        
+
         Based on FAO irrigation efficiency standards.
         """
-        efficiency_data = self.IRRIGATION_EFFICIENCY[system]
+        if not system:
+            return WaterIndicatorScore(
+                indicator=WaterManagementIndicator.IRRIGATION_EFFICIENCY,
+                score=5.0,
+                status="moderate",
+                description="Système irrigation non spécifié - Score neutre"
+            )
+
+        system_lower = system.lower()
+        efficiency_data = self.IRRIGATION_EFFICIENCY.get(system_lower)
+
+        if not efficiency_data:
+            # Unknown system - use moderate default
+            return WaterIndicatorScore(
+                indicator=WaterManagementIndicator.IRRIGATION_EFFICIENCY,
+                score=6.0,
+                status="moderate",
+                description=f"Système '{system}' non reconnu - Score estimé"
+            )
+
         typical_efficiency = efficiency_data["typical"]
-        
+
         # Convert efficiency % to 0-10 score
         score = (typical_efficiency / 100.0) * 10.0
-        
-        if system == IrrigationSystem.DRIP:
+
+        # Determine status based on efficiency
+        if typical_efficiency >= 90:
             status = "excellent"
             description = f"Irrigation goutte-à-goutte ({typical_efficiency}% efficacité) - Système optimal"
-        elif system == IrrigationSystem.CENTER_PIVOT:
+        elif typical_efficiency >= 85:
             status = "good"
             description = f"Pivot central ({typical_efficiency}% efficacité) - Bon système"
-        elif system == IrrigationSystem.SPRINKLER:
+        elif typical_efficiency >= 75:
             status = "moderate"
             description = f"Aspersion ({typical_efficiency}% efficacité) - Système correct, amélioration possible"
-        else:  # FLOOD
+        else:
             status = "poor"
             description = f"Gravitaire/submersion ({typical_efficiency}% efficacité) - Système peu efficace, upgrade recommandé"
-        
-        return WaterEfficiencyScore(
-            indicator="irrigation_system",
+
+        return WaterIndicatorScore(
+            indicator=WaterManagementIndicator.IRRIGATION_EFFICIENCY,
             score=round(score, 1),
             status=status,
             description=description
@@ -192,7 +239,7 @@ class EnhancedWaterManagementService:
         annual_usage_m3: float,
         surface_ha: float,
         crop: str
-    ) -> WaterEfficiencyScore:
+    ) -> WaterIndicatorScore:
         """
         Score water usage efficiency compared to crop requirements.
         
@@ -247,8 +294,8 @@ class EnhancedWaterManagementService:
                 status = "moderate"
                 description = f"Usage {usage_per_ha:.0f} m³/ha (culture {crop} non référencée, +{excess_pct:.0f}% vs benchmark)"
         
-        return WaterEfficiencyScore(
-            indicator="water_usage",
+        return WaterIndicatorScore(
+            indicator=WaterManagementIndicator.WATER_CONSERVATION,
             score=round(score, 1),
             status=status,
             description=description
@@ -260,7 +307,7 @@ class EnhancedWaterManagementService:
         weather_scheduling: bool,
         rainwater: bool,
         mulching: bool
-    ) -> WaterEfficiencyScore:
+    ) -> WaterIndicatorScore:
         """
         Score water conservation practices.
         
@@ -301,8 +348,8 @@ class EnhancedWaterManagementService:
             status = "poor"
             description = "0/4 pratiques conservation - Aucune pratique identifiée"
         
-        return WaterEfficiencyScore(
-            indicator="conservation_practices",
+        return WaterIndicatorScore(
+            indicator=WaterManagementIndicator.WATER_CONSERVATION,
             score=round(score, 1),
             status=status,
             description=description
@@ -322,90 +369,116 @@ class EnhancedWaterManagementService:
     def _calculate_savings_potential(
         self,
         input_data: WaterManagementInput,
-        irrigation_score: WaterEfficiencyScore,
-        conservation_score: WaterEfficiencyScore
+        irrigation_score: WaterIndicatorScore,
+        conservation_score: WaterIndicatorScore
     ) -> float:
         """
         Calculate potential water savings (m³/year) if recommendations implemented.
-        
-        Savings potential:
+
+        IMPORTANT: Savings are compounded (applied sequentially), not additive.
+        Each practice saves a percentage of the REMAINING usage after previous savings.
+
+        Weighting rationale:
+        - System efficiency: 40% (foundational - bad system = 30-50% losses)
+        - Usage optimization: 35% (direct consumption impact)
+        - Conservation: 25% (supplementary practices)
+
+        Savings potential (applied in order of impact):
         - Upgrade to drip: 20-40% savings vs flood/sprinkler
-        - Add sensors: 15-25% savings
-        - Weather scheduling: 10-20% savings
-        - Rainwater harvesting: 5-15% savings (depends on rainfall)
-        - Mulching: 10-20% savings (reduces evaporation)
+        - Add sensors: 15-25% savings (of remaining)
+        - Weather scheduling: 10-20% savings (of remaining)
+        - Mulching: 10-20% savings (of remaining)
+        - Rainwater harvesting: 5-15% savings (of remaining)
         """
-        current_usage = input_data.annual_water_usage_m3
-        potential_savings = 0.0
-        
-        # Irrigation system upgrade potential
-        if input_data.irrigation_system == IrrigationSystem.FLOOD:
-            # Upgrade to drip could save 30-40%
-            potential_savings += current_usage * 0.35
-        elif input_data.irrigation_system == IrrigationSystem.SPRINKLER:
-            # Upgrade to drip could save 15-20%
-            potential_savings += current_usage * 0.17
-        elif input_data.irrigation_system == IrrigationSystem.CENTER_PIVOT:
-            # Upgrade to drip could save 5-10%
-            potential_savings += current_usage * 0.07
-        
-        # Conservation practices potential
-        if not input_data.soil_moisture_sensors:
-            potential_savings += current_usage * 0.20  # 20% savings
-        if not input_data.weather_based_scheduling:
-            potential_savings += current_usage * 0.15  # 15% savings
-        if not input_data.rainwater_harvesting:
-            potential_savings += current_usage * 0.10  # 10% savings
+        if not input_data.annual_water_usage_m3:
+            return 0.0
+
+        remaining_usage = input_data.annual_water_usage_m3
+        total_savings = 0.0
+
+        # 1. Irrigation system upgrade potential (highest impact first)
+        if input_data.irrigation_method:
+            system_lower = input_data.irrigation_method.lower()
+            if system_lower in ["flood", "gravitaire", "submersion"]:
+                # Upgrade to drip could save 30-40%
+                savings = remaining_usage * 0.35
+                total_savings += savings
+                remaining_usage -= savings
+            elif system_lower in ["sprinkler", "aspersion"]:
+                # Upgrade to drip could save 15-20%
+                savings = remaining_usage * 0.17
+                total_savings += savings
+                remaining_usage -= savings
+            elif system_lower in ["center_pivot", "pivot", "pivot_central"]:
+                # Upgrade to drip could save 5-10%
+                savings = remaining_usage * 0.07
+                total_savings += savings
+                remaining_usage -= savings
+
+        # 2. Conservation practices (applied to remaining usage after system upgrade)
+        if not input_data.soil_moisture_monitoring:
+            # Sensors: 20% of remaining
+            savings = remaining_usage * 0.20
+            total_savings += savings
+            remaining_usage -= savings
+
+        if not input_data.weather_based_irrigation:
+            # Weather scheduling: 15% of remaining
+            savings = remaining_usage * 0.15
+            total_savings += savings
+            remaining_usage -= savings
+
         if not input_data.mulching_used:
-            potential_savings += current_usage * 0.15  # 15% savings
-        
-        return potential_savings
+            # Mulching: 15% of remaining
+            savings = remaining_usage * 0.15
+            total_savings += savings
+            remaining_usage -= savings
+
+        # Note: rainwater_harvesting not in schema, skipping
+
+        return total_savings
     
     def _generate_recommendations(
         self,
         input_data: WaterManagementInput,
-        irrigation_score: WaterEfficiencyScore,
-        usage_score: WaterEfficiencyScore,
-        conservation_score: WaterEfficiencyScore
+        irrigation_score: WaterIndicatorScore,
+        usage_score: WaterIndicatorScore,
+        conservation_score: WaterIndicatorScore
     ) -> List[str]:
         """Generate prioritized water management recommendations"""
         recommendations = []
-        
+
         # Irrigation system recommendations
-        if input_data.irrigation_system == IrrigationSystem.FLOOD:
-            recommendations.append(
-                "💧 PRIORITÉ 1: Upgrade système irrigation gravitaire → goutte-à-goutte "
-                "(économie 30-40%, ROI 3-5 ans)"
-            )
-        elif input_data.irrigation_system == IrrigationSystem.SPRINKLER:
-            recommendations.append(
-                "💧 Considérer upgrade aspersion → goutte-à-goutte "
-                "(économie 15-20%, meilleure uniformité)"
-            )
-        
+        if input_data.irrigation_method:
+            system_lower = input_data.irrigation_method.lower()
+            if system_lower in ["flood", "gravitaire", "submersion"]:
+                recommendations.append(
+                    "💧 PRIORITÉ 1: Upgrade système irrigation gravitaire → goutte-à-goutte "
+                    "(économie 30-40%, ROI 3-5 ans)"
+                )
+            elif system_lower in ["sprinkler", "aspersion"]:
+                recommendations.append(
+                    "💧 Considérer upgrade aspersion → goutte-à-goutte "
+                    "(économie 15-20%, meilleure uniformité)"
+                )
+
         # Conservation practices recommendations
-        if not input_data.soil_moisture_sensors:
+        if not input_data.soil_moisture_monitoring:
             recommendations.append(
                 "📊 PRIORITÉ 2: Installer capteurs humidité sol "
                 "(économie 15-25%, irrigation précise selon besoins réels)"
             )
-        
-        if not input_data.weather_based_scheduling:
+
+        if not input_data.weather_based_irrigation:
             recommendations.append(
                 "🌦️ Implémenter pilotage irrigation météo "
                 "(économie 10-20%, éviter irrigation avant pluie)"
             )
-        
+
         if not input_data.mulching_used:
             recommendations.append(
                 "🌾 Utiliser paillage/mulch "
                 "(économie 10-20%, réduit évaporation, améliore sol)"
-            )
-        
-        if not input_data.rainwater_harvesting:
-            recommendations.append(
-                "🌧️ Récupération eau pluie "
-                "(économie 5-15%, ressource gratuite, réduit dépendance)"
             )
         
         # Usage-based recommendations
@@ -425,43 +498,61 @@ class EnhancedWaterManagementService:
 async def assess_water_management_enhanced(
     surface_ha: float,
     crop: str,
-    irrigation_system: IrrigationSystem,
-    annual_water_usage_m3: float,
-    soil_moisture_sensors: bool = False,
-    weather_based_scheduling: bool = False,
-    rainwater_harvesting: bool = False,
+    irrigated: bool = False,
+    irrigation_method: Optional[str] = None,
+    annual_water_usage_m3: Optional[float] = None,
+    soil_moisture_monitoring: bool = False,
+    weather_based_irrigation: bool = False,
     mulching_used: bool = False,
-    location: Optional[str] = None
+    cover_crops_for_water: bool = False,
+    drainage_system: bool = False,
+    buffer_strips: bool = False,
+    contour_farming: bool = False,
+    location: Optional[str] = None,
+    rainfall_mm_annual: Optional[float] = None
 ) -> str:
     """
     Async wrapper for assess water management tool
-    
+
     Args:
         surface_ha: Surface area in hectares
         crop: Crop type
-        irrigation_system: Type of irrigation system
-        annual_water_usage_m3: Annual water usage in cubic meters
-        soil_moisture_sensors: Whether soil moisture sensors are used
-        weather_based_scheduling: Whether weather-based irrigation scheduling is used
-        rainwater_harvesting: Whether rainwater harvesting is implemented
+        irrigated: Whether the field is irrigated
+        irrigation_method: Type of irrigation (drip, sprinkler, flood, pivot, etc.)
+        annual_water_usage_m3: Annual water usage in cubic meters (optional)
+        soil_moisture_monitoring: Whether soil moisture sensors are used
+        weather_based_irrigation: Whether weather-based irrigation scheduling is used
         mulching_used: Whether mulching is used
+        cover_crops_for_water: Whether cover crops are used for water management
+        drainage_system: Whether drainage system is present
+        buffer_strips: Whether buffer strips are used
+        contour_farming: Whether contour farming is practiced
         location: Location for regional context (optional)
-        
+        rainfall_mm_annual: Annual rainfall in mm (optional)
+
     Returns:
         JSON string with water management assessment
+
+    LIMITATION: Water requirements based on temperate climate.
+    Mediterranean: +50%, Oceanic: -30%, Arid: irrigation essential.
     """
     try:
         # Validate inputs
         input_data = WaterManagementInput(
             surface_ha=surface_ha,
             crop=crop,
-            irrigation_system=irrigation_system,
+            irrigated=irrigated,
+            irrigation_method=irrigation_method,
             annual_water_usage_m3=annual_water_usage_m3,
-            soil_moisture_sensors=soil_moisture_sensors,
-            weather_based_scheduling=weather_based_scheduling,
-            rainwater_harvesting=rainwater_harvesting,
+            soil_moisture_monitoring=soil_moisture_monitoring,
+            weather_based_irrigation=weather_based_irrigation,
             mulching_used=mulching_used,
-            location=location
+            cover_crops_for_water=cover_crops_for_water,
+            drainage_system=drainage_system,
+            buffer_strips=buffer_strips,
+            contour_farming=contour_farming,
+            location=location,
+            rainfall_mm_annual=rainfall_mm_annual
         )
         
         # Execute service
@@ -476,8 +567,7 @@ async def assess_water_management_enhanced(
             success=False,
             surface_ha=surface_ha,
             crop=crop,
-            irrigation_system=irrigation_system,
-            overall_efficiency_score=0.0,
+            overall_water_score=0.0,
             overall_status="poor",
             error=str(e),
             error_type="validation"
@@ -490,8 +580,7 @@ async def assess_water_management_enhanced(
             success=False,
             surface_ha=surface_ha,
             crop=crop,
-            irrigation_system=irrigation_system,
-            overall_efficiency_score=0.0,
+            overall_water_score=0.0,
             overall_status="poor",
             error=f"Erreur inattendue: {str(e)}",
             error_type="unknown"
