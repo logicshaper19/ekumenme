@@ -165,6 +165,7 @@ class PlanningTasksOutput(BaseModel):
     tasks: List[PlanningTask] = Field(default_factory=list)
     total_tasks: int = Field(ge=0)
     estimated_total_duration_days: int = Field(ge=0)
+    warnings: List[str] = Field(default_factory=list, description="Warnings about task generation")
     timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
     error: Optional[str] = None
     error_type: Optional[str] = None
