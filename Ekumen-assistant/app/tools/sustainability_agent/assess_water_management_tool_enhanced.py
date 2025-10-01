@@ -78,6 +78,17 @@ class EnhancedWaterManagementService:
         "tomate": {"min": 4000, "max": 6000, "optimal": 5000},
         "vigne": {"min": 1000, "max": 2500, "optimal": 1800},
     }
+
+    # Scoring constants (avoid magic numbers)
+    USAGE_SCORE_DECAY_FACTOR = 20  # How fast score degrades with excess usage
+    USAGE_EXCESS_MODERATE_THRESHOLD = 1.3  # 30% over max = moderate
+    GENERIC_CROP_OPTIMAL_M3 = 3000  # Default for unknown crops
+
+    # Rainfall adjustment factors (mm/year)
+    # Reduces irrigation requirements based on effective rainfall
+    RAINFALL_LOW_THRESHOLD = 400  # Below this: arid/semi-arid
+    RAINFALL_MEDIUM_THRESHOLD = 800  # 400-800: moderate rainfall
+    RAINFALL_HIGH_THRESHOLD = 1200  # Above 800: high rainfall
     
     @redis_cache(ttl=7200, model_class=WaterManagementOutput, category="sustainability")
     async def assess_water_management(self, input_data: WaterManagementInput) -> WaterManagementOutput:
@@ -107,7 +118,8 @@ class EnhancedWaterManagementService:
                 usage_score = self._score_water_usage(
                     input_data.annual_water_usage_m3,
                     input_data.surface_ha,
-                    input_data.crop
+                    input_data.crop,
+                    input_data.rainfall_mm_annual
                 )
                 indicator_scores.append(usage_score)
 
@@ -119,6 +131,14 @@ class EnhancedWaterManagementService:
                 input_data.mulching_used
             )
             indicator_scores.append(conservation_score)
+
+            # Calculate drainage and runoff management
+            drainage_score = self._score_drainage_runoff(
+                input_data.drainage_system,
+                input_data.buffer_strips,
+                input_data.contour_farming
+            )
+            indicator_scores.append(drainage_score)
 
             # Overall efficiency score (weighted average)
             # Weighting rationale:
@@ -238,11 +258,17 @@ class EnhancedWaterManagementService:
         self,
         annual_usage_m3: float,
         surface_ha: float,
-        crop: str
+        crop: str,
+        rainfall_mm: Optional[float] = None
     ) -> WaterIndicatorScore:
         """
         Score water usage efficiency compared to crop requirements.
-        
+
+        Adjusts benchmarks based on rainfall:
+        - High rainfall (>800mm): Reduces irrigation needs by 20%
+        - Moderate rainfall (400-800mm): Reduces by 10%
+        - Low rainfall (<400mm): No adjustment (full irrigation needed)
+
         LIMITATION: Uses temperate climate benchmarks. Actual requirements vary by:
         - Climate zone (Mediterranean vs Continental)
         - Soil type (sandy vs clay)
@@ -250,50 +276,64 @@ class EnhancedWaterManagementService:
         - Crop variety
         """
         usage_per_ha = annual_usage_m3 / surface_ha if surface_ha > 0 else 0
-        
+
+        # Determine rainfall adjustment factor
+        rainfall_adjustment = 1.0
+        rainfall_note = ""
+        if rainfall_mm is not None:
+            if rainfall_mm >= self.RAINFALL_HIGH_THRESHOLD:
+                rainfall_adjustment = 0.8  # 20% reduction in irrigation needs
+                rainfall_note = f" (ajusté pluviométrie {rainfall_mm:.0f}mm/an)"
+            elif rainfall_mm >= self.RAINFALL_MEDIUM_THRESHOLD:
+                rainfall_adjustment = 0.9  # 10% reduction
+                rainfall_note = f" (ajusté pluviométrie {rainfall_mm:.0f}mm/an)"
+            elif rainfall_mm < self.RAINFALL_LOW_THRESHOLD:
+                rainfall_note = f" (climat aride {rainfall_mm:.0f}mm/an)"
+
         crop_lower = crop.lower()
         if crop_lower in self.CROP_WATER_REQUIREMENTS:
             requirements = self.CROP_WATER_REQUIREMENTS[crop_lower]
-            optimal = requirements["optimal"]
-            max_acceptable = requirements["max"]
-            
+            # Adjust requirements based on rainfall
+            optimal = requirements["optimal"] * rainfall_adjustment
+            max_acceptable = requirements["max"] * rainfall_adjustment
+
             # Calculate efficiency
             if usage_per_ha <= optimal:
                 # Under or at optimal - excellent
                 score = 10.0
                 status = "excellent"
-                description = f"Usage {usage_per_ha:.0f} m³/ha ≤ optimal {optimal} m³/ha pour {crop} - Excellent"
+                description = f"Usage {usage_per_ha:.0f} m³/ha ≤ optimal {optimal:.0f} m³/ha pour {crop}{rainfall_note} - Excellent"
             elif usage_per_ha <= max_acceptable:
                 # Between optimal and max - good
                 excess_pct = ((usage_per_ha - optimal) / optimal) * 100
-                score = max(7.0 - (excess_pct / 20), 5.0)  # Degrade from 7 to 5
+                score = max(7.0 - (excess_pct / self.USAGE_SCORE_DECAY_FACTOR), 5.0)
                 status = "good"
-                description = f"Usage {usage_per_ha:.0f} m³/ha acceptable pour {crop} (+{excess_pct:.0f}% vs optimal)"
-            elif usage_per_ha <= max_acceptable * 1.3:
+                description = f"Usage {usage_per_ha:.0f} m³/ha acceptable pour {crop}{rainfall_note} (+{excess_pct:.0f}% vs optimal)"
+            elif usage_per_ha <= max_acceptable * self.USAGE_EXCESS_MODERATE_THRESHOLD:
                 # 30% over max - moderate
                 excess_pct = ((usage_per_ha - optimal) / optimal) * 100
                 score = 4.0
                 status = "moderate"
-                description = f"Usage {usage_per_ha:.0f} m³/ha élevé pour {crop} (+{excess_pct:.0f}% vs optimal)"
+                description = f"Usage {usage_per_ha:.0f} m³/ha élevé pour {crop}{rainfall_note} (+{excess_pct:.0f}% vs optimal)"
             else:
                 # Very high usage - poor
                 excess_pct = ((usage_per_ha - optimal) / optimal) * 100
                 score = 2.0
                 status = "poor"
-                description = f"Usage {usage_per_ha:.0f} m³/ha très élevé pour {crop} (+{excess_pct:.0f}% vs optimal)"
+                description = f"Usage {usage_per_ha:.0f} m³/ha très élevé pour {crop}{rainfall_note} (+{excess_pct:.0f}% vs optimal)"
         else:
-            # Unknown crop - use generic benchmark (3000 m³/ha)
-            generic_optimal = 3000
+            # Unknown crop - use generic benchmark
+            generic_optimal = self.GENERIC_CROP_OPTIMAL_M3 * rainfall_adjustment
             if usage_per_ha <= generic_optimal:
                 score = 7.0
                 status = "good"
-                description = f"Usage {usage_per_ha:.0f} m³/ha (culture {crop} non référencée, benchmark générique)"
+                description = f"Usage {usage_per_ha:.0f} m³/ha (culture {crop} non référencée, benchmark générique{rainfall_note})"
             else:
                 excess_pct = ((usage_per_ha - generic_optimal) / generic_optimal) * 100
                 score = max(5.0 - (excess_pct / 30), 2.0)
                 status = "moderate"
-                description = f"Usage {usage_per_ha:.0f} m³/ha (culture {crop} non référencée, +{excess_pct:.0f}% vs benchmark)"
-        
+                description = f"Usage {usage_per_ha:.0f} m³/ha (culture {crop} non référencée, +{excess_pct:.0f}% vs benchmark{rainfall_note})"
+
         return WaterIndicatorScore(
             indicator=WaterManagementIndicator.WATER_CONSERVATION,
             score=round(score, 1),
@@ -354,7 +394,56 @@ class EnhancedWaterManagementService:
             status=status,
             description=description
         )
-    
+
+    def _score_drainage_runoff(
+        self,
+        drainage: bool,
+        buffer_strips: bool,
+        contour_farming: bool
+    ) -> WaterIndicatorScore:
+        """
+        Score drainage and runoff management practices.
+
+        These practices prevent waterlogging, reduce erosion, and protect water quality:
+        - Drainage system: Prevents waterlogging, improves root health
+        - Buffer strips: Filters runoff, protects water bodies
+        - Contour farming: Reduces runoff velocity, increases infiltration
+        """
+        score = 0.0
+        practices_used = []
+
+        if drainage:
+            score += 3.5
+            practices_used.append("drainage")
+        if buffer_strips:
+            score += 3.5
+            practices_used.append("bandes tampons")
+        if contour_farming:
+            score += 3.0
+            practices_used.append("culture en courbes de niveau")
+
+        count = len(practices_used)
+
+        if count >= 3:
+            status = "excellent"
+            description = f"{count}/3 pratiques drainage/ruissellement: {', '.join(practices_used)} - Excellent"
+        elif count >= 2:
+            status = "good"
+            description = f"{count}/3 pratiques drainage/ruissellement: {', '.join(practices_used)} - Bon"
+        elif count >= 1:
+            status = "moderate"
+            description = f"{count}/3 pratiques drainage/ruissellement: {', '.join(practices_used)} - Amélioration possible"
+        else:
+            status = "poor"
+            description = "0/3 pratiques drainage/ruissellement - Risque érosion et ruissellement"
+
+        return WaterIndicatorScore(
+            indicator=WaterManagementIndicator.DRAINAGE_MANAGEMENT,
+            score=round(score, 1),
+            status=status,
+            description=description
+        )
+
     def _determine_status(self, score: float) -> str:
         """Determine overall status from score"""
         if score >= 8.0:
@@ -480,19 +569,32 @@ class EnhancedWaterManagementService:
                 "🌾 Utiliser paillage/mulch "
                 "(économie 10-20%, réduit évaporation, améliore sol)"
             )
-        
+
+        # Drainage and runoff recommendations
+        if not input_data.buffer_strips:
+            recommendations.append(
+                "🌿 Implanter bandes tampons "
+                "(protection qualité eau, filtre ruissellement, biodiversité)"
+            )
+
+        if not input_data.contour_farming:
+            recommendations.append(
+                "🏔️ Adopter culture en courbes de niveau "
+                "(réduit érosion, augmente infiltration, conserve eau)"
+            )
+
         # Usage-based recommendations
         if usage_score.score < 6.0:
             recommendations.append(
                 "⚠️ Usage eau élevé - Audit irrigation recommandé "
                 "(fuites, uniformité, durées)"
             )
-        
+
         # General recommendations
         recommendations.append("📅 Planifier irrigation selon stades phénologiques (besoins variables)")
         recommendations.append("🔧 Entretien régulier système (fuites = 10-30% pertes)")
-        
-        return recommendations[:8]  # Limit to top 8
+
+        return recommendations[:10]  # Limit to top 10
 
 
 async def assess_water_management_enhanced(
