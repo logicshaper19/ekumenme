@@ -57,34 +57,31 @@ class EnhancedResourceRequirementsService:
             ValueError: If resource analysis fails
         """
         try:
-            warnings = []
-            
             # Validate tasks have required fields
             for idx, task in enumerate(input_data.tasks):
                 if 'task_name' not in task:
                     raise ValueError(f"Tâche {idx}: doit avoir 'task_name'")
-            
+
             # Extract resource requirements from tasks
             resource_requirements = self._extract_resource_requirements(
                 input_data.tasks,
                 input_data.surface_ha
             )
-            
+
             # Identify critical resources
             critical_resources = self._identify_critical_resources(
-                resource_requirements,
-                input_data.tasks
+                resource_requirements
             )
-            
+
             # Generate availability warnings
             availability_warnings = self._generate_availability_warnings(
                 resource_requirements,
                 critical_resources,
                 input_data.surface_ha
             )
-            
+
             logger.info(f"✅ Analyzed resources for {input_data.crop}: {len(resource_requirements)} resources identified")
-            
+
             return ResourceRequirementsOutput(
                 success=True,
                 crop=input_data.crop,
@@ -116,10 +113,7 @@ class EnhancedResourceRequirementsService:
             task_name = task.get('task_name', '')
             resources = task.get('resources_required', [])
             duration_days = task.get('estimated_duration_days', 1)
-            
-            # Timing for this task
-            timing = f"Tâche: {task_name}"
-            
+
             for resource_str in resources:
                 # Parse resource string (e.g., "Équipement: tracteur_120cv")
                 if 'Équipement:' in resource_str:
@@ -206,8 +200,7 @@ class EnhancedResourceRequirementsService:
     
     def _identify_critical_resources(
         self,
-        requirements: List[ResourceRequirement],
-        tasks: List[Dict[str, Any]]
+        requirements: List[ResourceRequirement]
     ) -> List[str]:
         """
         Identify critical resources based on:
