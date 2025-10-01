@@ -90,15 +90,16 @@ class EnhancedWaterManagementService:
     RAINFALL_MEDIUM_THRESHOLD = 800  # 400-800: moderate rainfall
     RAINFALL_HIGH_THRESHOLD = 1200  # Above 800: high rainfall
 
-    # Soil type water holding capacity adjustments
-    # Affects irrigation frequency and efficiency
+    # Soil type water requirement multipliers
+    # Sandy soils have low retention → need MORE water (1.3x)
+    # Clay soils have high retention → need LESS water (0.8x)
     SOIL_WATER_ADJUSTMENTS = {
-        "sandy": {"retention": 0.7, "note": "faible rétention, irrigation fréquente"},
-        "sableux": {"retention": 0.7, "note": "faible rétention, irrigation fréquente"},
-        "loamy": {"retention": 1.0, "note": "rétention optimale"},
-        "limoneux": {"retention": 1.0, "note": "rétention optimale"},
-        "clay": {"retention": 1.2, "note": "forte rétention, drainage important"},
-        "argileux": {"retention": 1.2, "note": "forte rétention, drainage important"},
+        "sandy": {"multiplier": 1.3, "note": "faible rétention, +30% besoins irrigation"},
+        "sableux": {"multiplier": 1.3, "note": "faible rétention, +30% besoins irrigation"},
+        "loamy": {"multiplier": 1.0, "note": "rétention optimale"},
+        "limoneux": {"multiplier": 1.0, "note": "rétention optimale"},
+        "clay": {"multiplier": 0.8, "note": "forte rétention, -20% besoins irrigation"},
+        "argileux": {"multiplier": 0.8, "note": "forte rétention, -20% besoins irrigation"},
     }
     
     @redis_cache(ttl=7200, model_class=WaterManagementOutput, category="sustainability")
@@ -285,8 +286,11 @@ class EnhancedWaterManagementService:
         Score water usage efficiency compared to crop requirements.
 
         Adjusts benchmarks based on:
-        - Rainfall: High (>800mm) reduces needs by 20%, Moderate (400-800mm) by 10%
-        - Soil type: Sandy soils need 30% more water (low retention), clay 20% less (high retention)
+        - Rainfall: High (>800mm) reduces irrigation needs by 20%, Moderate (400-800mm) by 10%
+        - Soil type:
+          * Sandy soils (low water retention) → INCREASE requirements by 30% (need more frequent irrigation)
+          * Clay soils (high water retention) → DECREASE requirements by 20% (hold water longer)
+          * Loamy soils → No adjustment (optimal)
 
         LIMITATION: Uses temperate climate benchmarks. Actual requirements vary by:
         - Climate zone (Mediterranean vs Continental)
@@ -315,7 +319,7 @@ class EnhancedWaterManagementService:
             soil_lower = soil_type.lower()
             if soil_lower in self.SOIL_WATER_ADJUSTMENTS:
                 soil_data = self.SOIL_WATER_ADJUSTMENTS[soil_lower]
-                soil_adjustment = soil_data["retention"]
+                soil_adjustment = soil_data["multiplier"]
                 soil_note = f", sol {soil_lower} ({soil_data['note']})"
 
         crop_lower = crop.lower()
