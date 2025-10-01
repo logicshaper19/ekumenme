@@ -7,6 +7,12 @@ from langchain.tools import BaseTool
 from langchain.schema import BaseMessage, HumanMessage, AIMessage
 from .base_agent import IntegratedAgriculturalAgent, AgentState
 from ..utils.prompts import FrenchAgriculturalPrompts
+from ..tools.sustainability_agent import (
+    carbon_footprint_tool,
+    biodiversity_tool,
+    soil_health_tool,
+    water_management_tool
+)
 import logging
 import json
 from datetime import datetime, timedelta
@@ -137,12 +143,15 @@ class SustainabilityAnalyticsAgent(IntegratedAgriculturalAgent):
     """
     
     def __init__(self, carbon_database_config=None, certification_config=None, **kwargs):
-        # Initialize enhanced tools
+        # Initialize production-ready tools with uncertainty quantification & economic ROI
         tools = [
-            EnhancedCarbonFootprintTool(),
-            CertificationAnalysisTool(),
+            carbon_footprint_tool,  # With emission factor uncertainty ranges
+            biodiversity_tool,  # 7 indicators with realistic improvement potentials
+            soil_health_tool,  # Crop-specific recommendations
+            water_management_tool,  # Rainfall/soil adjustment + economic ROI
+            CertificationAnalysisTool(),  # Keep legacy certification tool for now
         ]
-        
+
         super().__init__(
             name="sustainability_analytics",
             description="Conseiller en durabilité agricole français",
@@ -150,7 +159,7 @@ class SustainabilityAnalyticsAgent(IntegratedAgriculturalAgent):
             tools=tools,
             **kwargs
         )
-        
+
         self.carbon_db_config = carbon_database_config
         self.certification_config = certification_config
         logger.info("Initialized Enhanced Sustainability & Analytics Agent")
