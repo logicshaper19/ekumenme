@@ -11,41 +11,36 @@ from .semantic_base_agent import SemanticAgriculturalAgent
 from ..utils.prompts import FrenchAgriculturalPrompts
 
 # Import available tools
-from ..tools.crop_health_agent.diagnose_disease_tool import DiagnoseDiseaseToolEnhanced
-from ..tools.crop_health_agent.identify_pest_tool import IdentifyPestToolEnhanced
+from ..tools.crop_health_agent import (
+    diagnose_disease_tool,
+    identify_pest_tool,
+    analyze_nutrient_deficiency_tool,
+    generate_treatment_plan_tool
+)
 
 logger = logging.getLogger(__name__)
 
 class SemanticCropHealthAgent(SemanticAgriculturalAgent):
     """
     Semantic Crop Health Agent with intelligent tool selection.
-    
+
     This agent specializes in crop health diagnosis and monitoring using:
     - Semantic tool selection for disease diagnosis
     - Intelligent pest identification
     - Context-aware treatment recommendations
     - Database-integrated knowledge base
     """
-    
+
     def __init__(self, **kwargs):
         """Initialize semantic crop health agent."""
-        
-        # Initialize enhanced crop health tools
+
+        # Initialize crop health tools (all production-ready)
         tools = [
-            DiagnoseDiseaseToolEnhanced(),
-            IdentifyPestToolEnhanced(),
+            diagnose_disease_tool,
+            identify_pest_tool,
+            analyze_nutrient_deficiency_tool,
+            generate_treatment_plan_tool
         ]
-        
-        # Import additional tools if available
-        try:
-            from ..tools.crop_health_agent.analyze_nutrient_deficiency_tool import AnalyzeNutrientDeficiencyTool
-            from ..tools.crop_health_agent.generate_treatment_plan_tool import GenerateTreatmentPlanTool
-            tools.extend([
-                AnalyzeNutrientDeficiencyTool(),
-                GenerateTreatmentPlanTool()
-            ])
-        except ImportError:
-            logger.warning("Some additional crop health tools not available, using basic tools only")
         
         super().__init__(
             name="semantic_crop_health",

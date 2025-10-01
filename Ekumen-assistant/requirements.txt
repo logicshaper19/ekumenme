@@ -31,6 +31,7 @@ elevenlabs==0.2.26
 # HTTP clients and API integration
 httpx==0.25.2
 aiohttp==3.9.1
+aiofiles==23.2.1
 requests==2.31.0
 tavily-python==0.7.12
 
