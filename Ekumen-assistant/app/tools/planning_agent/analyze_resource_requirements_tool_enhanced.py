@@ -62,6 +62,24 @@ class EnhancedResourceRequirementsService:
                 if 'task_name' not in task:
                     raise ValueError(f"Tâche {idx}: doit avoir 'task_name'")
 
+                # Validate resources_required is a list if present
+                if 'resources_required' in task:
+                    if not isinstance(task['resources_required'], list):
+                        raise ValueError(f"Tâche '{task['task_name']}': resources_required doit être une liste")
+
+                    # Validate each resource string format
+                    for resource in task['resources_required']:
+                        if not isinstance(resource, str):
+                            raise ValueError(f"Tâche '{task['task_name']}': chaque ressource doit être une chaîne de caractères")
+
+                        # Check if resource has valid prefix
+                        valid_prefixes = ['Équipement:', 'Personnel:', 'Matériaux:']
+                        if not any(resource.startswith(prefix) for prefix in valid_prefixes):
+                            raise ValueError(
+                                f"Tâche '{task['task_name']}': ressource '{resource}' doit commencer par "
+                                f"'Équipement:', 'Personnel:', ou 'Matériaux:'"
+                            )
+
             # Extract resource requirements from tasks
             resource_requirements = self._extract_resource_requirements(
                 input_data.tasks,
@@ -161,18 +179,23 @@ class EnhancedResourceRequirementsService:
                 
                 elif 'Matériaux:' in resource_str:
                     materials = resource_str.split('Matériaux:')[1].strip()
-                    
-                    # Materials are typically per hectare
+
+                    # Materials are per hectare - track total quantity needed
+                    # Assume each task needs materials for the full surface
                     key = f"materials_{materials}"
                     if key not in resource_tracker:
                         resource_tracker[key] = {
                             'type': ResourceType.MATERIALS,
                             'name': materials,
-                            'quantity': surface_ha,
-                            'unit': 'hectares',
-                            'timing': [task_name],
+                            'quantity': 0.0,
+                            'unit': 'unités',  # Generic unit (could be kg, L, etc.)
+                            'timing': [],
                             'critical': True  # Materials are often critical
                         }
+
+                    # Accumulate material needs (1 unit per hectare per task)
+                    resource_tracker[key]['quantity'] += surface_ha
+                    resource_tracker[key]['timing'].append(task_name)
         
         # Convert tracker to ResourceRequirement objects
         for key, data in resource_tracker.items():
@@ -204,34 +227,45 @@ class EnhancedResourceRequirementsService:
     ) -> List[str]:
         """
         Identify critical resources based on:
-        - High utilization (>80 hours for equipment)
-        - Materials (always critical)
-        - Specialized equipment
+        - High utilization (>80 hours for equipment = >10 working days)
+        - Materials (always critical - must be ordered in advance)
+        - Specialized equipment (limited availability)
+        - High labor requirements (>200 hours = >25 working days)
+
+        Thresholds based on:
+        - Equipment: >80h assumes 8h/day = >10 days continuous use (high for single equipment)
+        - Labor: >200h assumes 8h/day = >25 days (requires dedicated team or seasonal workers)
         """
         critical = []
-        
+
         for req in requirements:
-            # Materials are always critical
+            # Materials are always critical (must be ordered, delivered, stored)
             if req.resource_type == ResourceType.MATERIALS:
                 critical.append(req.resource_name)
                 continue
-            
+
             # Equipment with high utilization
             if req.resource_type == ResourceType.EQUIPMENT:
-                if req.quantity > 80:  # >80 hours = >10 days of use
+                # >80 hours = >10 working days of continuous use
+                # Indicates potential bottleneck or need for backup equipment
+                if req.quantity > 80:
                     critical.append(req.resource_name)
                     continue
-                
-                # Specialized equipment (moissonneuse, etc.)
-                if 'moissonneuse' in req.resource_name.lower():
+
+                # Specialized equipment with limited availability
+                # (moissonneuse, pulvérisateur haute capacité, etc.)
+                specialized = ['moissonneuse', 'batteuse', 'ensileuse', 'arracheuse']
+                if any(spec in req.resource_name.lower() for spec in specialized):
                     critical.append(req.resource_name)
                     continue
-            
+
             # Labor with high hours
             if req.resource_type == ResourceType.LABOR:
-                if req.quantity > 200:  # >200 hours = >25 days
+                # >200 hours = >25 working days
+                # Requires dedicated team or seasonal recruitment
+                if req.quantity > 200:
                     critical.append(req.resource_name)
-        
+
         return critical
     
     def _generate_availability_warnings(
@@ -240,39 +274,61 @@ class EnhancedResourceRequirementsService:
         critical_resources: List[str],
         surface_ha: float
     ) -> List[str]:
-        """Generate warnings about resource availability"""
+        """
+        Generate warnings about resource availability.
+
+        Thresholds based on typical farm operations:
+        - Equipment: >400h total = >50 working days across all equipment (high utilization)
+        - Labor: >500h total = >60 working days across all personnel (requires team)
+        - Large surface: >100 ha requires significant logistics coordination
+        """
         warnings = []
-        
+        seasonal_warnings_added = set()  # Track to avoid duplicates
+
         # Warn about critical resources
         if critical_resources:
             warnings.append(f"⚠️ {len(critical_resources)} ressource(s) critique(s) identifiée(s) - Vérifier disponibilité")
-        
+
         # Check equipment utilization
         equipment_reqs = [r for r in requirements if r.resource_type == ResourceType.EQUIPMENT]
         total_equipment_hours = sum(r.quantity for r in equipment_reqs)
-        
+
+        # >400h total = >50 working days across all equipment
+        # Indicates high overall equipment demand, potential scheduling conflicts
         if total_equipment_hours > 400:
-            warnings.append(f"⚠️ Utilisation équipement élevée ({total_equipment_hours:.0f}h) - Planifier maintenance")
-        
+            warnings.append(f"⚠️ Utilisation équipement élevée ({total_equipment_hours:.0f}h total) - Planifier maintenance et disponibilité")
+
         # Check labor requirements
         labor_reqs = [r for r in requirements if r.resource_type == ResourceType.LABOR]
         total_labor_hours = sum(r.quantity for r in labor_reqs)
-        
+
+        # >500h total = >60 working days across all personnel
+        # Requires dedicated team or seasonal recruitment
         if total_labor_hours > 500:
-            warnings.append(f"⚠️ Besoins en main-d'œuvre élevés ({total_labor_hours:.0f}h) - Prévoir recrutement saisonnier")
-        
-        # Warn about large surface
+            warnings.append(f"⚠️ Besoins en main-d'œuvre élevés ({total_labor_hours:.0f}h total) - Prévoir recrutement saisonnier")
+
+        # Warn about large surface (>100 ha requires significant logistics)
         if surface_ha > 100:
-            warnings.append(f"ℹ️ Grande surface ({surface_ha} ha) - Vérifier capacité logistique")
-        
-        # Seasonal availability warnings
+            warnings.append(f"ℹ️ Grande surface ({surface_ha} ha) - Vérifier capacité logistique et stockage")
+
+        # Seasonal availability warnings (avoid duplicates)
+        specialized_equipment = {
+            'moissonneuse': "⚠️ Moissonneuse - Réserver à l'avance (forte demande en saison de récolte)",
+            'batteuse': "⚠️ Batteuse - Réserver à l'avance (forte demande en saison)",
+            'ensileuse': "⚠️ Ensileuse - Réserver à l'avance (disponibilité limitée)",
+            'pulvérisateur': "ℹ️ Pulvérisateur - Vérifier disponibilité pendant périodes de traitement"
+        }
+
         for req in requirements:
-            if 'moissonneuse' in req.resource_name.lower():
-                warnings.append("⚠️ Moissonneuse - Réserver à l'avance (forte demande en saison)")
-        
+            if req.resource_type == ResourceType.EQUIPMENT:
+                for equipment_type, warning in specialized_equipment.items():
+                    if equipment_type in req.resource_name.lower() and equipment_type not in seasonal_warnings_added:
+                        warnings.append(warning)
+                        seasonal_warnings_added.add(equipment_type)
+
         if not warnings:
             warnings.append("✅ Aucun problème de disponibilité identifié")
-        
+
         return warnings
 
 
