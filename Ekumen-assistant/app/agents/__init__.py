@@ -20,12 +20,12 @@ from .base_agent import (
 )
 
 # Specialized Agricultural Agents
-from .farm_data_agent import IntegratedFarmDataAgent
-from .regulatory_agent import IntegratedRegulatoryAgent
+from .farm_data_agent import FarmDataIntelligenceAgent
+from .regulatory_agent import RegulatoryIntelligenceAgent
 from .weather_agent import WeatherIntelligenceAgent
-from .crop_health_agent import CropHealthMonitorAgent
-from .planning_agent import OperationalPlanningCoordinatorAgent
-from .sustainability_agent import SustainabilityAnalyticsAgent
+from .crop_health_agent import CropHealthIntelligenceAgent
+from .planning_agent import PlanningIntelligenceAgent
+from .sustainability_agent import SustainabilityIntelligenceAgent
 
 # Orchestration Components
 from .agent_manager import AgentManager, AgentType
@@ -41,12 +41,12 @@ __all__ = [
     "AgentType",
     
     # Specialized Agricultural Agents
-    "IntegratedFarmDataAgent",
-    "IntegratedRegulatoryAgent", 
+    "FarmDataIntelligenceAgent",
+    "RegulatoryIntelligenceAgent",
     "WeatherIntelligenceAgent",
-    "CropHealthMonitorAgent",
-    "OperationalPlanningCoordinatorAgent",
-    "SustainabilityAnalyticsAgent",
+    "CropHealthIntelligenceAgent",
+    "PlanningIntelligenceAgent",
+    "SustainabilityIntelligenceAgent",
     
     # Orchestration Components
     "AgentManager",

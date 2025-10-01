@@ -1,517 +1,294 @@
 """
-Farm Data Manager Agent fully integrated with cost optimization, semantic search, and reasoning.
+Simple Farm Data Intelligence Agent - Uses LangChain directly without broken base classes.
+
+This agent:
+1. Uses 4 production-ready tools
+2. Delegates orchestration to LangChain's create_react_agent
+3. No fake object creation
+4. No overcomplicated abstractions
+5. Dependencies injected, not created
 """
 
-from typing import Dict, List, Any, Optional, Union
-from langchain.tools import BaseTool
 import logging
-import json
-from datetime import datetime, timedelta
+import requests
+from typing import Dict, List, Any, Optional
+from langchain.agents import create_react_agent, AgentExecutor
+from langchain.prompts import PromptTemplate
+from langchain_openai import ChatOpenAI
 
-# Import from integrated system
-try:
-    from .base_agent import IntegratedAgriculturalAgent, AgentType, TaskComplexity
-    # Remove circular import - use fallback SemanticKnowledgeRetriever
-    from .base_agent import SemanticKnowledgeRetriever
-except ImportError:
-    # Fallback imports
-    class AgentType:
-        FARM_DATA = "farm_data"
-    
-    class TaskComplexity:
-        SIMPLE = "simple"
-        MODERATE = "moderate"
-        COMPLEX = "complex"
-        CRITICAL = "critical"
-    
-    class SemanticKnowledgeRetriever:
-        def retrieve_relevant_knowledge(self, query: str, top_k: int = 3) -> List[str]:
-            return ["Connaissance agricole générale disponible"]
-    
-    # Fallback base class
-    class IntegratedAgriculturalAgent:
-        def __init__(self, agent_type, description, llm_manager, knowledge_retriever, 
-                     complexity_default=None, specialized_tools=None):
-            self.agent_type = agent_type
-            self.description = description
-            self.llm_manager = llm_manager
-            self.knowledge_retriever = knowledge_retriever
-            self.complexity_default = complexity_default
-            self.specialized_tools = specialized_tools or []
-        
-        def process_message(self, message: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
-            return {"response": "Mock response", "agent_type": self.agent_type.value}
-        
-        def _get_agent_prompt_template(self) -> str:
-            return "Mock prompt template"
-        
-        def _analyze_message_complexity(self, message: str, context: Dict[str, Any]):
-            return TaskComplexity.MODERATE
-        
-        def _retrieve_domain_knowledge(self, message: str) -> List[str]:
-            return ["Mock knowledge"]
+from ..tools.farm_data_agent import (
+    get_farm_data_tool,
+    calculate_performance_metrics_tool,
+    analyze_trends_tool,
+    benchmark_crop_performance_tool
+)
 
 logger = logging.getLogger(__name__)
 
-class SemanticFarmDataTool(BaseTool):
-    """Enhanced farm data tool with semantic understanding and cost optimization."""
+
+class FarmDataIntelligenceAgent:
+    """
+    Farm Data Intelligence Agent using 4 production-ready tools.
     
-    name: str = "semantic_farm_data_query"
-    description: str = "Interroger les données agricoles avec compréhension sémantique"
+    Simple wrapper around LangChain's ReAct agent that:
+    - Holds reference to production tools
+    - Provides farm data-specific prompt
+    - Delegates to LangChain agent executor
     
-    def __init__(self, database_manager=None, knowledge_retriever: SemanticKnowledgeRetriever = None, **kwargs):
-        super().__init__(**kwargs)
-        self._db = database_manager or EnhancedMockDatabaseManager()
-        self.knowledge_retriever = knowledge_retriever
+    Tools:
+    - get_farm_data: Retrieve raw farm data with SIRET-based multi-tenancy
+    - calculate_performance_metrics: Calculate metrics with statistical analysis
+    - analyze_trends: Year-over-year trends with regression analysis
+    - benchmark_crop_performance: Compare against industry benchmarks
+    """
     
-    def _run(self, natural_query: str, context: Dict[str, Any] = None) -> str:
-        """Execute semantic farm data query with intelligent interpretation."""
+    def __init__(
+        self,
+        llm: Optional[ChatOpenAI] = None,
+        tools: Optional[List] = None,
+        config: Optional[Dict[str, Any]] = None
+    ):
+        """
+        Initialize Farm Data Intelligence Agent.
         
-        try:
-            # Parse natural language query semantically
-            query_analysis = self._analyze_query_semantically(natural_query)
-            
-            # Retrieve relevant agricultural knowledge
-            agricultural_context = []
-            if self.knowledge_retriever:
-                agricultural_context = self.knowledge_retriever.retrieve_relevant_knowledge(
-                    f"données exploitation {natural_query}", top_k=3
-                )
-            
-            # Execute database query based on semantic analysis
-            data = self._execute_semantic_query(query_analysis, context)
-            
-            # Enhance results with semantic insights
-            enhanced_results = self._enhance_results_with_context(
-                data, query_analysis, agricultural_context
-            )
-            
-            return json.dumps(enhanced_results, ensure_ascii=False, indent=2)
-            
-        except Exception as e:
-            logger.error(f"Semantic farm data query error: {e}")
-            return json.dumps({"error": "Erreur lors de l'analyse sémantique des données"})
-    
-    def _analyze_query_semantically(self, query: str) -> Dict[str, Any]:
-        """Analyze query using semantic understanding."""
-        query_lower = query.lower()
-        
-        analysis = {
-            "intent": self._detect_query_intent(query_lower),
-            "entities": self._extract_entities(query_lower),
-            "temporal_scope": self._extract_temporal_scope(query_lower),
-            "comparison_type": self._detect_comparison_type(query_lower),
-            "aggregation_level": self._detect_aggregation_level(query_lower)
-        }
-        
-        return analysis
-    
-    def _detect_query_intent(self, query: str) -> str:
-        """Detect the main intent of the query."""
-        intent_patterns = {
-            "performance_analysis": ["performance", "analyse", "évolution", "tendance"],
-            "comparison": ["compare", "différence", "versus", "par rapport"],
-            "optimization": ["optimise", "améliore", "meilleur", "efficace"],
-            "reporting": ["rapport", "bilan", "résumé", "synthèse"],
-            "monitoring": ["surveille", "suivi", "état", "situation"],
-            "forecasting": ["prévision", "projection", "estimation", "prédiction"]
-        }
-        
-        for intent, patterns in intent_patterns.items():
-            if any(pattern in query for pattern in patterns):
-                return intent
-        
-        return "data_retrieval"  # Default
-    
-    def _extract_entities(self, query: str) -> Dict[str, List[str]]:
-        """Extract agricultural entities from query."""
-        entities = {
-            "crops": [],
-            "parcels": [],
-            "operations": [],
-            "metrics": [],
-            "time_periods": []
-        }
-        
-        # Crop detection
-        crop_keywords = {
-            "blé": ["blé", "wheat"], "orge": ["orge", "barley"], 
-            "maïs": ["maïs", "corn"], "colza": ["colza", "canola"],
-            "tournesol": ["tournesol", "sunflower"]
-        }
-        
-        for crop, keywords in crop_keywords.items():
-            if any(keyword in query for keyword in keywords):
-                entities["crops"].append(crop)
-        
-        # Metric detection
-        metric_keywords = {
-            "rendement": ["rendement", "yield", "production"],
-            "coût": ["coût", "prix", "budget", "dépense"],
-            "marge": ["marge", "bénéfice", "rentabilité"],
-            "surface": ["surface", "hectare", "ha"]
-        }
-        
-        for metric, keywords in metric_keywords.items():
-            if any(keyword in query for keyword in keywords):
-                entities["metrics"].append(metric)
-        
-        return entities
-    
-    def _extract_temporal_scope(self, query: str) -> Dict[str, Any]:
-        """Extract temporal information from query."""
-        temporal_patterns = {
-            "current_year": ["cette année", "2024", "actuel"],
-            "last_year": ["année dernière", "2023", "précédent"],
-            "multi_year": ["années", "historique", "évolution"],
-            "season": ["campagne", "saison", "récolte"],
-            "monthly": ["mois", "mensuel", "trimestre"]
-        }
-        
-        scope = {"type": "current_year", "specific_years": [], "range": None}
-        
-        for pattern_type, patterns in temporal_patterns.items():
-            if any(pattern in query for pattern in patterns):
-                scope["type"] = pattern_type
-                break
-        
-        # Extract specific years
-        import re
-        years = re.findall(r'\b(20\d{2})\b', query)
-        scope["specific_years"] = years
-        
-        return scope
-    
-    def _detect_comparison_type(self, query: str) -> str:
-        """Detect type of comparison requested."""
-        if any(word in query for word in ["versus", "vs", "par rapport", "compare"]):
-            return "comparative"
-        elif any(word in query for word in ["évolution", "tendance", "progression"]):
-            return "temporal"
-        elif any(word in query for word in ["moyenne", "médiane", "percentile"]):
-            return "statistical"
-        else:
-            return "none"
-    
-    def _detect_aggregation_level(self, query: str) -> str:
-        """Detect desired aggregation level."""
-        if any(word in query for word in ["parcelle", "champ", "détail"]):
-            return "parcel"
-        elif any(word in query for word in ["exploitation", "ferme", "total"]):
-            return "farm"
-        elif any(word in query for word in ["région", "département", "secteur"]):
-            return "regional"
-        else:
-            return "farm"  # Default
-    
-    def _execute_semantic_query(self, analysis: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute database query based on semantic analysis."""
-        intent = analysis["intent"]
-        entities = analysis["entities"]
-        temporal = analysis["temporal_scope"]
-        
-        # Build query parameters
-        filters = self._build_filters_from_entities(entities, context)
-        date_range = self._build_date_range_from_temporal(temporal)
-        
-        # Execute appropriate query based on intent
-        if intent == "performance_analysis":
-            return self._get_performance_data(filters, date_range, analysis)
-        elif intent == "comparison":
-            return self._get_comparison_data(filters, date_range, analysis)
-        elif intent == "optimization":
-            return self._get_optimization_data(filters, date_range, analysis)
-        else:
-            return self._get_general_data(filters, date_range, analysis)
-    
-    def _build_filters_from_entities(self, entities: Dict[str, List[str]], context: Dict[str, Any]) -> Dict[str, Any]:
-        """Build database filters from extracted entities."""
-        filters = {}
-        
-        if context and 'farm_id' in context:
-            filters['farm_id'] = context['farm_id']
-        
-        if entities["crops"]:
-            filters['crop_type'] = entities["crops"]
-        
-        return filters
-    
-    def _build_date_range_from_temporal(self, temporal: Dict[str, Any]) -> Optional[tuple]:
-        """Build date range from temporal analysis."""
-        if temporal["type"] == "current_year":
-            return ("2024-01-01", "2024-12-31")
-        elif temporal["type"] == "last_year":
-            return ("2023-01-01", "2023-12-31")
-        elif temporal["type"] == "multi_year":
-            return ("2020-01-01", "2024-12-31")
-        elif temporal["specific_years"]:
-            year = temporal["specific_years"][0]
-            return (f"{year}-01-01", f"{year}-12-31")
-        
-        return None
-    
-    def _get_performance_data(self, filters: Dict[str, Any], date_range: Optional[tuple], 
-                            analysis: Dict[str, Any]) -> Dict[str, Any]:
-        """Get performance analysis data."""
-        data = self._db.get_performance_analysis(filters, date_range)
-        
-        return {
-            "query_type": "performance_analysis",
-            "data": data,
-            "insights": self._generate_performance_insights(data),
-            "semantic_analysis": analysis
-        }
-    
-    def _get_comparison_data(self, filters: Dict[str, Any], date_range: Optional[tuple],
-                           analysis: Dict[str, Any]) -> Dict[str, Any]:
-        """Get comparison data."""
-        data = self._db.get_comparison_data(filters, date_range)
-        
-        return {
-            "query_type": "comparison",
-            "data": data,
-            "insights": self._generate_comparison_insights(data),
-            "semantic_analysis": analysis
-        }
-    
-    def _get_optimization_data(self, filters: Dict[str, Any], date_range: Optional[tuple],
-                             analysis: Dict[str, Any]) -> Dict[str, Any]:
-        """Get optimization recommendations."""
-        data = self._db.get_optimization_opportunities(filters, date_range)
-        
-        return {
-            "query_type": "optimization",
-            "data": data,
-            "recommendations": self._generate_optimization_recommendations(data),
-            "semantic_analysis": analysis
-        }
-    
-    def _get_general_data(self, filters: Dict[str, Any], date_range: Optional[tuple],
-                        analysis: Dict[str, Any]) -> Dict[str, Any]:
-        """Get general farm data."""
-        data = self._db.get_general_farm_data(filters, date_range)
-        
-        return {
-            "query_type": "general",
-            "data": data,
-            "summary": self._generate_summary_stats(data),
-            "semantic_analysis": analysis
-        }
-    
-    def _enhance_results_with_context(self, data: Dict[str, Any], 
-                                    analysis: Dict[str, Any],
-                                    agricultural_context: List[str]) -> Dict[str, Any]:
-        """Enhance results with agricultural context and insights."""
-        enhanced = data.copy()
-        
-        enhanced["agricultural_context"] = agricultural_context
-        enhanced["contextual_insights"] = self._generate_contextual_insights(
-            data, agricultural_context
-        )
-        enhanced["action_recommendations"] = self._generate_action_recommendations(
-            data, analysis
+        Args:
+            llm: Language model to use (if None, creates default ChatOpenAI)
+            tools: List of tools to use (if None, uses 4 production farm data tools)
+            config: Additional configuration (optional)
+        """
+        # Use provided LLM or create default
+        self.llm = llm or ChatOpenAI(
+            model="gpt-4",
+            temperature=0.1
         )
         
-        return enhanced
-    
-    def _generate_performance_insights(self, data: Dict[str, Any]) -> List[str]:
-        """Generate insights from performance data."""
-        return [
-            "Analyse des performances en cours...",
-            "Tendances identifiées dans les données",
-            "Comparaison avec les objectifs de l'exploitation"
-        ]
-    
-    def _generate_comparison_insights(self, data: Dict[str, Any]) -> List[str]:
-        """Generate comparison insights."""
-        return [
-            "Analyse comparative des parcelles",
-            "Identification des meilleures performances",
-            "Facteurs de différenciation identifiés"
-        ]
-    
-    def _generate_optimization_recommendations(self, data: Dict[str, Any]) -> List[str]:
-        """Generate optimization recommendations."""
-        return [
-            "Optimisation des intrants recommandée",
-            "Ajustement des pratiques culturales",
-            "Amélioration de la rentabilité possible"
-        ]
-    
-    def _generate_summary_stats(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate summary statistics."""
-        return {
-            "total_records": len(data.get("records", [])),
-            "data_quality": "good",
-            "completeness": 0.95
-        }
-    
-    def _generate_contextual_insights(self, data: Dict[str, Any], 
-                                    context: List[str]) -> List[str]:
-        """Generate insights using agricultural context."""
-        insights = []
-        
-        if context:
-            insights.append("Données analysées dans le contexte agricole français")
-            insights.append("Référentiels techniques appliqués")
-        
-        return insights
-    
-    def _generate_action_recommendations(self, data: Dict[str, Any],
-                                       analysis: Dict[str, Any]) -> List[str]:
-        """Generate actionable recommendations."""
-        intent = analysis.get("intent", "")
-        
-        if intent == "optimization":
-            return [
-                "Réviser les pratiques sur les parcelles moins performantes",
-                "Analyser les coûts de production en détail",
-                "Considérer l'ajustement des variétés cultivées"
-            ]
-        elif intent == "performance_analysis":
-            return [
-                "Surveiller les indicateurs de performance clés",
-                "Identifier les facteurs de succès reproductibles",
-                "Planifier les améliorations pour la prochaine campagne"
-            ]
-        
-        return ["Continuer le suivi des données de l'exploitation"]
-
-class EnhancedMockDatabaseManager:
-    """Enhanced mock database with performance analysis capabilities."""
-    
-    def get_performance_analysis(self, filters: Dict[str, Any], date_range: Optional[tuple]) -> Dict[str, Any]:
-        """Mock performance analysis data."""
-        return {
-            "records": [
-                {
-                    "parcelle": "Grande Pièce",
-                    "culture": "blé",
-                    "rendement_2024": 75.2,
-                    "rendement_2023": 68.5,
-                    "evolution": "+9.8%",
-                    "performance_relative": "excellente"
-                }
-            ],
-            "kpi": {
-                "rendement_moyen": 71.8,
-                "progression_annuelle": 6.2,
-                "rang_performance": "top 25%"
-            }
-        }
-    
-    def get_comparison_data(self, filters: Dict[str, Any], date_range: Optional[tuple]) -> Dict[str, Any]:
-        """Mock comparison data."""
-        return {
-            "comparisons": [
-                {
-                    "parcelle_a": "Grande Pièce",
-                    "parcelle_b": "Champ du Bas", 
-                    "difference_rendement": "+12.3 q/ha",
-                    "difference_cout": "-45€/ha",
-                    "avantage": "Grande Pièce"
-                }
-            ]
-        }
-    
-    def get_optimization_opportunities(self, filters: Dict[str, Any], date_range: Optional[tuple]) -> Dict[str, Any]:
-        """Mock optimization opportunities."""
-        return {
-            "opportunities": [
-                {
-                    "type": "reduction_intrants",
-                    "description": "Optimisation de la fertilisation azotée",
-                    "gain_potentiel": "180€/ha",
-                    "niveau_difficulte": "modéré"
-                }
-            ]
-        }
-    
-    def get_general_farm_data(self, filters: Dict[str, Any], date_range: Optional[tuple]) -> Dict[str, Any]:
-        """Mock general farm data."""
-        return {
-            "records": [
-                {
-                    "parcelle": "Grande Pièce",
-                    "surface": 12.5,
-                    "culture": "blé",
-                    "rendement": 75.2
-                }
-            ]
-        }
-
-class IntegratedFarmDataAgent(IntegratedAgriculturalAgent):
-    """Farm Data Manager Agent fully integrated with the system architecture."""
-    
-    def __init__(self, llm_manager, knowledge_retriever: SemanticKnowledgeRetriever, 
-                 database_config=None):
-        
-        # Initialize enhanced tools
-        tools = [
-            SemanticFarmDataTool(database_config, knowledge_retriever)
+        # Use provided tools or default production tools
+        self.tools = tools or [
+            get_farm_data_tool,
+            calculate_performance_metrics_tool,
+            analyze_trends_tool,
+            benchmark_crop_performance_tool
         ]
         
-        super().__init__(
-            agent_type=AgentType.FARM_DATA,
-            description="Expert en analyse de données d'exploitation agricole française",
-            llm_manager=llm_manager,
-            knowledge_retriever=knowledge_retriever,
-            complexity_default=TaskComplexity.MODERATE,
-            specialized_tools=tools
+        self.config = config or {}
+        
+        # Create LangChain ReAct agent
+        self.agent = self._create_agent()
+        self.agent_executor = AgentExecutor(
+            agent=self.agent,
+            tools=self.tools,
+            verbose=True,
+            handle_parsing_errors=True,
+            max_iterations=5
         )
         
-        self.database_config = database_config
-        logger.info("Initialized Integrated Farm Data Manager Agent")
+        logger.info(f"Initialized Farm Data Intelligence Agent with {len(self.tools)} production tools")
     
-    def _get_agent_prompt_template(self) -> str:
-        """Get enhanced system prompt for farm data analysis."""
-        return """Vous êtes un expert en analyse de données d'exploitation agricole française.
+    def _create_agent(self):
+        """Create LangChain ReAct agent with farm data-specific prompt."""
+        prompt = self._get_prompt_template()
+        return create_react_agent(self.llm, self.tools, prompt)
+    
+    def _get_prompt_template(self) -> PromptTemplate:
+        """Get farm data-specific prompt template for ReAct agent."""
+        template = """Tu es un expert en analyse de données agricoles et gestion d'exploitation français.
 
-VOTRE RÔLE:
-- Analyser les données de parcelles, interventions et rendements
-- Fournir des insights sur la performance de l'exploitation  
-- Recommander des optimisations basées sur les données historiques
-- Considérer le contexte agricole français et les réglementations
+{context}
 
-CAPACITÉS AVANCÉES:
-- Compréhension sémantique des requêtes en langage naturel
-- Analyse de performance avec benchmarking
-- Recommandations d'optimisation contextuelle
-- Intégration de connaissances agricoles externes
+Tu as accès à ces outils pour aider les agriculteurs:
+{tools}
+
+Noms des outils disponibles: {tool_names}
+
+EXPERTISE:
+- Récupération et analyse de données d'exploitation (parcelles, interventions, rendements)
+- Calcul de métriques de performance (rendement, coûts, marges)
+- Analyse de tendances pluriannuelles (évolution des rendements, des coûts)
+- Benchmarking par rapport aux moyennes régionales et nationales
 
 INSTRUCTIONS:
-1. Utilisez l'outil semantic_farm_data_query pour les analyses de données
-2. Interprétez les résultats dans le contexte agricole français
-3. Fournissez des recommandations pratiques et réalisables
-4. Intégrez les bonnes pratiques agricoles dans vos conseils
-5. Mentionnez les aspects réglementaires quand pertinent
+1. Identifie les données nécessaires pour répondre à la question
+2. Utilise les outils appropriés pour récupérer et analyser les données
+3. Fournis des insights actionnables basés sur les données réelles
+4. Compare avec les benchmarks quand pertinent
+5. Réponds toujours en français avec un ton professionnel mais accessible
 
-Répondez en français avec des termes agricoles appropriés."""
-    
-    def _analyze_message_complexity(self, message: str, context: Dict[str, Any]) -> TaskComplexity:
-        """Analyze complexity for farm data queries."""
-        message_lower = message.lower()
+IMPORTANT:
+- Demande toujours le SIRET ou l'identifiant d'exploitation
+- Vérifie la disponibilité des données avant de faire des analyses
+- Utilise les millesimes (années de campagne) pour les analyses temporelles
+- Respecte la confidentialité des données d'exploitation
+
+Utilise ce format:
+
+Question: la question de l'utilisateur
+Thought: réfléchis à ce que tu dois faire
+Action: le nom de l'outil à utiliser
+Action Input: l'entrée pour l'outil
+Observation: le résultat de l'outil
+... (répète Thought/Action/Action Input/Observation autant de fois que nécessaire)
+Thought: je connais maintenant la réponse finale
+Final Answer: la réponse finale en français
+
+Question: {input}
+
+{agent_scratchpad}"""
         
-        # Simple data retrieval
-        if any(word in message_lower for word in ["combien", "quelle", "superficie", "rendement de"]):
-            return TaskComplexity.SIMPLE
-        
-        # Complex analysis
-        elif any(word in message_lower for word in ["analyse", "compare", "optimise", "tendance"]):
-            return TaskComplexity.COMPLEX
-        
-        return TaskComplexity.MODERATE
-    
-    def _retrieve_domain_knowledge(self, message: str) -> List[str]:
-        """Retrieve farm data specific knowledge."""
-        return self.knowledge_retriever.retrieve_relevant_knowledge(
-            f"données exploitation rendement {message}", top_k=3
+        return PromptTemplate(
+            template=template,
+            input_variables=["input", "context", "tools", "tool_names", "agent_scratchpad"]
         )
     
-    def _should_use_tool(self, tool: Any, message: str, context: Dict[str, Any]) -> bool:
-        """Determine if data tools are needed."""
-        data_indicators = [
-            "données", "parcelles", "rendements", "analyse", "performance",
-            "comparaison", "historique", "évolution", "optimisation"
-        ]
-        return any(indicator in message.lower() for indicator in data_indicators)
+    def _format_context(self, context: Dict[str, Any]) -> str:
+        """Format context for prompt injection."""
+        if not context:
+            return ""
+        
+        context_parts = []
+        if "siret" in context:
+            context_parts.append(f"SIRET: {context['siret']}")
+        if "farm_id" in context:
+            context_parts.append(f"Exploitation: {context['farm_id']}")
+        if "millesime" in context:
+            context_parts.append(f"Campagne: {context['millesime']}")
+        if "parcelle_id" in context:
+            context_parts.append(f"Parcelle: {context['parcelle_id']}")
+        
+        if context_parts:
+            return "CONTEXTE:\n" + "\n".join(f"- {part}" for part in context_parts) + "\n"
+        return ""
+    
+    def _format_result(self, result: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Format agent result into standardized response."""
+        return {
+            "response": result.get("output", ""),
+            "agent_type": "farm_data_intelligence",
+            "tools_available": [tool.name for tool in self.tools],
+            "context_used": context or {},
+            "success": True
+        }
+    
+    async def aprocess(self, message: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Process user message using production tools (async).
+        
+        Args:
+            message: User message/question
+            context: Additional context (siret, farm_id, millesime, etc.)
+            
+        Returns:
+            Dict with response and metadata
+        """
+        try:
+            logger.info(f"Farm Data Agent processing: {message[:100]}...")
+            
+            # Prepare input with context separated from user message
+            agent_input = {
+                "input": message,
+                "context": self._format_context(context)
+            }
+            
+            # Execute agent
+            result = await self.agent_executor.ainvoke(agent_input)
+            
+            return self._format_result(result, context)
+            
+        except ValueError as e:
+            # Validation errors (missing data, invalid input)
+            logger.warning(f"Validation error in Farm Data Agent: {e}")
+            return {
+                "response": f"Données manquantes ou invalides: {str(e)}",
+                "error": str(e),
+                "error_type": "validation",
+                "agent_type": "farm_data_intelligence",
+                "success": False
+            }
+        except requests.exceptions.RequestException as e:
+            # API errors (database unavailable)
+            logger.error(f"Database/API error: {e}")
+            return {
+                "response": "Base de données temporairement indisponible. Veuillez réessayer dans quelques instants.",
+                "error": str(e),
+                "error_type": "api",
+                "agent_type": "farm_data_intelligence",
+                "success": False
+            }
+        except Exception as e:
+            # Unexpected errors
+            logger.error(f"Unexpected error in Farm Data Agent: {e}", exc_info=True)
+            return {
+                "response": "Erreur technique inattendue. Veuillez reformuler votre question ou contacter le support.",
+                "error": str(e),
+                "error_type": "unexpected",
+                "agent_type": "farm_data_intelligence",
+                "success": False
+            }
+    
+    def process(self, message: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Process user message using production tools (sync).
+        
+        Args:
+            message: User message/question
+            context: Additional context
+            
+        Returns:
+            Dict with response and metadata
+        """
+        try:
+            logger.info(f"Farm Data Agent processing (sync): {message[:100]}...")
+            
+            # Prepare input with context separated from user message
+            agent_input = {
+                "input": message,
+                "context": self._format_context(context)
+            }
+            
+            # Execute agent synchronously
+            result = self.agent_executor.invoke(agent_input)
+            
+            return self._format_result(result, context)
+            
+        except ValueError as e:
+            logger.warning(f"Validation error in Farm Data Agent: {e}")
+            return {
+                "response": f"Données manquantes ou invalides: {str(e)}",
+                "error": str(e),
+                "error_type": "validation",
+                "agent_type": "farm_data_intelligence",
+                "success": False
+            }
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Database/API error: {e}")
+            return {
+                "response": "Base de données temporairement indisponible. Veuillez réessayer dans quelques instants.",
+                "error": str(e),
+                "error_type": "api",
+                "agent_type": "farm_data_intelligence",
+                "success": False
+            }
+        except Exception as e:
+            logger.error(f"Unexpected error in Farm Data Agent: {e}", exc_info=True)
+            return {
+                "response": "Erreur technique inattendue. Veuillez reformuler votre question ou contacter le support.",
+                "error": str(e),
+                "error_type": "unexpected",
+                "agent_type": "farm_data_intelligence",
+                "success": False
+            }
+    
+    def get_capabilities(self) -> Dict[str, Any]:
+        """Get agent capabilities and metadata."""
+        return {
+            "agent_type": "farm_data_intelligence",
+            "tools": [tool.name for tool in self.tools],
+            "capabilities": [
+                "farm_data_retrieval",
+                "performance_metrics",
+                "trend_analysis",
+                "benchmarking"
+            ],
+            "data_sources": ["MesParcelles", "database"],
+            "language": "french"
+        }
+

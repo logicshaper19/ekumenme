@@ -1,17 +1,18 @@
 """
-Agent Manager - Single Purpose Component
+Agent Manager - Agent Registry and Request Router
 
-Job: Manage and coordinate agricultural agents.
+Job: Manage agent registry and route requests to appropriate agents.
 Input: Agent requests and configurations
-Output: Agent responses and coordination
+Output: Agent responses with standardized format
 
-This component does ONLY:
-- Execute specific, well-defined function
-- Take structured inputs, return structured outputs
-- Contain domain-specific business logic
-- Be stateless and reusable
+Agent Types:
+- Production agents: Internet, Supplier, Market Prices (Tavily-powered), Weather, Crop Health, Farm Data, Planning, Regulatory, Sustainability (LangChain ReAct)
+- Demo agents: None (all agents are production-ready!)
 
-No prompting logic, no orchestration, no agent responsibilities.
+To upgrade demo agents to production:
+1. Implement agent class in app/agents/
+2. Add to _create_agent_instance() method
+3. Remove from DEMO_AGENTS set
 """
 
 from typing import Dict, List, Any, Optional
@@ -21,6 +22,10 @@ from enum import Enum
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
+
+# Demo agents that return canned responses (not yet implemented)
+# ALL AGENTS ARE NOW PRODUCTION-READY! 🎉
+DEMO_AGENTS = set()
 
 class AgentType(Enum):
     """Agricultural agent types."""
@@ -45,16 +50,27 @@ class AgentProfile:
 
 class AgentManager:
     """
-    Manager for agricultural agents.
-    
-    Job: Manage and coordinate agricultural agents.
-    Input: Agent requests and configurations
-    Output: Agent responses and coordination
+    Agent registry and request router.
+
+    Manages agent lifecycle and routes requests to appropriate agents.
+
+    Production agents (ALL AGENTS ARE PRODUCTION-READY! 🎉):
+    - Internet, Supplier, Market Prices (Tavily-powered)
+    - Weather (LangChain ReAct with 4 production tools)
+    - Crop Health (LangChain ReAct with 4 production tools)
+    - Farm Data (LangChain ReAct with 4 production tools)
+    - Planning (LangChain ReAct with 5 production tools)
+    - Regulatory (LangChain ReAct with 4 production tools)
+    - Sustainability (LangChain ReAct with 4 production tools)
+
+    Demo agents: None - all agents use production tools!
     """
-    
+
     def __init__(self):
         self.agents = {}
         self.agent_profiles = self._initialize_agent_profiles()
+        self._agent_instances: Dict[str, Any] = {}  # Cache for agent instances
+        logger.info("AgentManager initialized with agent instance caching")
     
     def _initialize_agent_profiles(self) -> Dict[AgentType, AgentProfile]:
         """Initialize agent profiles."""
@@ -131,6 +147,84 @@ class AgentManager:
     def list_available_agents(self) -> List[AgentProfile]:
         """List all available agents."""
         return list(self.agent_profiles.values())
+
+    def _is_demo_agent(self, agent_type: str) -> bool:
+        """
+        Check if agent is demo-only (returns canned responses).
+
+        Args:
+            agent_type: Agent type string (e.g., "farm_data", "internet")
+
+        Returns:
+            True if agent is demo-only, False if production agent
+        """
+        return agent_type.lower() in DEMO_AGENTS
+
+    async def _get_or_create_agent(self, agent_type: str) -> Any:
+        """
+        Get cached agent instance or create new one.
+
+        Args:
+            agent_type: Agent type string
+
+        Returns:
+            Agent instance
+        """
+        if agent_type not in self._agent_instances:
+            logger.info(f"Creating new agent instance for {agent_type}")
+            self._agent_instances[agent_type] = await self._create_agent_instance(agent_type)
+        return self._agent_instances[agent_type]
+
+    async def _create_agent_instance(self, agent_type: str) -> Any:
+        """
+        Create a new agent instance.
+
+        Args:
+            agent_type: Agent type string
+
+        Returns:
+            New agent instance
+
+        Raises:
+            ValueError: If agent type is not supported
+        """
+        # Import agents lazily to avoid circular imports and missing dependencies
+        agent_type_lower = agent_type.lower()
+
+        if agent_type_lower == "weather":
+            from app.agents.weather_agent import WeatherIntelligenceAgent
+            return WeatherIntelligenceAgent()
+
+        elif agent_type_lower == "crop_health":
+            from app.agents.crop_health_agent import CropHealthIntelligenceAgent
+            return CropHealthIntelligenceAgent()
+
+        elif agent_type_lower == "farm_data":
+            from app.agents.farm_data_agent import FarmDataIntelligenceAgent
+            return FarmDataIntelligenceAgent()
+
+        elif agent_type_lower == "planning":
+            from app.agents.planning_agent import PlanningIntelligenceAgent
+            return PlanningIntelligenceAgent()
+
+        elif agent_type_lower == "regulatory":
+            from app.agents.regulatory_agent import RegulatoryIntelligenceAgent
+            return RegulatoryIntelligenceAgent()
+
+        elif agent_type_lower == "sustainability":
+            from app.agents.sustainability_agent import SustainabilityIntelligenceAgent
+            return SustainabilityIntelligenceAgent()
+
+        elif agent_type_lower in ["internet", "market_prices"]:
+            from app.agents.internet_agent import InternetAgent
+            return InternetAgent()
+
+        elif agent_type_lower == "supplier":
+            from app.agents.supplier_agent import SupplierAgent
+            return SupplierAgent()
+
+        else:
+            raise ValueError(f"Unknown production agent type: {agent_type}")
     
     def get_agent_capabilities(self, agent_type: AgentType) -> List[str]:
         """Get capabilities for a specific agent."""
@@ -142,40 +236,49 @@ class AgentManager:
         profile = self.get_agent_profile(agent_type)
         return profile.cost_per_request * request_count if profile else 0.0
 
-    def execute_agent(self, agent_type: str, message: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
+    async def execute_agent(self, agent_type: str, message: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
         """
-        Execute an agent with a message.
+        Execute an agent with a message (async to support all agent types).
 
         Args:
-            agent_type: Type of agent to execute
+            agent_type: Type of agent to execute (string like "farm_data", "internet")
             message: Message to process
             context: Additional context for processing
 
         Returns:
-            Dict containing the agent response
+            Dict containing the agent response with standardized format:
+            {
+                "response": str,
+                "agent_type": str,
+                "agent_name": str,
+                "capabilities": List[str],
+                "metadata": {...},
+                "sources": [...] (optional, for Tavily agents)
+            }
         """
         try:
+            # Normalize agent type to lowercase
+            agent_type_str = agent_type.lower() if isinstance(agent_type, str) else agent_type.value.lower()
+
             # Convert string agent_type to AgentType enum
-            if isinstance(agent_type, str):
-                agent_type_map = {
-                    "farm_data": AgentType.FARM_DATA,
-                    "weather": AgentType.WEATHER,
-                    "crop_health": AgentType.CROP_HEALTH,
-                    "planning": AgentType.PLANNING,
-                    "regulatory": AgentType.REGULATORY,
-                    "sustainability": AgentType.SUSTAINABILITY,
-                    "internet": AgentType.INTERNET,
-                    "supplier": AgentType.SUPPLIER,
-                    "market_prices": AgentType.MARKET_PRICES
+            agent_type_map = {
+                "farm_data": AgentType.FARM_DATA,
+                "weather": AgentType.WEATHER,
+                "crop_health": AgentType.CROP_HEALTH,
+                "planning": AgentType.PLANNING,
+                "regulatory": AgentType.REGULATORY,
+                "sustainability": AgentType.SUSTAINABILITY,
+                "internet": AgentType.INTERNET,
+                "supplier": AgentType.SUPPLIER,
+                "market_prices": AgentType.MARKET_PRICES
+            }
+
+            agent_enum = agent_type_map.get(agent_type_str)
+            if not agent_enum:
+                return {
+                    "response": f"Type d'agent '{agent_type}' non reconnu",
+                    "error": "Unknown agent type"
                 }
-                agent_enum = agent_type_map.get(agent_type)
-                if not agent_enum:
-                    return {
-                        "response": f"Type d'agent '{agent_type}' non reconnu",
-                        "error": "Unknown agent type"
-                    }
-            else:
-                agent_enum = agent_type
 
             # Get agent profile
             profile = self.get_agent_profile(agent_enum)
@@ -185,9 +288,29 @@ class AgentManager:
                     "error": "Agent not found"
                 }
 
-            # For new Tavily-powered agents, use actual implementation
-            if agent_enum in [AgentType.INTERNET, AgentType.SUPPLIER, AgentType.MARKET_PRICES]:
-                result = self._execute_tavily_agent(agent_enum, message, context or {})
+            # Check if this is a demo agent or production agent
+            if self._is_demo_agent(agent_type_str):
+                # Demo agent - return canned response
+                logger.info(f"Executing demo agent: {agent_type_str}")
+                response = self._generate_demo_response(profile, message)
+                return {
+                    "response": response,
+                    "agent_type": profile.agent_type.value,
+                    "agent_name": profile.name,
+                    "capabilities": profile.capabilities,
+                    "metadata": {
+                        "cost": profile.cost_per_request,
+                        "message_length": len(message),
+                        "context_provided": bool(context),
+                        "is_demo": True
+                    }
+                }
+            else:
+                # Production agent - execute actual agent
+                logger.info(f"Executing production agent: {agent_type_str}")
+                agent = await self._get_or_create_agent(agent_type_str)
+                result = await agent.process(message, context or {})
+
                 # result is a dict with 'response' and optionally 'sources'
                 return {
                     "response": result.get("response", ""),
@@ -199,33 +322,39 @@ class AgentManager:
                         "cost": profile.cost_per_request,
                         "message_length": len(message),
                         "context_provided": bool(context),
+                        "is_demo": False,
                         **(result.get("metadata", {}))  # Include agent metadata
                     }
                 }
-            else:
-                # Generate response based on agent type (legacy agents)
-                response = self._generate_agent_response(profile, message, context or {})
-                return {
-                    "response": response,
-                    "agent_type": profile.agent_type.value,
-                    "agent_name": profile.name,
-                    "capabilities": profile.capabilities,
-                    "metadata": {
-                        "cost": profile.cost_per_request,
-                        "message_length": len(message),
-                        "context_provided": bool(context)
-                    }
-                }
 
+        except ValueError as e:
+            # Configuration or validation errors
+            logger.error(f"Agent configuration error: {e}")
+            return {
+                "response": f"Erreur de configuration de l'agent: {str(e)}",
+                "error": str(e),
+                "error_type": "configuration"
+            }
         except Exception as e:
-            logger.error(f"Agent execution error: {e}")
+            # Unexpected errors
+            logger.error(f"Agent execution error: {e}", exc_info=True)
             return {
                 "response": f"Désolé, une erreur s'est produite lors du traitement de votre demande: {str(e)}",
-                "error": str(e)
+                "error": str(e),
+                "error_type": "execution"
             }
 
-    def _generate_agent_response(self, profile: AgentProfile, message: str, context: Dict[str, Any]) -> str:
-        """Generate a response based on agent profile and message."""
+    def _generate_demo_response(self, profile: AgentProfile, message: str) -> str:
+        """
+        Generate a canned demo response for agents not yet implemented.
+
+        Args:
+            profile: Agent profile
+            message: User message (not used, but kept for consistency)
+
+        Returns:
+            Canned response explaining agent capabilities
+        """
         agent_responses = {
             AgentType.FARM_DATA: f"""🌾 **{profile.name}** - Analyse de vos données d'exploitation
 
@@ -302,43 +431,45 @@ Décrivez vos pratiques actuelles pour des recommandations personnalisées."""
 
         return agent_responses.get(profile.agent_type, f"Réponse de {profile.name} pour: {message}")
 
-    def _execute_tavily_agent(self, agent_type: AgentType, message: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute Tavily-powered agents (Internet, Supplier, Market Prices)
+    def execute_agent_sync(self, agent_type: str, message: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
+        """
+        Synchronous wrapper for execute_agent (for backward compatibility).
+
+        This method handles event loop creation/management for calling async execute_agent
+        from synchronous code.
+
+        Args:
+            agent_type: Type of agent to execute
+            message: Message to process
+            context: Additional context for processing
 
         Returns:
-            Dict with 'response' and optionally 'sources' keys
+            Dict containing the agent response
         """
         try:
-            # Import agents here to avoid circular imports
-            from app.agents.internet_agent import InternetAgent
-            from app.agents.supplier_agent import SupplierAgent
-
-            # Create event loop if needed
-            try:
-                loop = asyncio.get_event_loop()
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-
-            # Execute the appropriate agent
-            if agent_type == AgentType.INTERNET:
-                agent = InternetAgent()
-                result = loop.run_until_complete(agent.process(message, context))
-            elif agent_type == AgentType.SUPPLIER:
-                agent = SupplierAgent()
-                result = loop.run_until_complete(agent.process(message, context))
-            elif agent_type == AgentType.MARKET_PRICES:
-                # Market prices uses Internet agent with specific query
-                agent = InternetAgent()
-                result = loop.run_until_complete(agent.process(message, context))
+            # Try to get existing event loop
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If loop is already running, we can't use run_until_complete
+                # This happens when called from async context
+                logger.warning("Event loop already running, use execute_agent() instead of execute_agent_sync()")
+                # Create a new loop in a thread (not ideal, but works)
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(asyncio.run, self.execute_agent(agent_type, message, context))
+                    return future.result()
             else:
-                return {"response": f"Agent type {agent_type} not implemented"}
+                # Loop exists but not running, use it
+                return loop.run_until_complete(self.execute_agent(agent_type, message, context))
+        except RuntimeError:
+            # No event loop exists, create one
+            return asyncio.run(self.execute_agent(agent_type, message, context))
 
-            # Return full result dict (includes response and sources)
-            if isinstance(result, dict):
-                return result
-            return {"response": str(result)}
+    def cleanup(self):
+        """
+        Cleanup agent instances and resources.
 
-        except Exception as e:
-            logger.error(f"Error executing Tavily agent {agent_type}: {e}")
-            return {"response": f"❌ Erreur lors de l'exécution de l'agent: {str(e)}"}
+        Call this when shutting down the application to properly cleanup agent resources.
+        """
+        logger.info("Cleaning up agent instances")
+        self._agent_instances.clear()
