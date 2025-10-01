@@ -103,16 +103,27 @@ class EnhancedFarmReportService:
             
             # Generate data overview
             data_overview = self._generate_data_overview(farm_data)
-            
+
             # Generate recommendations
             recommendations = self._generate_recommendations(
                 metrics_output,
                 benchmark_analysis,
                 trend_analysis
             )
-            
+
+            # Aggregate warnings from all tools
+            warnings = []
+            if farm_data and hasattr(farm_data, 'warnings') and farm_data.warnings:
+                warnings.extend(farm_data.warnings)
+            if benchmark_analysis:
+                for crop, benchmark in benchmark_analysis.items():
+                    if benchmark.get('warnings'):
+                        warnings.extend(benchmark['warnings'])
+            if trend_analysis and trend_analysis.get('warnings'):
+                warnings.extend(trend_analysis['warnings'])
+
             logger.info(f"✅ Generated farm report for {input_data.farm_id}")
-            
+
             return FarmReportOutput(
                 success=True,
                 farm_id=input_data.farm_id,
@@ -122,7 +133,8 @@ class EnhancedFarmReportService:
                 performance_analysis=metrics_output.model_dump() if metrics_output.success else None,
                 benchmark_analysis=benchmark_analysis,
                 trend_analysis=trend_analysis,
-                recommendations=recommendations
+                recommendations=recommendations,
+                warnings=warnings
             )
             
         except Exception as e:
@@ -241,34 +253,58 @@ class EnhancedFarmReportService:
             elif total_records > 20:
                 recommendations.append("✅ Excellent volume de données - Continuer la collecte systématique")
         
-        # Performance recommendations
+        # Performance recommendations (with None handling)
         if metrics_output and metrics_output.success and metrics_output.overall_metrics:
             avg_yield = metrics_output.overall_metrics.average_yield_q_ha
             avg_cost = metrics_output.overall_metrics.average_cost_eur_ha
-            
-            if avg_yield < 60:
-                recommendations.append("🌾 Optimiser les pratiques culturales pour améliorer le rendement")
-            if avg_cost > 500:
-                recommendations.append("💰 Analyser les coûts pour identifier les économies possibles")
-        
-        # Benchmark recommendations
+
+            # Only make recommendations if real data available
+            if avg_yield is not None:
+                if avg_yield < 60:
+                    recommendations.append("🌾 Optimiser les pratiques culturales pour améliorer le rendement")
+                elif avg_yield > 80:
+                    recommendations.append("🌾 Excellent rendement - Maintenir les bonnes pratiques")
+            else:
+                recommendations.append("ℹ️ Données de rendement manquantes - Améliorer la collecte de données de récolte")
+
+            if avg_cost is not None:
+                if avg_cost > 500:
+                    recommendations.append("💰 Analyser les coûts pour identifier les économies possibles")
+                elif avg_cost < 350:
+                    recommendations.append("💰 Coûts maîtrisés - Continuer l'optimisation")
+            else:
+                recommendations.append("ℹ️ Données de coût manquantes - Améliorer le suivi des dépenses")
+
+        # Benchmark recommendations (updated for new rank names)
         if benchmark_analysis:
             for crop, benchmark in benchmark_analysis.items():
                 rank = benchmark.get("performance_rank")
                 if rank == "below_average":
                     recommendations.append(f"⚠️ {crop}: Mettre en place un plan d'amélioration des performances")
-                elif rank == "top_10_percent":
-                    recommendations.append(f"🏆 {crop}: Maintenir l'excellence et partager les bonnes pratiques")
-        
-        # Trend recommendations
+                elif rank == "exceptional":  # Updated from "top_10_percent"
+                    recommendations.append(f"🏆 {crop}: Performance exceptionnelle - Maintenir l'excellence et partager les bonnes pratiques")
+                elif rank == "excellent":
+                    recommendations.append(f"⭐ {crop}: Excellente performance - Continuer sur cette voie")
+
+        # Trend recommendations (with None handling)
         if trend_analysis:
-            yield_trend = trend_analysis.get("yield_trend", {}).get("trend_direction")
-            cost_trend = trend_analysis.get("cost_trend", {}).get("trend_direction")
-            
-            if yield_trend == "decreasing":
-                recommendations.append("📉 Investiguer les causes de la baisse de rendement")
-            if cost_trend == "increasing":
-                recommendations.append("📈 Contrôler l'évolution des coûts de production")
+            yield_trend_data = trend_analysis.get("yield_trend")
+            cost_trend_data = trend_analysis.get("cost_trend")
+
+            # Only make recommendations if trend data available
+            if yield_trend_data is not None:
+                yield_trend = yield_trend_data.get("trend_direction")
+                if yield_trend == "decreasing":
+                    recommendations.append("📉 Investiguer les causes de la baisse de rendement")
+                elif yield_trend == "increasing":
+                    recommendations.append("📈 Tendance positive du rendement - Continuer les efforts")
+
+            if cost_trend_data is not None:
+                cost_trend = cost_trend_data.get("trend_direction")
+                if cost_trend == "increasing":
+                    recommendations.append("📈 Contrôler l'évolution des coûts de production")
+                elif cost_trend == "decreasing":
+                    recommendations.append("💰 Bonne maîtrise des coûts - Maintenir la tendance")
         
         return recommendations
 

@@ -356,8 +356,12 @@ class ExecutiveSummary(BaseModel):
 
 
 class FarmReportOutput(BaseModel):
-    """Output schema for generate farm report tool"""
-    
+    """
+    Output schema for generate farm report tool.
+
+    Aggregates data from all farm data tools with comprehensive warnings.
+    """
+
     success: bool = Field(default=True)
     farm_id: str
     report_period: str
@@ -368,6 +372,7 @@ class FarmReportOutput(BaseModel):
     benchmark_analysis: Optional[Dict[str, Any]] = None
     trend_analysis: Optional[Dict[str, Any]] = None
     recommendations: List[str] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list, description="Aggregated warnings from all tools")
     error: Optional[str] = None
     error_type: Optional[str] = None
 
