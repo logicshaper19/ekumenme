@@ -9,15 +9,15 @@ Tools:
 - OptimizeTaskSequenceTool: Optimize task sequence based on constraints
 - CalculatePlanningCostsTool: Calculate costs and economic impact
 - AnalyzeResourceRequirementsTool: Analyze resource requirements
-- GeneratePlanningReportTool: Generate structured planning reports
 - CheckCropFeasibilityTool: Check crop feasibility for a location with climate analysis
+
+Note: GeneratePlanningReportTool was removed (meta-orchestration - agent's job)
 """
 
 from .generate_planning_tasks_tool import GeneratePlanningTasksTool
 from .optimize_task_sequence_tool import OptimizeTaskSequenceTool
 from .calculate_planning_costs_tool import CalculatePlanningCostsTool
 from .analyze_resource_requirements_tool import AnalyzeResourceRequirementsTool
-from .generate_planning_report_tool import GeneratePlanningReportTool
 from .check_crop_feasibility_tool import CheckCropFeasibilityTool
 
 __all__ = [
@@ -25,6 +25,5 @@ __all__ = [
     "OptimizeTaskSequenceTool",
     "CalculatePlanningCostsTool",
     "AnalyzeResourceRequirementsTool",
-    "GeneratePlanningReportTool",
     "CheckCropFeasibilityTool"
 ]

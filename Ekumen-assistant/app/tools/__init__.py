@@ -24,8 +24,7 @@ from .planning_agent import (
     GeneratePlanningTasksTool,
     OptimizeTaskSequenceTool,
     CalculatePlanningCostsTool,
-    AnalyzeResourceRequirementsTool,
-    GeneratePlanningReportTool
+    AnalyzeResourceRequirementsTool
 )
 from .farm_data_agent import (
     GetFarmDataTool,
@@ -48,11 +47,10 @@ from .regulatory_agent import (
     CheckEnvironmentalRegulationsTool
 )
 from .sustainability_agent import (
-    CalculateCarbonFootprintTool,
-    AssessBiodiversityTool,
-    AnalyzeSoilHealthTool,
-    AssessWaterManagementTool,
-    GenerateSustainabilityReportTool
+    carbon_footprint_tool,
+    biodiversity_tool,
+    soil_health_tool,
+    water_management_tool
 )
 
 __all__ = [
@@ -67,7 +65,6 @@ __all__ = [
     "OptimizeTaskSequenceTool",
     "CalculatePlanningCostsTool",
     "AnalyzeResourceRequirementsTool",
-    "GeneratePlanningReportTool",
     
     # Farm Data Tools (Clean - One Tool, One Job)
     "GetFarmDataTool",
@@ -89,10 +86,9 @@ __all__ = [
     "GetSafetyGuidelinesTool",
     "CheckEnvironmentalRegulationsTool",
     
-    # Sustainability Agent Tools (Organized - One Tool, One Job)
-    "CalculateCarbonFootprintTool",
-    "AssessBiodiversityTool",
-    "AnalyzeSoilHealthTool",
-    "AssessWaterManagementTool",
-    "GenerateSustainabilityReportTool"
+    # Sustainability Agent Tools (Production-Ready with Uncertainty Quantification & Economic ROI)
+    "carbon_footprint_tool",
+    "biodiversity_tool",
+    "soil_health_tool",
+    "water_management_tool"
 ]
