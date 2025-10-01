@@ -268,6 +268,7 @@ class PlanningCostsOutput(BaseModel):
     estimated_revenue_eur: Optional[float] = Field(default=None, ge=0)
     estimated_profit_eur: Optional[float] = None
     roi_percent: Optional[float] = None
+    warnings: List[str] = Field(default_factory=list, description="Warnings about cost assumptions")
     timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
     error: Optional[str] = None
     error_type: Optional[str] = None
