@@ -230,6 +230,96 @@ Question spécifique: {input}"""),
 ])
 
 # Export all prompts
+
+# ReAct-compatible prompt template for Planning Agent
+def get_planning_react_prompt(include_examples: bool = False) -> ChatPromptTemplate:
+    """
+    Get ReAct-compatible ChatPromptTemplate for Planning Intelligence Agent.
+    
+    This combines the sophisticated planning expertise with ReAct format
+    for tool-using agents.
+    
+    Args:
+        include_examples: Whether to include few-shot examples (default False for token optimization)
+        
+    Returns:
+        ChatPromptTemplate configured for ReAct agent with planning expertise
+    """
+    
+    # Build examples section if requested
+    examples_section = ""
+    if include_examples:
+        examples_section = """
+
+EXEMPLES DE RAISONNEMENT RÉUSSI:
+
+Exemple 1 - Planification d'intervention:
+Question: Crée un plan d'intervention pour ma parcelle de blé
+Thought: Je dois créer un plan d'intervention complet
+Action: create_intervention_plan
+Action Input: {{"crop": "blé", "parcel_id": "BLE-001", "season": "2024"}}
+Observation: Plan créé - 5 interventions planifiées (semis, fertilisation, traitements)
+Thought: J'ai le plan, je peux le présenter
+Final Answer: **Plan d'Intervention Blé 2024:**
+- Semis: Octobre 2023
+- Fertilisation: Mars 2024
+- Traitements: Avril-Mai 2024
+
+Exemple 2 - Rotation des cultures:
+Question: Optimise ma rotation sur 3 ans
+Thought: Je dois optimiser la rotation
+Action: optimize_crop_rotation
+Action Input: {{"years": 3, "current_crop": "blé"}}
+Observation: Rotation optimisée - Blé → Colza → Orge
+Final Answer: **Rotation Optimisée:**
+Année 1: Blé
+Année 2: Colza
+Année 3: Orge"""
+    
+    # Enhanced system prompt with ReAct format
+    react_system_prompt = f"""{PLANNING_SYSTEM_PROMPT}
+
+Tu as accès à ces outils pour obtenir des données précises:
+{{tools}}
+
+Noms des outils disponibles: {{tool_names}}
+
+UTILISATION DES OUTILS:
+Utilise TOUJOURS les outils pour obtenir des données précises plutôt que de deviner.
+- Pour créer un plan: utilise create_intervention_plan
+- Pour optimiser les rotations: utilise optimize_crop_rotation
+- Pour planifier les semis: utilise plan_sowing_schedule
+- Pour calculer les besoins: utilise calculate_resource_needs
+
+FORMAT REACT OBLIGATOIRE:
+Tu dois suivre ce format de raisonnement:
+
+Question: la question de l'utilisateur
+Thought: [analyse de ce que tu dois faire et quel outil utiliser]
+Action: [nom exact de l'outil à utiliser]
+Action Input: [paramètres de l'outil au format JSON]
+Observation: [résultat retourné par l'outil]
+... (répète Thought/Action/Action Input/Observation autant de fois que nécessaire)
+Thought: je connais maintenant la réponse finale avec toutes les données nécessaires
+Final Answer: [réponse complète en français avec toutes les analyses]
+{examples_section}
+
+IMPORTANT:
+- Utilise TOUJOURS les outils pour obtenir des données précises
+- Ne devine JAMAIS les informations
+- Fournis des analyses précises avec chiffres et recommandations
+- Suis EXACTEMENT le format ReAct ci-dessus"""
+
+    # Create ChatPromptTemplate with ReAct format
+    return ChatPromptTemplate.from_messages([
+        ("system", react_system_prompt),
+        ("human", """{{context}}
+
+Question: {{input}}"""),
+        ("ai", "{agent_scratchpad}")
+    ])
+
+
 __all__ = [
     "PLANNING_SYSTEM_PROMPT",
     "PLANNING_CHAT_PROMPT",
@@ -240,4 +330,6 @@ __all__ = [
     "COST_OPTIMIZATION_PROMPT",
     "EMERGENCY_PLANNING_PROMPT",
     "WORKFLOW_OPTIMIZATION_PROMPT"
+,
+    "get_planning_react_prompt"
 ]
