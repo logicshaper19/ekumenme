@@ -322,47 +322,7 @@ class ResourceRequirementsOutput(BaseModel):
 
 
 # ============================================================================
-# GENERATE PLANNING REPORT TOOL SCHEMAS
+# NOTE: generate_planning_report tool removed - meta-orchestration is the agent's job
+# The agent should call individual planning tools and synthesize their outputs
 # ============================================================================
-
-class PlanningReportInput(BaseModel):
-    """Input schema for generate planning report tool"""
-
-    crop: str = Field(min_length=1, max_length=100)
-    surface_ha: float = Field(gt=0, le=10000)
-    location: Optional[str] = Field(default=None, max_length=100)
-    include_costs: bool = Field(default=True)
-    include_resources: bool = Field(default=True)
-    include_feasibility: bool = Field(default=False)
-
-
-class PlanningReportSummary(BaseModel):
-    """Planning report executive summary"""
-
-    crop: str
-    surface_ha: float
-    total_tasks: int = Field(ge=0)
-    total_duration_days: int = Field(ge=0)
-    total_cost_eur: Optional[float] = Field(default=None, ge=0)
-    feasibility_score: Optional[float] = Field(default=None, ge=0.0, le=10.0)
-    is_feasible: Optional[bool] = None
-
-
-class PlanningReportOutput(BaseModel):
-    """Output schema for generate planning report tool"""
-
-    success: bool = Field(default=True)
-    crop: str
-    surface_ha: float
-    location: Optional[str] = None
-    generated_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
-    summary: Optional[PlanningReportSummary] = None
-    tasks_analysis: Optional[Dict[str, Any]] = None
-    cost_analysis: Optional[Dict[str, Any]] = None
-    resource_analysis: Optional[Dict[str, Any]] = None
-    feasibility_analysis: Optional[Dict[str, Any]] = None
-    recommendations: List[str] = Field(default_factory=list)
-    warnings: List[str] = Field(default_factory=list)
-    error: Optional[str] = None
-    error_type: Optional[str] = None
 
