@@ -282,24 +282,34 @@ class TrendMetrics(BaseModel):
 
 
 class YearlyMetrics(BaseModel):
-    """Metrics for a specific year"""
-    average_yield: float = Field(ge=0)
-    average_cost: float = Field(ge=0)
-    average_quality: float = Field(ge=0, le=10)
+    """
+    Metrics for a specific year.
+
+    Fields are Optional to handle missing real data honestly.
+    """
+    average_yield: Optional[float] = Field(default=None, ge=0, description="None if no harvest data available")
+    average_cost: Optional[float] = Field(default=None, ge=0, description="None if no cost data available")
+    average_quality: Optional[float] = Field(default=None, ge=0, le=10, description="None if no quality data available")
     total_surface: float = Field(ge=0)
     record_count: int = Field(ge=0)
 
 
 class TrendsOutput(BaseModel):
-    """Output schema for analyze trends tool"""
-    
+    """
+    Output schema for analyze trends tool.
+
+    Trend fields are Optional to handle missing real data honestly.
+    Warnings field alerts users to data quality issues.
+    """
+
     success: bool = Field(default=True)
     yearly_metrics: Dict[str, YearlyMetrics] = Field(default_factory=dict)
-    yield_trend: Optional[TrendMetrics] = None
-    cost_trend: Optional[TrendMetrics] = None
-    quality_trend: Optional[TrendMetrics] = None
+    yield_trend: Optional[TrendMetrics] = Field(default=None, description="None if no yield data available")
+    cost_trend: Optional[TrendMetrics] = Field(default=None, description="None if no cost data available")
+    quality_trend: Optional[TrendMetrics] = Field(default=None, description="None if no quality data available")
     crop_trends: Dict[str, Dict[str, TrendMetrics]] = Field(default_factory=dict)
     trend_insights: List[str] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list, description="Data quality warnings")
     years_analyzed: int = Field(ge=0)
     timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
     error: Optional[str] = None
