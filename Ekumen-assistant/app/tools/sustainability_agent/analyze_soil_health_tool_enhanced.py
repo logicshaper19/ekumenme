@@ -49,14 +49,26 @@ class EnhancedSoilHealthService:
     
     # Optimal ranges for common soil indicators (French agricultural standards)
     OPTIMAL_RANGES = {
-        "ph": {"min": 6.0, "max": 7.5, "unit": "pH", "critical_low": 5.0, "critical_high": 8.5},
-        "organic_matter_percent": {"min": 3.0, "max": 6.0, "unit": "%", "critical_low": 1.5, "critical_high": 10.0},
-        "nitrogen_ppm": {"min": 20.0, "max": 40.0, "unit": "ppm", "critical_low": 10.0, "critical_high": 80.0},
-        "phosphorus_ppm": {"min": 15.0, "max": 30.0, "unit": "ppm", "critical_low": 5.0, "critical_high": 60.0},
-        "potassium_ppm": {"min": 100.0, "max": 200.0, "unit": "ppm", "critical_low": 50.0, "critical_high": 400.0},
-        "calcium_ppm": {"min": 2000.0, "max": 4000.0, "unit": "ppm", "critical_low": 1000.0, "critical_high": 8000.0},
-        "magnesium_ppm": {"min": 100.0, "max": 300.0, "unit": "ppm", "critical_low": 50.0, "critical_high": 600.0},
-        "cec_meq": {"min": 10.0, "max": 25.0, "unit": "meq/100g", "critical_low": 5.0, "critical_high": 40.0}
+        "ph": {"min": 6.0, "max": 7.5, "unit": "pH", "critical_low": 5.0, "critical_high": 8.5, "improvement_months": 4},
+        "organic_matter_percent": {"min": 3.0, "max": 6.0, "unit": "%", "critical_low": 1.5, "critical_high": 10.0, "improvement_months": 36},
+        "nitrogen_ppm": {"min": 20.0, "max": 40.0, "unit": "ppm", "critical_low": 10.0, "critical_high": 80.0, "improvement_months": 3},
+        "phosphorus_ppm": {"min": 15.0, "max": 30.0, "unit": "ppm", "critical_low": 5.0, "critical_high": 60.0, "improvement_months": 3},
+        "potassium_ppm": {"min": 100.0, "max": 200.0, "unit": "ppm", "critical_low": 50.0, "critical_high": 400.0, "improvement_months": 3},
+        "calcium_ppm": {"min": 2000.0, "max": 4000.0, "unit": "ppm", "critical_low": 1000.0, "critical_high": 8000.0, "improvement_months": 6},
+        "magnesium_ppm": {"min": 100.0, "max": 300.0, "unit": "ppm", "critical_low": 50.0, "critical_high": 600.0, "improvement_months": 6},
+        "cec_meq": {"min": 10.0, "max": 25.0, "unit": "meq/100g", "critical_low": 5.0, "critical_high": 40.0, "improvement_months": 24}
+    }
+
+    # Crop-specific pH adjustments (some crops prefer different pH ranges)
+    CROP_PH_ADJUSTMENTS = {
+        "bleuets": {"min": 4.5, "max": 5.5},  # Acidic soil
+        "myrtilles": {"min": 4.5, "max": 5.5},  # Acidic soil
+        "pomme de terre": {"min": 5.5, "max": 6.5},  # Slightly acidic (scab prevention)
+        "luzerne": {"min": 6.5, "max": 7.5},  # Neutral to alkaline
+        "blé": {"min": 6.0, "max": 7.0},  # Standard
+        "maïs": {"min": 6.0, "max": 7.0},  # Standard
+        "soja": {"min": 6.0, "max": 7.0},  # Standard
+        "tournesol": {"min": 6.0, "max": 7.5},  # Tolerant
     }
     
     @redis_cache(ttl=7200, model_class=SoilHealthOutput, category="sustainability")
@@ -102,8 +114,15 @@ class EnhancedSoilHealthService:
             total_score = 0.0
             
             for indicator_name, current_value in indicators_data.items():
-                optimal = self.OPTIMAL_RANGES[indicator_name]
-                
+                optimal = self.OPTIMAL_RANGES[indicator_name].copy()
+
+                # Apply crop-specific pH adjustments if applicable
+                if indicator_name == "ph" and input_data.crop:
+                    crop_lower = input_data.crop.lower()
+                    if crop_lower in self.CROP_PH_ADJUSTMENTS:
+                        optimal["min"] = self.CROP_PH_ADJUSTMENTS[crop_lower]["min"]
+                        optimal["max"] = self.CROP_PH_ADJUSTMENTS[crop_lower]["max"]
+
                 # Determine status and score
                 status, score, deviation = self._evaluate_indicator(
                     current_value,
@@ -147,9 +166,9 @@ class EnhancedSoilHealthService:
                 input_data.crop,
                 input_data.location
             )
-            
-            # Estimate improvement time
-            improvement_time = self._estimate_improvement_time(overall_status, critical_issues)
+
+            # Estimate improvement time (based on worst indicator)
+            improvement_time = self._estimate_improvement_time(analyzed_indicators, overall_status)
             
             logger.info(
                 f"✅ Soil health analyzed: {len(indicators_data)} indicators, "
@@ -233,23 +252,32 @@ class EnhancedSoilHealthService:
     ) -> List[str]:
         """Generate prioritized improvement recommendations"""
         recommendations = []
-        
+
         # Critical and poor indicators first
         for indicator in indicators:
             if indicator.status == SoilHealthStatus.CRITICAL:
                 recommendations.extend(self._get_indicator_recommendations(indicator, urgent=True))
             elif indicator.status == SoilHealthStatus.POOR:
                 recommendations.extend(self._get_indicator_recommendations(indicator, urgent=False))
-        
+
+        # Add improvement time disclaimer
+        if any(ind.status in [SoilHealthStatus.CRITICAL, SoilHealthStatus.POOR] for ind in indicators):
+            recommendations.append(
+                "⏱️ Temps d'amélioration variable: pH 3-6 mois, Nutriments 1 saison, Matière organique 3-5 ans"
+            )
+
         # General recommendations
         if crop:
             recommendations.append(f"📊 Adapter fertilisation aux besoins spécifiques de {crop}")
-        
-        recommendations.append("🔬 Effectuer analyse de sol complète tous les 3-5 ans")
+
+        if location:
+            recommendations.append(f"� Consulter Chambre d'Agriculture de {location} pour recommandations locales")
+
+        recommendations.append("�🔬 Effectuer analyse de sol complète tous les 3-5 ans")
         recommendations.append("♻️ Maintenir apports organiques réguliers (compost, fumier)")
         recommendations.append("🌱 Pratiquer rotation des cultures pour équilibre nutritif")
-        
-        return recommendations[:10]  # Limit to top 10
+
+        return recommendations[:12]  # Limit to top 12
     
     def _get_indicator_recommendations(self, indicator: SoilIndicator, urgent: bool) -> List[str]:
         """Get specific recommendations for an indicator"""
@@ -281,16 +309,44 @@ class EnhancedSoilHealthService:
         
         return recommendations
     
-    def _estimate_improvement_time(self, status: SoilHealthStatus, critical_issues: List[str]) -> int:
-        """Estimate months to reach good status"""
+    def _estimate_improvement_time(
+        self,
+        indicators: List[SoilIndicator],
+        status: SoilHealthStatus
+    ) -> int:
+        """
+        Estimate months to reach good status based on worst indicator.
+
+        Different indicators improve at different rates:
+        - pH: 3-6 months (lime application)
+        - Nutrients (NPK): 3 months (1 growing season)
+        - Calcium/Magnesium: 6 months
+        - Organic matter: 36 months (3-5 years, very slow)
+        - CEC: 24 months (depends on organic matter)
+        """
         if status == SoilHealthStatus.OPTIMAL or status == SoilHealthStatus.GOOD:
             return 0
-        elif status == SoilHealthStatus.MODERATE:
-            return 6
-        elif status == SoilHealthStatus.POOR:
-            return 12
-        else:  # CRITICAL
-            return 24
+
+        # Find worst indicator and use its improvement time
+        max_improvement_time = 0
+        for indicator in indicators:
+            if indicator.status in [SoilHealthStatus.CRITICAL, SoilHealthStatus.POOR, SoilHealthStatus.MODERATE]:
+                # Extract indicator name to match with OPTIMAL_RANGES
+                indicator_key = indicator.indicator_name.lower().replace(" ", "_")
+                if indicator_key in self.OPTIMAL_RANGES:
+                    improvement_time = self.OPTIMAL_RANGES[indicator_key].get("improvement_months", 12)
+                    max_improvement_time = max(max_improvement_time, improvement_time)
+
+        # If no specific time found, use status-based estimate
+        if max_improvement_time == 0:
+            if status == SoilHealthStatus.MODERATE:
+                return 6
+            elif status == SoilHealthStatus.POOR:
+                return 12
+            else:  # CRITICAL
+                return 24
+
+        return max_improvement_time
 
 
 async def analyze_soil_health_enhanced(
