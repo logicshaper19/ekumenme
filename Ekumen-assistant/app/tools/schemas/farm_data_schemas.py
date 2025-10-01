@@ -106,12 +106,14 @@ class ParcelRecord(BaseModel):
 
 class FarmDataOutput(BaseModel):
     """Output schema for get farm data tool"""
-    
+
     success: bool = Field(default=True)
     database_records: List[ParcelRecord] = Field(default_factory=list)
     total_records: int = Field(ge=0)
+    total_available: Optional[int] = Field(default=None, description="Total parcels available before pagination")
     filters: Dict[str, Any] = Field(default_factory=dict)
     data_sources: List[str] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list, description="Data quality and pagination warnings")
     mesparcelles_data: Optional[Dict[str, Any]] = None
     mesparcelles_error: Optional[str] = None
     timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")

@@ -48,7 +48,30 @@ class InterventionType:
 
 
 class EnhancedFarmDataService:
-    """Service for fetching farm data with caching"""
+    """
+    Service for fetching farm data with caching.
+
+    Requirements:
+    - MesParcelles database accessible via SessionLocal
+    - Parcelle model with relationships:
+      * succession_cultures → SuccessionCulture → culture
+      * interventions → Intervention → extrants, intrants
+    - Harvest data in intervention.extrants[].extrant_details JSON
+      * Expected fields: quantite_kg, quantite, or quantity_kg
+
+    Features:
+    - Real database integration with eager loading (prevents N+1 queries)
+    - Async-safe (uses thread pool for DB operations)
+    - Pagination (max 100 parcels by default)
+    - Extracts real harvest yields from intervention extrants
+    - Returns None for missing data (no fake/mock values)
+    - Comprehensive error handling with user-friendly warnings
+
+    Cache Strategy:
+    - TTL: 1 hour (3600s)
+    - Category: farm_data
+    - Keys include all filters (farm_id, time_period, crops, parcels)
+    """
 
     @redis_cache(ttl=3600, model_class=FarmDataOutput, category="farm_data")
     async def get_farm_data(self, input_data: FarmDataInput) -> FarmDataOutput:
@@ -66,17 +89,23 @@ class EnhancedFarmDataService:
         """
         try:
             # Get data from MesParcelles database
-            database_records = await self._get_database_farm_data(
+            db_result = await self._get_database_farm_data(
                 time_period=input_data.time_period,
                 crops=input_data.crops,
                 parcels=input_data.parcels,
                 farm_id=input_data.farm_id
             )
-            
+
+            database_records = db_result.get("records", [])
+            total_available = db_result.get("total_available")
+            warnings = db_result.get("warnings", [])
+
             result = FarmDataOutput(
                 success=True,
                 database_records=database_records,
                 total_records=len(database_records),
+                total_available=total_available,
+                warnings=warnings,
                 filters={
                     "time_period": input_data.time_period.value if input_data.time_period else None,
                     "crops": input_data.crops,
@@ -113,11 +142,14 @@ class EnhancedFarmDataService:
         parcels: Optional[List[str]] = None,
         farm_id: Optional[str] = None,
         max_results: int = 100
-    ) -> List[ParcelRecord]:
+    ) -> Dict[str, Any]:
         """
         Async wrapper for database farm data retrieval.
 
         Runs synchronous database query in thread pool to avoid blocking event loop.
+
+        Returns:
+            Dict with keys: records, total_available, warnings
         """
         return await asyncio.to_thread(
             self._get_database_farm_data_sync,
@@ -135,12 +167,18 @@ class EnhancedFarmDataService:
         parcels: Optional[List[str]] = None,
         farm_id: Optional[str] = None,
         max_results: int = 100
-    ) -> List[ParcelRecord]:
+    ) -> Dict[str, Any]:
         """
         Get farm data from MesParcelles database (synchronous).
 
         Uses eager loading to prevent N+1 query problem.
         Limited to max_results to prevent memory issues.
+
+        Returns:
+            Dict with keys:
+            - records: List[ParcelRecord]
+            - total_available: int (total before pagination)
+            - warnings: List[str] (pagination and data quality warnings)
         """
         try:
             # TODO: Remove sys.path manipulation - fix PYTHONPATH in deployment
@@ -161,7 +199,7 @@ class EnhancedFarmDataService:
             except ImportError as e:
                 logger.error(f"Failed to import MesParcelles models: {e}")
                 logger.error("Check PYTHONPATH configuration and database setup")
-                return []
+                return {"records": [], "total_available": 0, "warnings": ["⚠️ Base de données MesParcelles non disponible"]}
 
             # Use synchronous session
             with SessionLocal() as db:
@@ -198,12 +236,17 @@ class EnhancedFarmDataService:
                 # Add pagination to prevent memory issues
                 query = query.limit(max_results)
 
+                # Track warnings
+                warnings = []
+
                 # Warn if results are truncated
                 if total_count > max_results:
-                    logger.warning(
-                        f"Results limited to {max_results} of {total_count} parcels. "
-                        f"Increase max_results or add more specific filters."
+                    warning_msg = (
+                        f"⚠️ Résultats limités à {max_results} sur {total_count} parcelles. "
+                        f"Utilisez des filtres plus spécifiques pour affiner."
                     )
+                    logger.warning(warning_msg)
+                    warnings.append(warning_msg)
 
                 # Execute query with unique() to handle joinedload duplicates
                 result = db.execute(query)
@@ -247,16 +290,29 @@ class EnhancedFarmDataService:
                     ))
 
                 logger.info(f"✅ Retrieved {len(farm_data)} parcels from MesParcelles database")
-                return farm_data
+
+                return {
+                    "records": farm_data,
+                    "total_available": total_count,
+                    "warnings": warnings
+                }
 
         except SQLAlchemyError as e:
             logger.error(f"❌ Database error: {e}", exc_info=True)
             logger.warning("Returning empty result due to database error")
-            return []
+            return {
+                "records": [],
+                "total_available": 0,
+                "warnings": ["⚠️ Erreur de base de données - Impossible de récupérer les données"]
+            }
         except Exception as e:
             logger.error(f"❌ Unexpected error in farm data retrieval: {e}", exc_info=True)
             logger.warning("Returning empty result")
-            return []
+            return {
+                "records": [],
+                "total_available": 0,
+                "warnings": ["⚠️ Erreur inattendue lors de la récupération des données"]
+            }
 
     def _extract_intervention_summary(
         self,
