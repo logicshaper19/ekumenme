@@ -184,13 +184,20 @@ class EnhancedPlanningCostsService:
             warnings.append(f"⚠️ Coûts fixes estimés non inclus: ~{estimated_fixed_costs:.0f}€ (terre, assurance, amortissement)")
 
             # Warn if ROI is low (based on variable costs only)
+            # ROI thresholds based on:
+            # - Cost of capital (loan interest ~3-5%)
+            # - Opportunity cost of land/labor
+            # - Risk premium for agriculture (~10-15%)
+            # Minimum viable ROI on variable costs: ~30-40% to cover fixed costs and risk
             if roi_percent is not None:
                 if roi_percent < 0:
                     warnings.append("🚨 ROI NÉGATIF sur coûts variables - Projet non viable sans révision majeure")
-                elif roi_percent < 20:
-                    warnings.append("⚠️ ROI faible (<20%) - Après coûts fixes, rentabilité douteuse")
+                elif roi_percent < 30:
+                    warnings.append("⚠️ ROI très faible (<30%) - Insuffisant pour couvrir coûts fixes + risque agricole")
                 elif roi_percent < 50:
-                    warnings.append("ℹ️ ROI modéré - Vérifier viabilité après ajout coûts fixes")
+                    warnings.append("⚠️ ROI modéré (30-50%) - Marge faible après coûts fixes - Vérifier viabilité")
+                else:
+                    warnings.append("✅ ROI acceptable (>50%) - Marge suffisante pour coûts fixes si rendements atteints")
 
             # Probability of loss warning
             if worst_case_profit < 0:
@@ -243,11 +250,16 @@ class EnhancedPlanningCostsService:
             task_name = task.get('task_name', '').lower()
             duration_days = task.get('estimated_duration_days', 1)
 
-            # Equipment utilization: assume 30% of task duration is actual equipment use
-            # (rest is setup, waiting for weather, breaks, etc.)
+            # Equipment utilization assumptions based on typical farm operations:
+            # - 30% of calendar time is actual equipment use
+            # - Rest is setup, weather delays, maintenance, field transitions
+            # - Source: Chambres d'Agriculture operational studies
             equipment_hours = duration_days * 8 * 0.3
 
-            # Labor hours: assume 50% of task duration (more realistic than 100%)
+            # Labor utilization assumptions:
+            # - 50% of calendar time is active labor
+            # - Rest is preparation, breaks, weather waits, logistics
+            # - More realistic than 100% utilization
             labor_hours = duration_days * 8 * 0.5
 
             # Categorize based on task name - ROUGH ESTIMATES ONLY
@@ -411,21 +423,38 @@ async def calculate_planning_costs_enhanced(
 calculate_planning_costs_tool_enhanced = StructuredTool.from_function(
     func=calculate_planning_costs_enhanced,
     name="calculate_planning_costs",
-    description="""🚨 ESTIMATION PRÉLIMINAIRE - Calcule les coûts de planification agricole.
+    description="""⚠️ OUTIL DE PLANIFICATION PRÉLIMINAIRE - PAS UN CONSEIL FINANCIER
 
-⚠️ AVERTISSEMENT IMPORTANT:
+🚨 ESTIMATION APPROXIMATIVE - Calcule les coûts de planification agricole.
+
+⚠️ AVERTISSEMENTS CRITIQUES:
 - Basé sur moyennes nationales (±30% variation régionale)
-- COÛTS VARIABLES UNIQUEMENT (terre, assurance, stockage NON inclus)
-- Données Sept 2024 - Prix agricoles volatils
-- NE PAS utiliser pour décisions financières sans consultation professionnelle
+- COÛTS VARIABLES UNIQUEMENT (terre, assurance, stockage, transport NON inclus)
+- Données Sept 2024 - Prix agricoles volatils (±20% variation annuelle)
+- Utilisation équipement/main-d'œuvre estimée (30%/50% du temps calendaire)
+- NE PAS utiliser pour décisions financières définitives
+- NE PAS utiliser pour demandes de prêt bancaire
+- Consulter comptable agricole pour décisions réelles
 
 Analyse fournie:
 - Coûts par catégorie avec fourchettes d'incertitude
-- Scénarios optimiste/pessimiste
-- ROI sur coûts variables (incomplet)
-- Avertissements détaillés sur limitations
+- Scénarios optimiste/pessimiste (rendement et prix)
+- ROI sur coûts variables uniquement (incomplet - coûts fixes manquants)
+- Avertissements détaillés sur toutes les limitations
 
-Pour planification préliminaire uniquement. Consulter comptable agricole pour décisions réelles.""",
+Cas d'usage appropriés:
+✅ Exploration initiale de choix de culture
+✅ Planification budgétaire préliminaire
+✅ Comparaison relative entre cultures
+✅ Formation et éducation
+
+Cas d'usage NON appropriés:
+❌ Demandes de prêt bancaire
+❌ Décisions financières définitives
+❌ Planification fiscale
+❌ Conformité réglementaire
+
+Pour planification préliminaire uniquement. Consulter professionnel pour décisions réelles.""",
     args_schema=PlanningCostsInput,
     return_direct=False,
     coroutine=calculate_planning_costs_enhanced,
