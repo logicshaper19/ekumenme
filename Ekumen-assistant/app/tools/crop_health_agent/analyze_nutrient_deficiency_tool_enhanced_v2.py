@@ -85,7 +85,7 @@ CROP_NUTRIENT_REQUIREMENTS = {
 }
 
 
-class EnhancedNutrientService:
+class NutrientService:
     """
     Enhanced nutrient deficiency analysis service with Phase 2 database integration.
     
@@ -388,7 +388,7 @@ class EnhancedNutrientService:
 
 
 # Service instance
-_nutrient_service = EnhancedNutrientService()
+_nutrient_service = NutrientService()
 
 
 # Async wrapper function
@@ -417,7 +417,7 @@ async def analyze_nutrient_deficiency_async(
 
 
 # Create StructuredTool
-analyze_nutrient_deficiency_tool_enhanced = StructuredTool.from_function(
+analyze_nutrient_deficiency_tool = StructuredTool.from_function(
     coroutine=analyze_nutrient_deficiency_async,
     name="analyze_nutrient_deficiency",
     description="""Analyse les carences nutritionnelles à partir des symptômes des plantes et conditions du sol.

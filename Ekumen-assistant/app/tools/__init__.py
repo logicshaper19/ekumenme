@@ -15,36 +15,36 @@ No prompting logic, no orchestration, no agent responsibilities.
 
 # Import tools organized by agent
 from .weather_agent import (
-    GetWeatherDataTool,
-    AnalyzeWeatherRisksTool,
-    IdentifyInterventionWindowsTool,
-    CalculateEvapotranspirationTool
+    get_weather_data_tool,
+    analyze_weather_risks_tool,
+    identify_intervention_windows_tool,
+    calculate_evapotranspiration_tool
 )
 from .planning_agent import (
-    GeneratePlanningTasksTool,
-    OptimizeTaskSequenceTool,
-    CalculatePlanningCostsTool,
-    AnalyzeResourceRequirementsTool
+    generate_planning_tasks_tool,
+    optimize_task_sequence_tool,
+    calculate_planning_costs_tool,
+    analyze_resource_requirements_tool,
+    check_crop_feasibility_tool
 )
 from .farm_data_agent import (
-    GetFarmDataTool,
-    CalculatePerformanceMetricsTool,
-    BenchmarkCropPerformanceTool,
-    AnalyzeTrendsTool,
-    GenerateFarmReportTool
+    get_farm_data_tool,
+    calculate_performance_metrics_tool,
+    benchmark_crop_performance_tool,
+    analyze_trends_tool
 )
 from .crop_health_agent import (
-    DiagnoseDiseaseTool,
-    IdentifyPestTool,
-    AnalyzeNutrientDeficiencyTool,
-    GenerateTreatmentPlanTool
+    diagnose_disease_tool,
+    identify_pest_tool,
+    analyze_nutrient_deficiency_tool,
+    generate_treatment_plan_tool
 )
 from .regulatory_agent import (
-    DatabaseIntegratedAMMLookupTool,
-    LookupAMMTool,  # Legacy tool
-    CheckRegulatoryComplianceTool,
-    GetSafetyGuidelinesTool,
-    CheckEnvironmentalRegulationsTool
+    database_integrated_amm_tool,
+    LookupAMMTool,  # Legacy tool (keep for backward compatibility)
+    check_regulatory_compliance_tool,
+    get_safety_guidelines_tool,
+    check_environmental_regulations_tool
 )
 from .sustainability_agent import (
     carbon_footprint_tool,
@@ -54,38 +54,38 @@ from .sustainability_agent import (
 )
 
 __all__ = [
-    # Weather Agent Tools (Organized - One Tool, One Job)
-    "GetWeatherDataTool",
-    "AnalyzeWeatherRisksTool",
-    "IdentifyInterventionWindowsTool",
-    "CalculateEvapotranspirationTool",
-    
-    # Planning Tools (Clean - One Tool, One Job)
-    "GeneratePlanningTasksTool",
-    "OptimizeTaskSequenceTool",
-    "CalculatePlanningCostsTool",
-    "AnalyzeResourceRequirementsTool",
-    
-    # Farm Data Tools (Clean - One Tool, One Job)
-    "GetFarmDataTool",
-    "CalculatePerformanceMetricsTool",
-    "BenchmarkCropPerformanceTool",
-    "AnalyzeTrendsTool",
-    "GenerateFarmReportTool",
-    
-    # Crop Health Agent Tools (Organized - One Tool, One Job)
-    "DiagnoseDiseaseTool",
-    "IdentifyPestTool",
-    "AnalyzeNutrientDeficiencyTool",
-    "GenerateTreatmentPlanTool",
-    
-    # Regulatory Agent Tools (Database-Integrated)
-    "DatabaseIntegratedAMMLookupTool",  # Primary tool with real EPHY data
-    "LookupAMMTool",  # Legacy tool (deprecated)
-    "CheckRegulatoryComplianceTool",
-    "GetSafetyGuidelinesTool",
-    "CheckEnvironmentalRegulationsTool",
-    
+    # Weather Agent Tools (Production-Ready with Dynamic TTL Caching)
+    "get_weather_data_tool",
+    "analyze_weather_risks_tool",
+    "identify_intervention_windows_tool",
+    "calculate_evapotranspiration_tool",
+
+    # Planning Tools (Production-Ready with BBCH Integration)
+    "generate_planning_tasks_tool",
+    "optimize_task_sequence_tool",
+    "calculate_planning_costs_tool",
+    "analyze_resource_requirements_tool",
+    "check_crop_feasibility_tool",
+
+    # Farm Data Tools (Production-Ready with SIRET Multi-Tenancy)
+    "get_farm_data_tool",
+    "calculate_performance_metrics_tool",
+    "benchmark_crop_performance_tool",
+    "analyze_trends_tool",
+
+    # Crop Health Agent Tools (Production-Ready with EPPO Codes)
+    "diagnose_disease_tool",
+    "identify_pest_tool",
+    "analyze_nutrient_deficiency_tool",
+    "generate_treatment_plan_tool",
+
+    # Regulatory Agent Tools (Production-Ready with Real EPHY Database)
+    "database_integrated_amm_tool",  # Primary tool with real EPHY data
+    "LookupAMMTool",  # Legacy tool (keep for backward compatibility)
+    "check_regulatory_compliance_tool",
+    "get_safety_guidelines_tool",
+    "check_environmental_regulations_tool",
+
     # Sustainability Agent Tools (Production-Ready with Uncertainty Quantification & Economic ROI)
     "carbon_footprint_tool",
     "biodiversity_tool",

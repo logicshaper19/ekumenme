@@ -1,177 +1,530 @@
 """
-Calculate Evapotranspiration Tool - Single Purpose Tool
+Enhanced Calculate Evapotranspiration Tool - With Caching and Type Safety
 
-Job: Calculate evapotranspiration and water needs from weather data.
-Input: JSON string of weather data from GetWeatherDataTool
-Output: JSON string with evapotranspiration analysis
+Enhancements:
+- Pydantic schemas for type safety
+- Redis + memory caching
+- Structured error handling
+- Async support
+- Category-specific cache
+- Penman-Monteith FAO-56 method
+- Simple 4-stage Kc lookup (FAO-56 standard)
 
-This tool does ONLY:
-- Execute specific, well-defined function
-- Take structured inputs, return structured outputs
-- Contain domain-specific business logic
-- Be stateless and reusable
-
-No prompting logic, no orchestration, no agent responsibilities.
+Architecture:
+- Uses simple 4-stage crop coefficients (semis, croissance, floraison, maturation)
+- NO database queries, NO BBCH service calls
+- BBCH → simple stage conversion happens in input validation only
 """
 
-from typing import Dict, List, Any, Optional
-from langchain.tools import BaseTool
+from typing import List, Dict, Any, Optional
+from langchain.tools import StructuredTool
 import logging
 import json
-from dataclasses import dataclass
+import math
+from datetime import datetime
+from pydantic import ValidationError
+
+from app.tools.schemas.evapotranspiration_schemas import (
+    EvapotranspirationInput,
+    EvapotranspirationOutput,
+    DailyEvapotranspiration,
+    WaterBalance,
+    IrrigationRecommendation,
+    CROP_COEFFICIENTS,
+)
+from app.tools.exceptions import (
+    WeatherValidationError,
+    WeatherDataError
+)
+from app.core.cache import redis_cache
+from app.services.evapotranspiration_service import (
+    SolarRadiationEstimator,
+    PenmanMonteithET0
+)
 
 logger = logging.getLogger(__name__)
 
-@dataclass
-class WeatherCondition:
-    """Structured weather condition."""
-    date: str
-    temperature_min: float
-    temperature_max: float
-    humidity: float
-    wind_speed: float
-    wind_direction: str
-    precipitation: float
-    cloud_cover: float
-    uv_index: float
 
-class CalculateEvapotranspirationTool(BaseTool):
-    """
-    Tool: Calculate evapotranspiration and water needs from weather data.
+class EvapotranspirationService:
+    """Service for calculating evapotranspiration with caching"""
     
-    Job: Take weather data and calculate evapotranspiration for crops.
-    Input: JSON string of weather data from GetWeatherDataTool
-    Output: JSON string with evapotranspiration analysis
-    """
-    
-    name: str = "calculate_evapotranspiration_tool"
-    description: str = "Calcule l'évapotranspiration et les besoins en eau"
-    
-    def _run(
-        self, 
+    @redis_cache(
+        ttl=3600,  # 1 hour cache (derived data from weather)
+        model_class=EvapotranspirationOutput,
+        category="weather"
+    )
+    async def calculate_evapotranspiration(
+        self,
         weather_data_json: str,
-        crop_type: str = None,
-        **kwargs
-    ) -> str:
+        crop_type: Optional[str] = None,
+        crop_stage: Optional[str] = None
+    ) -> EvapotranspirationOutput:
         """
-        Calculate evapotranspiration and water needs from weather data.
+        Calculate evapotranspiration from weather data
+        
+        Uses 1-hour cache since ET is derived from weather data
+        and doesn't change as frequently as raw weather data.
         
         Args:
-            weather_data_json: JSON string from GetWeatherDataTool
-            crop_type: Type of crop for crop-specific calculations
+            weather_data_json: JSON string from weather tool
+            crop_type: Optional crop type for crop-specific calculations
+            crop_stage: Optional crop development stage
+            
+        Returns:
+            EvapotranspirationOutput with ET calculations and irrigation recommendations
+            
+        Raises:
+            WeatherValidationError: If weather data is invalid
+            WeatherDataError: If required weather data is missing
         """
         try:
+            # Parse weather data
             data = json.loads(weather_data_json)
             
-            if "error" in data:
-                return weather_data_json  # Pass through errors
+            # Check for errors in weather data
+            if not data.get("success", True):
+                raise WeatherDataError(
+                    f"Données météo invalides: {data.get('error', 'Erreur inconnue')}"
+                )
             
+            # Extract weather conditions
             weather_conditions = data.get("weather_conditions", [])
             if not weather_conditions:
-                return json.dumps({"error": "Aucune donnée météo fournie pour le calcul de l'ETP"})
+                raise WeatherDataError("Aucune donnée météo fournie pour le calcul de l'ETP")
             
-            # Convert back to WeatherCondition objects for processing
-            conditions = [WeatherCondition(**condition_dict) for condition_dict in weather_conditions]
+            location = data.get("location", "")
+            forecast_period_days = len(weather_conditions)
             
-            # Calculate evapotranspiration
-            etp_data = self._calculate_evapotranspiration(conditions, crop_type)
+            # Calculate daily ET
+            daily_et_list = []
+            warnings = []
             
-            # Calculate water needs
-            water_needs = self._calculate_water_needs(etp_data, crop_type)
+            for condition in weather_conditions:
+                try:
+                    daily_et = self._calculate_daily_et(
+                        condition,
+                        crop_type,
+                        crop_stage,
+                        warnings
+                    )
+                    daily_et_list.append(daily_et)
+                except Exception as e:
+                    logger.warning(f"Error calculating ET for {condition.get('date')}: {e}")
+                    warnings.append(f"Calcul ETP incomplet pour {condition.get('date')}: {str(e)}")
+            
+            if not daily_et_list:
+                raise WeatherDataError("Impossible de calculer l'évapotranspiration")
+            
+            # Calculate water balance
+            water_balance = self._calculate_water_balance(
+                daily_et_list,
+                weather_conditions,
+                crop_type
+            )
             
             # Generate irrigation recommendations
-            irrigation_recommendations = self._generate_irrigation_recommendations(etp_data, water_needs)
+            irrigation_recommendations = self._generate_irrigation_recommendations(
+                daily_et_list,
+                water_balance,
+                crop_type,
+                crop_stage
+            )
             
-            result = {
-                "location": data.get("location", ""),
-                "forecast_period_days": data.get("forecast_period_days", 0),
-                "crop_type": crop_type,
-                "evapotranspiration": etp_data,
-                "water_needs": water_needs,
-                "irrigation_recommendations": irrigation_recommendations
-            }
+            # Calculate summary statistics
+            avg_et0 = sum(d.et0 for d in daily_et_list) / len(daily_et_list)
+            avg_etc = None
+            if all(d.etc is not None for d in daily_et_list):
+                avg_etc = sum(d.etc for d in daily_et_list) / len(daily_et_list)
             
-            return json.dumps(result, ensure_ascii=False)
+            # Find peak ET
+            peak_et_day = max(daily_et_list, key=lambda d: d.etc if d.etc else d.et0)
+            peak_et_date = peak_et_day.date
+            peak_et_value = peak_et_day.etc if peak_et_day.etc else peak_et_day.et0
             
+            # Build output
+            result = EvapotranspirationOutput(
+                location=location,
+                forecast_period_days=forecast_period_days,
+                crop_type=crop_type,
+                crop_stage=crop_stage,
+                daily_et=daily_et_list,
+                water_balance=water_balance,
+                irrigation_recommendations=irrigation_recommendations,
+                avg_et0=round(avg_et0, 2),
+                avg_etc=round(avg_etc, 2) if avg_etc else None,
+                peak_et_date=peak_et_date,
+                peak_et_value=round(peak_et_value, 2),
+                calculation_method="Penman-Monteith FAO-56",
+                data_source="weather_analysis",
+                calculated_at=datetime.utcnow().isoformat() + "Z",
+                success=True,
+                warnings=warnings
+            )
+            
+            return result
+            
+        except (WeatherValidationError, WeatherDataError):
+            raise
+        except json.JSONDecodeError as e:
+            raise WeatherValidationError(f"Format JSON invalide: {str(e)}")
         except Exception as e:
-            logger.error(f"Calculate evapotranspiration error: {e}")
-            return json.dumps({"error": f"Erreur lors du calcul de l'ETP: {str(e)}"})
+            logger.error(f"Evapotranspiration calculation error: {e}", exc_info=True)
+            raise WeatherDataError(f"Erreur lors du calcul de l'ETP: {str(e)}")
     
-    def _calculate_evapotranspiration(self, conditions: List[WeatherCondition], crop_type: str = None) -> Dict[str, Any]:
-        """Calculate evapotranspiration for weather conditions."""
-        # Simplified ETP calculation - in production would use Penman-Monteith
-        total_etp = 0
-        daily_etp = []
+    def _calculate_daily_et(
+        self,
+        condition: Dict[str, Any],
+        crop_type: Optional[str],
+        crop_stage: Optional[str],
+        warnings: List[str]
+    ) -> DailyEvapotranspiration:
+        """
+        Calculate daily evapotranspiration using Penman-Monteith FAO-56
+
+        Args:
+            condition: Weather condition dict
+            crop_type: Crop type
+            crop_stage: Crop development stage (semis, croissance, floraison, maturation)
+            warnings: List to append warnings to
+
+        Returns:
+            DailyEvapotranspiration object
+        """
+        date_str = condition.get("date", "")
+        temp_min = condition.get("temperature_min", 15.0)
+        temp_max = condition.get("temperature_max", 25.0)
+        humidity = condition.get("humidity", 70.0)
+        wind_speed_kmh = condition.get("wind_speed", 10.0)
+        cloud_cover = condition.get("cloud_cover", 50.0)
+
+        # Parse date
+        try:
+            date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        except:
+            date = datetime.now()
+
+        # Calculate average temperature
+        temp_avg = (temp_min + temp_max) / 2
+
+        # Estimate solar radiation from cloud cover and temperature
+        # Default latitude for France (approximate center)
+        latitude_deg = 46.0  # TODO: Extract from location if available
+        elevation_m = 200.0  # TODO: Extract from location if available
+
+        Rs, method = SolarRadiationEstimator.estimate_best_available(
+            temp_min=temp_min,
+            temp_max=temp_max,
+            latitude_deg=latitude_deg,
+            date=date,
+            cloud_cover_percent=cloud_cover,
+            elevation_m=elevation_m
+        )
+
+        # Calculate ET0 using Penman-Monteith FAO-56
+        try:
+            et0 = PenmanMonteithET0.calculate(
+                temp_min=temp_min,
+                temp_max=temp_max,
+                humidity_mean=humidity,
+                wind_speed_kmh=wind_speed_kmh,
+                Rs=Rs,
+                latitude_deg=latitude_deg,
+                date=date,
+                elevation_m=elevation_m
+            )
+        except Exception as e:
+            logger.warning(f"Penman-Monteith calculation failed, using fallback: {e}")
+            # Fallback to simplified Hargreaves
+            temp_range = temp_max - temp_min
+            et0 = 0.0023 * (temp_avg + 17.8) * math.sqrt(max(temp_range, 0.1)) * 15.0
+            et0 = max(0.0, et0)
+
+        # Calculate crop coefficient (simple 4-stage lookup)
+        kc = None
+        etc = None
+        if crop_type:
+            kc = self._get_crop_coefficient(crop_type, crop_stage)
+            etc = et0 * kc
+
+        return DailyEvapotranspiration(
+            date=date_str,
+            et0=round(et0, 2),
+            etc=round(etc, 2) if etc is not None else None,
+            kc=round(kc, 2) if kc is not None else None,
+            temperature_avg=round(temp_avg, 1),
+            humidity_avg=round(humidity, 1),
+            wind_speed_avg=round(wind_speed_kmh, 1),
+            solar_radiation=round(Rs, 2) if Rs else None
+        )
+    
+    def _get_crop_coefficient(
+        self,
+        crop_type: Optional[str],
+        crop_stage: Optional[str]
+    ) -> float:
+        """
+        Get crop coefficient (Kc) for crop type and stage
         
-        for condition in conditions:
-            # Simplified ETP calculation
-            etp = (condition.temperature_max + condition.temperature_min) / 2 * 0.1
-            if condition.humidity < 60:
-                etp *= 1.2  # Higher ETP in dry conditions
-            if condition.wind_speed > 15:
-                etp *= 1.1  # Higher ETP with wind
+        Args:
+            crop_type: Crop type
+            crop_stage: Crop development stage
             
-            total_etp += etp
-            daily_etp.append({
-                "date": condition.date,
-                "etp_mm": round(etp, 1)
-            })
+        Returns:
+            Crop coefficient (Kc)
+        """
+        if not crop_type:
+            return 0.8  # Default Kc
         
-        # Crop-specific water needs
-        crop_water_needs = {
-            "blé": {"coefficient": 0.8, "critical_stage": "épiaison"},
-            "maïs": {"coefficient": 1.2, "critical_stage": "floraison"},
-            "colza": {"coefficient": 0.9, "critical_stage": "floraison"},
-            "tournesol": {"coefficient": 1.0, "critical_stage": "floraison"}
-        }
+        crop_lower = crop_type.lower()
+        crop_coeffs = CROP_COEFFICIENTS.get(crop_lower, CROP_COEFFICIENTS["general"])
         
-        crop_coefficient = crop_water_needs.get(crop_type, {"coefficient": 1.0})["coefficient"]
-        crop_etp = total_etp * crop_coefficient
+        if crop_stage:
+            stage_lower = crop_stage.lower()
+            return crop_coeffs.get(stage_lower, crop_coeffs.get("default", 0.8))
         
-        return {
-            "etp_totale_mm": round(total_etp, 1),
-            "etp_culture_mm": round(crop_etp, 1),
-            "etp_quotidienne": daily_etp,
-            "coefficient_culture": crop_coefficient
-        }
+        return crop_coeffs.get("default", 0.8)
     
-    def _calculate_water_needs(self, etp_data: Dict[str, Any], crop_type: str = None) -> Dict[str, Any]:
-        """Calculate water needs based on ETP."""
-        crop_etp = etp_data["etp_culture_mm"]
+    def _calculate_water_balance(
+        self,
+        daily_et_list: List[DailyEvapotranspiration],
+        weather_conditions: List[Dict[str, Any]],
+        crop_type: Optional[str]
+    ) -> WaterBalance:
+        """Calculate water balance for the period"""
+        # Sum ET
+        total_et0 = sum(d.et0 for d in daily_et_list)
+        total_etc = None
+        if all(d.etc is not None for d in daily_et_list):
+            total_etc = sum(d.etc for d in daily_et_list)
         
-        # Assess irrigation needs
-        if crop_etp > 5:
-            irrigation_needs = "Élevés - Irrigation recommandée"
-        elif crop_etp > 3:
-            irrigation_needs = "Modérés - Surveillance nécessaire"
-        else:
-            irrigation_needs = "Faibles - Irrigation non nécessaire"
+        # Sum precipitation
+        total_precipitation = sum(c.get("precipitation", 0.0) for c in weather_conditions)
         
-        return {
-            "irrigation_needs": irrigation_needs,
-            "etp_culture_mm": crop_etp,
-            "water_deficit_risk": "Élevé" if crop_etp > 4 else "Modéré" if crop_etp > 2 else "Faible"
-        }
-    
-    def _generate_irrigation_recommendations(self, etp_data: Dict[str, Any], water_needs: Dict[str, Any]) -> List[str]:
-        """Generate irrigation recommendations."""
+        # Calculate deficit/surplus
+        et_for_balance = total_etc if total_etc is not None else total_et0
+        water_deficit = max(0.0, et_for_balance - total_precipitation)
+        water_surplus = max(0.0, total_precipitation - et_for_balance)
+        
+        # Determine if irrigation is needed (deficit > 10mm)
+        irrigation_needed = water_deficit > 10.0
+        irrigation_amount = round(water_deficit * 1.1, 1) if irrigation_needed else None  # Add 10% buffer
+        
+        return WaterBalance(
+            total_et0=round(total_et0, 1),
+            total_etc=round(total_etc, 1) if total_etc is not None else None,
+            total_precipitation=round(total_precipitation, 1),
+            water_deficit=round(water_deficit, 1),
+            water_surplus=round(water_surplus, 1),
+            irrigation_needed=irrigation_needed,
+            irrigation_amount=irrigation_amount
+        )
+
+    def _generate_irrigation_recommendations(
+        self,
+        daily_et_list: List[DailyEvapotranspiration],
+        water_balance: WaterBalance,
+        crop_type: Optional[str],
+        crop_stage: Optional[str]
+    ) -> List[IrrigationRecommendation]:
+        """Generate irrigation recommendations based on ET and water balance"""
         recommendations = []
-        
-        crop_etp = etp_data["etp_culture_mm"]
-        
-        if crop_etp > 5:
-            recommendations.append("Irrigation d'urgence recommandée")
-            recommendations.append("Surveiller l'humidité du sol quotidiennement")
-        elif crop_etp > 3:
-            recommendations.append("Surveillance accrue de l'humidité")
-            recommendations.append("Préparer l'irrigation si nécessaire")
-        else:
-            recommendations.append("Irrigation non nécessaire actuellement")
-        
-        # Daily recommendations
-        daily_etp = etp_data["etp_quotidienne"]
-        high_etp_days = [day for day in daily_etp if day["etp_mm"] > 3]
-        if high_etp_days:
-            recommendations.append(f"Jours à forte ETP: {', '.join([day['date'] for day in high_etp_days])}")
-        
+
+        if not water_balance.irrigation_needed:
+            return recommendations
+
+        # Find days with highest ET deficit
+        cumulative_deficit = 0.0
+        for i, daily_et in enumerate(daily_et_list):
+            # Assume no precipitation for simplification (already in water balance)
+            daily_deficit = daily_et.etc if daily_et.etc else daily_et.et0
+            cumulative_deficit += daily_deficit
+
+            # Recommend irrigation when cumulative deficit > 15mm
+            if cumulative_deficit > 15.0:
+                amount_mm = round(cumulative_deficit, 1)
+                amount_m3_ha = round(amount_mm * 10, 1)  # 1mm = 10 m³/ha
+
+                # Determine priority based on crop stage and deficit
+                priority = "moyenne"
+                if crop_stage in ["floraison", "maturation"] or cumulative_deficit > 30:
+                    priority = "haute"
+                elif cumulative_deficit < 20:
+                    priority = "basse"
+
+                # Generate reason
+                reason = f"Déficit hydrique de {amount_mm}mm"
+                if crop_type and crop_stage:
+                    reason += f" pendant {crop_stage} de {crop_type}"
+
+                # Optimal time (morning for most crops)
+                optimal_time = "matin"
+                if daily_et.temperature_avg > 25:
+                    optimal_time = "soir"  # Evening if hot
+
+                # Method recommendation
+                method = "aspersion"
+                if crop_type in ["vigne", "maïs"]:
+                    method = "goutte à goutte"
+
+                recommendations.append(IrrigationRecommendation(
+                    date=daily_et.date,
+                    amount_mm=amount_mm,
+                    amount_m3_ha=amount_m3_ha,
+                    priority=priority,
+                    reason=reason,
+                    optimal_time=optimal_time,
+                    method_recommendation=method
+                ))
+
+                # Reset cumulative deficit after recommendation
+                cumulative_deficit = 0.0
+
         return recommendations
+
+
+# Create service instance
+evapotranspiration_service = EvapotranspirationService()
+
+
+async def calculate_evapotranspiration_enhanced(
+    weather_data_json: str,
+    crop_type: Optional[str] = None,
+    crop_stage: Optional[str] = None
+) -> str:
+    """
+    Calculate evapotranspiration and water needs from weather data
+
+    Args:
+        weather_data_json: JSON string from weather tool containing forecast data
+        crop_type: Optional crop type for crop-specific calculations (blé, maïs, colza, etc.)
+        crop_stage: Optional crop development stage (semis, croissance, floraison, maturation)
+
+    Returns:
+        JSON string with ET calculations, water balance, and irrigation recommendations
+    """
+    try:
+        # Validate input
+        input_data = EvapotranspirationInput(
+            weather_data_json=weather_data_json,
+            crop_type=crop_type,
+            crop_stage=crop_stage
+        )
+
+        # Calculate evapotranspiration
+        result = await evapotranspiration_service.calculate_evapotranspiration(
+            weather_data_json=input_data.weather_data_json,
+            crop_type=input_data.crop_type,
+            crop_stage=input_data.crop_stage
+        )
+
+        # Return as JSON
+        return result.model_dump_json(indent=2, exclude_none=True)
+
+    except ValidationError as e:
+        logger.error(f"Evapotranspiration validation error: {e}")
+        error_result = EvapotranspirationOutput(
+            location="",
+            forecast_period_days=1,  # Minimum valid value
+            daily_et=[],
+            water_balance=WaterBalance(
+                total_et0=0.0,
+                total_precipitation=0.0,
+                water_deficit=0.0,
+                water_surplus=0.0,
+                irrigation_needed=False
+            ),
+            avg_et0=0.0,
+            calculated_at=datetime.utcnow().isoformat() + "Z",
+            success=False,
+            error=f"Paramètres invalides: {str(e)}",
+            error_type="validation"
+        )
+        return error_result.model_dump_json(indent=2)
+
+    except WeatherValidationError as e:
+        logger.error(f"Weather validation error: {e}")
+        error_result = EvapotranspirationOutput(
+            location="",
+            forecast_period_days=1,  # Minimum valid value
+            daily_et=[],
+            water_balance=WaterBalance(
+                total_et0=0.0,
+                total_precipitation=0.0,
+                water_deficit=0.0,
+                water_surplus=0.0,
+                irrigation_needed=False
+            ),
+            avg_et0=0.0,
+            calculated_at=datetime.utcnow().isoformat() + "Z",
+            success=False,
+            error=f"Données météo invalides: {str(e)}",
+            error_type="validation"
+        )
+        return error_result.model_dump_json(indent=2)
+
+    except WeatherDataError as e:
+        logger.error(f"Weather data error: {e}")
+        error_result = EvapotranspirationOutput(
+            location="",
+            forecast_period_days=1,  # Minimum valid value
+            daily_et=[],
+            water_balance=WaterBalance(
+                total_et0=0.0,
+                total_precipitation=0.0,
+                water_deficit=0.0,
+                water_surplus=0.0,
+                irrigation_needed=False
+            ),
+            avg_et0=0.0,
+            calculated_at=datetime.utcnow().isoformat() + "Z",
+            success=False,
+            error=f"Données manquantes: {str(e)}",
+            error_type="data_missing"
+        )
+        return error_result.model_dump_json(indent=2)
+
+    except Exception as e:
+        logger.error(f"Evapotranspiration calculation error: {e}", exc_info=True)
+        error_result = EvapotranspirationOutput(
+            location="",
+            forecast_period_days=1,  # Minimum valid value
+            daily_et=[],
+            water_balance=WaterBalance(
+                total_et0=0.0,
+                total_precipitation=0.0,
+                water_deficit=0.0,
+                water_surplus=0.0,
+                irrigation_needed=False
+            ),
+            avg_et0=0.0,
+            calculated_at=datetime.utcnow().isoformat() + "Z",
+            success=False,
+            error="Erreur inattendue lors du calcul de l'ETP. Veuillez réessayer.",
+            error_type="unknown"
+        )
+        return error_result.model_dump_json(indent=2)
+
+
+# Create the enhanced tool
+calculate_evapotranspiration_tool = StructuredTool.from_function(
+    func=calculate_evapotranspiration_enhanced,
+    name="calculate_evapotranspiration",
+    description="""Calcule l'évapotranspiration (ETP) et les besoins en eau à partir des données météo.
+
+    Utilise la méthode Penman-Monteith FAO-56 pour calculer:
+    - ETP de référence (ET0) quotidienne
+    - ETP de la culture (ETc) avec coefficients culturaux
+    - Bilan hydrique (précipitations vs besoins)
+    - Recommandations d'irrigation personnalisées
+
+    Supporte les cultures: blé, maïs, colza, orge, tournesol, betterave, pomme de terre, vigne, prairie
+    Stades de développement: semis, croissance, floraison, maturation
+
+    Entrée: JSON de données météo + type de culture (optionnel) + stade (optionnel)
+    Sortie: Calculs ETP, bilan hydrique, recommandations d'irrigation""",
+    args_schema=EvapotranspirationInput,
+    return_direct=False,
+    coroutine=calculate_evapotranspiration_enhanced,
+    handle_validation_error=False  # We handle errors ourselves
+)
+

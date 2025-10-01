@@ -5,39 +5,20 @@ This package contains all crop health-related tools following the "One Tool, One
 Each tool does ONE specific thing and does it well.
 
 Tools:
-- DiagnoseDiseaseTool: Diagnose crop diseases from symptoms
-- IdentifyPestTool: Identify crop pests from damage patterns
-- AnalyzeNutrientDeficiencyTool: Analyze nutrient deficiencies
-- GenerateTreatmentPlanTool: Generate comprehensive treatment plans
-
-Enhanced Tools (Phase 2 - Database Integration):
-- diagnose_disease_tool_enhanced: Disease diagnosis with Crop table + EPPO codes
-- identify_pest_tool_enhanced: Pest identification with crop categories + EPPO codes
-- analyze_nutrient_deficiency_tool_enhanced: Nutrient analysis with Crop integration
-- generate_treatment_plan_tool_enhanced: Comprehensive treatment planning with Crop model
+- diagnose_disease_tool: Disease diagnosis with Crop table + EPPO codes, severity scoring
+- identify_pest_tool: Pest identification with crop categories + EPPO codes, damage assessment
+- analyze_nutrient_deficiency_tool: Nutrient analysis with Crop integration, visual symptom matching
+- generate_treatment_plan_tool: Comprehensive treatment planning with multi-issue prioritization
 """
 
-# Original tools
-from .diagnose_disease_tool import DiagnoseDiseaseTool
-from .identify_pest_tool import IdentifyPestTool
-from .analyze_nutrient_deficiency_tool import AnalyzeNutrientDeficiencyTool
-from .generate_treatment_plan_tool import GenerateTreatmentPlanTool
-
-# Enhanced tools (Phase 2)
-from .diagnose_disease_tool_enhanced import diagnose_disease_tool_enhanced
-from .identify_pest_tool_enhanced import identify_pest_tool_enhanced
-from .analyze_nutrient_deficiency_tool_enhanced import analyze_nutrient_deficiency_tool_enhanced
-from .generate_treatment_plan_tool_enhanced import generate_treatment_plan_tool_enhanced
+from .diagnose_disease_tool import diagnose_disease_tool
+from .identify_pest_tool import identify_pest_tool
+from .analyze_nutrient_deficiency_tool import analyze_nutrient_deficiency_tool
+from .generate_treatment_plan_tool import generate_treatment_plan_tool
 
 __all__ = [
-    # Original tools
-    "DiagnoseDiseaseTool",
-    "IdentifyPestTool",
-    "AnalyzeNutrientDeficiencyTool",
-    "GenerateTreatmentPlanTool",
-    # Enhanced tools
-    "diagnose_disease_tool_enhanced",
-    "identify_pest_tool_enhanced",
-    "analyze_nutrient_deficiency_tool_enhanced",
-    "generate_treatment_plan_tool_enhanced",
+    "diagnose_disease_tool",
+    "identify_pest_tool",
+    "analyze_nutrient_deficiency_tool",
+    "generate_treatment_plan_tool",
 ]

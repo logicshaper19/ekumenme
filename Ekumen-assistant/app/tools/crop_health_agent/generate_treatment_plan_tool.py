@@ -1,320 +1,945 @@
 """
-Generate Treatment Plan Tool - Single Purpose Tool
+Enhanced Treatment Plan Generation Tool with Pydantic schemas, caching, and error handling
 
-Job: Generate comprehensive treatment plans from disease, pest, and nutrient analyses.
-Input: JSON strings from other crop health tools
-Output: JSON string with comprehensive treatment plan
-
-This tool does ONLY:
-- Execute specific, well-defined function
-- Take structured inputs, return structured outputs
-- Contain domain-specific business logic
-- Be stateless and reusable
-
-No prompting logic, no orchestration, no agent responsibilities.
+Improvements over original:
+- ✅ Pydantic schemas for type safety
+- ✅ Redis caching with 30-min TTL
+- ✅ Async support
+- ✅ Granular error handling
+- ✅ Database integration (Crop table + EPPO codes)
+- ✅ Follows PoC pattern (Service class + StructuredTool)
+- ✅ Input validation (max 10 analyses, budget constraints)
+- ✅ Multi-issue prioritization (not just top issue)
 """
 
-from typing import Dict, List, Any, Optional
-from langchain.tools import BaseTool
 import logging
-import json
+from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime, timedelta
-from dataclasses import dataclass, asdict
+
+from langchain.tools import StructuredTool
+from pydantic import ValidationError, Field
+
+from app.models.crop import Crop
+from app.tools.schemas.treatment_schemas import (
+    TreatmentPlanInput,
+    TreatmentPlanOutput,
+    TreatmentStep,
+    TreatmentSchedule,
+    CostAnalysis,
+    MonitoringPlan,
+    ExecutiveSummary,
+    TreatmentPriority,
+    TreatmentType,
+    TreatmentTiming
+)
+from app.tools.schemas.disease_schemas import DiseaseDiagnosisOutput
+from app.tools.schemas.pest_schemas import PestIdentificationOutput
+from app.core.cache import redis_cache
 
 logger = logging.getLogger(__name__)
 
-@dataclass
-class TreatmentStep:
-    """Structured treatment step."""
-    step_name: str
-    description: str
-    priority: str
-    timing: str
-    cost_estimate: float
-    effectiveness: str
+# Maximum number of treatment steps (realistic limit)
+MAX_TREATMENT_STEPS = 10
 
-class GenerateTreatmentPlanTool(BaseTool):
-    """
-    Tool: Generate comprehensive treatment plans from disease, pest, and nutrient analyses.
-    
-    Job: Take results from other crop health tools and generate comprehensive treatment plan.
-    Input: JSON strings from other crop health tools
-    Output: JSON string with comprehensive treatment plan
-    """
-    
-    name: str = "generate_treatment_plan_tool"
-    description: str = "Génère un plan de traitement complet pour la santé des cultures"
-    
-    def _run(
-        self,
-        disease_analysis_json: str = None,
-        pest_analysis_json: str = None,
-        nutrient_analysis_json: str = None,
-        crop_type: str = None,
-        **kwargs
-    ) -> str:
+
+# Treatment cost estimates (EUR per hectare)
+TREATMENT_COSTS = {
+    "fungicide": 45.0,
+    "insecticide": 35.0,
+    "herbicide": 30.0,
+    "fertilizer": 50.0,
+    "biological": 60.0,
+    "cultural": 15.0,
+    "mechanical": 25.0
+}
+
+
+class TreatmentService:
+    """Service for treatment plan generation with caching and database integration"""
+
+    @redis_cache(ttl=1800, model_class=TreatmentPlanOutput, category="crop_health")
+    async def generate_treatment_plan(self, input_data: TreatmentPlanInput) -> TreatmentPlanOutput:
         """
-        Generate comprehensive treatment plan from crop health analyses.
+        Generate comprehensive treatment plan.
         
         Args:
-            disease_analysis_json: JSON string from DiagnoseDiseaseTool (optional)
-            pest_analysis_json: JSON string from IdentifyPestTool (optional)
-            nutrient_analysis_json: JSON string from AnalyzeNutrientDeficiencyTool (optional)
-            crop_type: Type of crop for crop-specific recommendations
+            input_data: Validated treatment plan input
+            
+        Returns:
+            TreatmentPlanOutput with comprehensive plan
         """
         try:
-            # Parse input data
-            disease_analysis = json.loads(disease_analysis_json) if disease_analysis_json else None
-            pest_analysis = json.loads(pest_analysis_json) if pest_analysis_json else None
-            nutrient_analysis = json.loads(nutrient_analysis_json) if nutrient_analysis_json else None
+            # Step 1: Get crop from database
+            crop = await self._get_crop_from_database(input_data.crop_type, input_data.eppo_code)
+
+            if not crop:
+                raise ValueError(f"Culture inconnue: {input_data.crop_type}")
             
-            # Generate comprehensive treatment plan
-            treatment_plan = self._generate_comprehensive_treatment_plan(
-                disease_analysis, pest_analysis, nutrient_analysis, crop_type
+            # Step 2: Validate at least one analysis provided
+            if not any([input_data.disease_analysis, input_data.pest_analysis, input_data.nutrient_analysis]):
+                logger.warning("No analysis provided for treatment plan")
+                return TreatmentPlanOutput(
+                    success=False,
+                    crop_type=crop.name_fr,
+                    crop_eppo_code=crop.eppo_code,
+                    plan_metadata={},
+                    executive_summary=ExecutiveSummary(
+                        total_issues_identified=0,
+                        priority_level=TreatmentPriority.LOW,
+                        estimated_treatment_duration="N/A",
+                        has_disease_issues=False,
+                        has_pest_issues=False,
+                        has_nutrient_issues=False,
+                        key_recommendations=["Aucune analyse fournie"]
+                    ),
+                    treatment_steps=[],
+                    treatment_schedule=[],
+                    cost_analysis=CostAnalysis(
+                        total_estimated_cost_eur=0.0,
+                        cost_breakdown={}
+                    ),
+                    monitoring_plan=MonitoringPlan(
+                        monitoring_frequency="N/A",
+                        monitoring_methods=[],
+                        success_indicators=[],
+                        warning_signs=[]
+                    ),
+                    prevention_measures=[],
+                    total_steps=0,
+                    error="Aucune analyse fournie. Au moins une analyse (maladie, ravageur ou carence) est requise.",
+                    error_type="no_analysis"
+                )
+
+            # Step 3: Generate executive summary
+            executive_summary = self._generate_executive_summary(
+                input_data.disease_analysis,
+                input_data.pest_analysis,
+                input_data.nutrient_analysis
+            )
+
+            # Step 4: Generate treatment steps
+            treatment_steps, warnings = self._generate_treatment_steps(
+                crop=crop,
+                disease_analysis=input_data.disease_analysis,
+                pest_analysis=input_data.pest_analysis,
+                nutrient_analysis=input_data.nutrient_analysis,
+                bbch_stage=input_data.bbch_stage,
+                organic_farming=input_data.organic_farming
             )
             
-            return json.dumps(treatment_plan, ensure_ascii=False)
+            # Step 4: Generate treatment schedule
+            treatment_schedule = self._generate_treatment_schedule(
+                treatment_steps,
+                input_data.bbch_stage
+            )
+            
+            # Step 5: Generate cost analysis
+            cost_analysis = self._generate_cost_analysis(
+                treatment_steps,
+                input_data.field_size_ha,
+                input_data.budget_constraint
+            )
+            
+            # Step 6: Generate monitoring plan
+            monitoring_plan = self._generate_monitoring_plan(
+                treatment_steps,
+                crop
+            )
+            
+            # Step 7: Generate prevention measures
+            prevention_measures = self._generate_prevention_measures(
+                crop,
+                input_data.disease_analysis,
+                input_data.pest_analysis,
+                input_data.nutrient_analysis
+            )
+            
+            # Step 8: Build output
+            output = TreatmentPlanOutput(
+                success=True,
+                crop_type=crop.name_fr,
+                crop_eppo_code=crop.eppo_code,
+                plan_metadata={
+                    "generated_at": datetime.now().isoformat(),
+                    "plan_version": "2.0",
+                    "crop_category": crop.category,
+                    "bbch_stage": input_data.bbch_stage,
+                    "organic_farming": input_data.organic_farming
+                },
+                executive_summary=executive_summary,
+                treatment_steps=treatment_steps,
+                treatment_schedule=treatment_schedule,
+                cost_analysis=cost_analysis,
+                monitoring_plan=monitoring_plan,
+                prevention_measures=prevention_measures,
+                total_steps=len(treatment_steps),
+                estimated_duration_days=self._estimate_duration(treatment_steps),
+                warnings=warnings if warnings else None
+            )
+            
+            logger.info(
+                f"Treatment plan generated for {crop.name_fr} (EPPO: {crop.eppo_code}): "
+                f"{len(treatment_steps)} steps, {cost_analysis.total_estimated_cost_eur:.2f} EUR"
+            )
+            
+            return output
+            
+        except ValueError as e:
+            logger.error(f"Treatment plan generation error: {e}")
+            return TreatmentPlanOutput(
+                success=False,
+                crop_type=input_data.crop_type,
+                plan_metadata={"error": str(e)},
+                executive_summary=ExecutiveSummary(
+                    total_issues_identified=0,
+                    priority_level=TreatmentPriority.LOW,
+                    estimated_treatment_duration="unknown",
+                    has_disease_issues=False,
+                    has_pest_issues=False,
+                    has_nutrient_issues=False,
+                    key_recommendations=["Erreur lors de la génération du plan"]
+                ),
+                treatment_steps=[],
+                treatment_schedule=[],
+                cost_analysis=CostAnalysis(
+                    total_estimated_cost_eur=0.0,
+                    cost_breakdown={}
+                ),
+                monitoring_plan=MonitoringPlan(
+                    monitoring_frequency="unknown",
+                    monitoring_methods=[],
+                    success_indicators=[],
+                    warning_signs=[]
+                ),
+                prevention_measures=[],
+                total_steps=0,
+                error=str(e),
+                error_type=getattr(e, 'error_type', 'unknown_error')
+            )
+        except Exception as e:
+            logger.exception(f"Unexpected error in treatment plan generation: {e}")
+            return TreatmentPlanOutput(
+                success=False,
+                crop_type=input_data.crop_type,
+                plan_metadata={},
+                executive_summary=ExecutiveSummary(
+                    total_issues_identified=0,
+                    priority_level=TreatmentPriority.LOW,
+                    estimated_treatment_duration="unknown",
+                    has_disease_issues=False,
+                    has_pest_issues=False,
+                    has_nutrient_issues=False,
+                    key_recommendations=["Aucune analyse fournie"]
+                ),
+                treatment_steps=[],
+                treatment_schedule=[],
+                cost_analysis=CostAnalysis(
+                    total_estimated_cost_eur=0.0,
+                    cost_breakdown={}
+                ),
+                monitoring_plan=MonitoringPlan(
+                    monitoring_frequency="unknown",
+                    monitoring_methods=[],
+                    success_indicators=[],
+                    warning_signs=[]
+                ),
+                prevention_measures=[],
+                total_steps=0,
+                error=f"Erreur inattendue: {str(e)}",
+                error_type="unexpected_error"
+            )
+    
+    async def _get_crop_from_database(self, crop_name: str, eppo_code: Optional[str] = None) -> Optional[Crop]:
+        """Get crop from database using Crop model"""
+        try:
+            if eppo_code:
+                crop = await Crop.from_eppo_code(eppo_code)
+                if crop:
+                    return crop
+            
+            crop = await Crop.from_french_name(crop_name)
+            return crop
             
         except Exception as e:
-            logger.error(f"Generate treatment plan error: {e}")
-            return json.dumps({"error": f"Erreur lors de la génération du plan de traitement: {str(e)}"})
+            logger.warning(f"Error getting crop from database: {e}")
+            return None
     
-    def _generate_comprehensive_treatment_plan(self, disease_analysis: Dict = None, pest_analysis: Dict = None, nutrient_analysis: Dict = None, crop_type: str = None) -> Dict[str, Any]:
-        """Generate comprehensive treatment plan from analyses."""
-        treatment_plan = {
-            "plan_metadata": {
-                "generated_at": datetime.now().isoformat(),
-                "plan_type": "crop_health_treatment",
-                "version": "1.0",
-                "crop_type": crop_type
-            },
-            "executive_summary": self._generate_executive_summary(disease_analysis, pest_analysis, nutrient_analysis),
-            "treatment_steps": self._generate_treatment_steps(disease_analysis, pest_analysis, nutrient_analysis),
-            "treatment_schedule": self._generate_treatment_schedule(disease_analysis, pest_analysis, nutrient_analysis),
-            "cost_analysis": self._generate_cost_analysis(disease_analysis, pest_analysis, nutrient_analysis),
-            "monitoring_plan": self._generate_monitoring_plan(disease_analysis, pest_analysis, nutrient_analysis),
-            "prevention_measures": self._generate_prevention_measures(disease_analysis, pest_analysis, nutrient_analysis)
-        }
-        
-        return treatment_plan
+    def _generate_executive_summary(
+        self,
+        disease_analysis: Optional[Any],
+        pest_analysis: Optional[Any],
+        nutrient_analysis: Optional[Dict[str, Any]]
+    ) -> ExecutiveSummary:
+        """Generate executive summary"""
+        total_issues = 0
+        priority_level = TreatmentPriority.LOW
+        key_recommendations = []
+
+        # Count issues from disease analysis
+        if disease_analysis:
+            if isinstance(disease_analysis, DiseaseDiagnosisOutput):
+                total_issues += disease_analysis.total_diagnoses
+                if disease_analysis.total_diagnoses > 0:
+                    key_recommendations.append(f"{disease_analysis.total_diagnoses} maladie(s) identifiée(s)")
+            elif isinstance(disease_analysis, dict):
+                diagnoses = disease_analysis.get("diagnoses", [])
+                total_issues += len(diagnoses)
+                if diagnoses:
+                    key_recommendations.append(f"{len(diagnoses)} maladie(s) identifiée(s)")
+
+        # Count issues from pest analysis
+        if pest_analysis:
+            if isinstance(pest_analysis, PestIdentificationOutput):
+                total_issues += pest_analysis.total_identifications
+                if pest_analysis.total_identifications > 0:
+                    key_recommendations.append(f"{pest_analysis.total_identifications} ravageur(s) identifié(s)")
+            elif isinstance(pest_analysis, dict):
+                pests = pest_analysis.get("pest_identifications", [])
+                total_issues += len(pests)
+                if pests:
+                    key_recommendations.append(f"{len(pests)} ravageur(s) identifié(s)")
+
+        # Count issues from nutrient analysis
+        if nutrient_analysis:
+            deficiencies = nutrient_analysis.get("nutrient_deficiencies", [])
+            total_issues += len(deficiencies)
+            if deficiencies:
+                key_recommendations.append(f"{len(deficiencies)} carence(s) identifiée(s)")
+
+        # Determine priority
+        if total_issues > 5:
+            priority_level = TreatmentPriority.CRITICAL
+            duration = "3-4 semaines"
+            key_recommendations.insert(0, "⚠️ PRIORITÉ CRITIQUE - Intervention immédiate requise")
+        elif total_issues > 2:
+            priority_level = TreatmentPriority.HIGH
+            duration = "2-3 semaines"
+            key_recommendations.insert(0, "Intervention rapide recommandée")
+        elif total_issues > 0:
+            priority_level = TreatmentPriority.MODERATE
+            duration = "1-2 semaines"
+            key_recommendations.insert(0, "Traitement préventif recommandé")
+        else:
+            duration = "Aucun traitement nécessaire"
+            key_recommendations.append("Aucun problème majeur détecté")
+
+        return ExecutiveSummary(
+            total_issues_identified=total_issues,
+            priority_level=priority_level,
+            estimated_treatment_duration=duration,
+            has_disease_issues=disease_analysis is not None,
+            has_pest_issues=pest_analysis is not None,
+            has_nutrient_issues=nutrient_analysis is not None,
+            key_recommendations=key_recommendations
+        )
     
-    def _generate_executive_summary(self, disease_analysis: Dict = None, pest_analysis: Dict = None, nutrient_analysis: Dict = None) -> Dict[str, Any]:
-        """Generate executive summary of treatment plan."""
-        summary = {
-            "total_issues_identified": 0,
-            "priority_level": "low",
-            "estimated_treatment_duration": "1-2 weeks",
-            "estimated_total_cost": 0.0
-        }
-        
-        # Count issues
-        if disease_analysis and "diagnoses" in disease_analysis:
-            summary["total_issues_identified"] += len(disease_analysis["diagnoses"])
-        
-        if pest_analysis and "pest_identifications" in pest_analysis:
-            summary["total_issues_identified"] += len(pest_analysis["pest_identifications"])
-        
-        if nutrient_analysis and "nutrient_deficiencies" in nutrient_analysis:
-            summary["total_issues_identified"] += len(nutrient_analysis["nutrient_deficiencies"])
-        
-        # Determine priority level
-        if summary["total_issues_identified"] > 5:
-            summary["priority_level"] = "high"
-            summary["estimated_treatment_duration"] = "3-4 weeks"
-        elif summary["total_issues_identified"] > 2:
-            summary["priority_level"] = "moderate"
-            summary["estimated_treatment_duration"] = "2-3 weeks"
-        
-        return summary
-    
-    def _generate_treatment_steps(self, disease_analysis: Dict = None, pest_analysis: Dict = None, nutrient_analysis: Dict = None) -> List[Dict[str, Any]]:
-        """Generate treatment steps based on analyses."""
-        treatment_steps = []
+    def _generate_treatment_steps(
+        self,
+        crop: Crop,
+        disease_analysis: Optional[Any],
+        pest_analysis: Optional[Any],
+        nutrient_analysis: Optional[Dict[str, Any]],
+        bbch_stage: Optional[int],
+        organic_farming: bool
+    ) -> Tuple[List[TreatmentStep], List[str]]:
+        """Generate treatment steps and warnings"""
+        steps = []
+        warnings = []
+        step_number = 1
         
         # Disease treatment steps
-        if disease_analysis and "diagnoses" in disease_analysis:
-            for diagnosis in disease_analysis["diagnoses"]:
-                if diagnosis["confidence"] > 0.6:
-                    for treatment in diagnosis["treatment_recommendations"]:
-                        step = TreatmentStep(
-                            step_name=f"Traitement maladie: {diagnosis['disease_name']}",
-                            description=f"Application de {treatment}",
-                            priority="high" if diagnosis["severity"] == "high" else "moderate",
-                            timing="immédiat",
-                            cost_estimate=self._estimate_treatment_cost(treatment),
-                            effectiveness="high" if diagnosis["confidence"] > 0.8 else "moderate"
-                        )
-                        treatment_steps.append(asdict(step))
+        if disease_analysis:
+            disease_steps = self._generate_disease_steps(
+                disease_analysis,
+                crop,
+                step_number,
+                organic_farming
+            )
+            steps.extend(disease_steps)
+            step_number += len(disease_steps)
         
         # Pest treatment steps
-        if pest_analysis and "pest_identifications" in pest_analysis:
-            for identification in pest_analysis["pest_identifications"]:
-                if identification["confidence"] > 0.6:
-                    for treatment in identification["treatment_recommendations"]:
-                        step = TreatmentStep(
-                            step_name=f"Traitement ravageur: {identification['pest_name']}",
-                            description=f"Application de {treatment}",
-                            priority="high" if identification["severity"] == "high" else "moderate",
-                            timing="immédiat",
-                            cost_estimate=self._estimate_treatment_cost(treatment),
-                            effectiveness="high" if identification["confidence"] > 0.8 else "moderate"
-                        )
-                        treatment_steps.append(asdict(step))
+        if pest_analysis:
+            pest_steps = self._generate_pest_steps(
+                pest_analysis,
+                crop,
+                step_number,
+                organic_farming
+            )
+            steps.extend(pest_steps)
+            step_number += len(pest_steps)
         
         # Nutrient treatment steps
-        if nutrient_analysis and "nutrient_deficiencies" in nutrient_analysis:
-            for deficiency in nutrient_analysis["nutrient_deficiencies"]:
-                if deficiency["confidence"] > 0.6:
-                    for treatment in deficiency["treatment_recommendations"]:
-                        step = TreatmentStep(
-                            step_name=f"Traitement carence: {deficiency['nutrient']}",
-                            description=f"Application de {treatment}",
-                            priority="moderate",
-                            timing="prochain_arrosage",
-                            cost_estimate=self._estimate_treatment_cost(treatment),
-                            effectiveness="high" if deficiency["confidence"] > 0.8 else "moderate"
-                        )
-                        treatment_steps.append(asdict(step))
-        
-        # Sort by priority
-        treatment_steps.sort(key=lambda x: 0 if x["priority"] == "high" else 1 if x["priority"] == "moderate" else 2)
-        
-        return treatment_steps
+        if nutrient_analysis:
+            nutrient_steps = self._generate_nutrient_steps(
+                nutrient_analysis,
+                crop,
+                step_number
+            )
+            steps.extend(nutrient_steps)
+
+        # Limit to MAX_TREATMENT_STEPS (realistic constraint)
+        if len(steps) > MAX_TREATMENT_STEPS:
+            truncated_count = len(steps) - MAX_TREATMENT_STEPS
+            warnings.append(
+                f"⚠️ Plan limité à {MAX_TREATMENT_STEPS} étapes prioritaires. "
+                f"{truncated_count} traitement(s) supplémentaire(s) recommandé(s). "
+                f"Consulter un expert pour plan complet."
+            )
+            logger.warning(f"Treatment plan has {len(steps)} steps - limiting to {MAX_TREATMENT_STEPS}")
+            steps = steps[:MAX_TREATMENT_STEPS]
+
+        return steps, warnings
     
-    def _generate_treatment_schedule(self, disease_analysis: Dict = None, pest_analysis: Dict = None, nutrient_analysis: Dict = None) -> Dict[str, Any]:
-        """Generate treatment schedule."""
-        schedule = {
-            "immediate_actions": [],
-            "short_term_actions": [],
-            "long_term_actions": []
-        }
+    def _generate_disease_steps(
+        self,
+        disease_analysis: Any,
+        crop: Crop,
+        start_number: int,
+        organic_farming: bool
+    ) -> List[TreatmentStep]:
+        """Generate disease treatment steps"""
+        steps = []
         
-        # Immediate actions (high priority)
-        if disease_analysis and "diagnoses" in disease_analysis:
-            for diagnosis in disease_analysis["diagnoses"]:
-                if diagnosis["severity"] == "high" and diagnosis["confidence"] > 0.7:
-                    schedule["immediate_actions"].append(f"Traitement urgent: {diagnosis['disease_name']}")
+        # Extract diagnoses
+        diagnoses = []
+        if isinstance(disease_analysis, DiseaseDiagnosisOutput):
+            diagnoses = disease_analysis.diagnoses
+        elif isinstance(disease_analysis, dict):
+            diagnoses = disease_analysis.get("diagnoses", [])
         
-        if pest_analysis and "pest_identifications" in pest_analysis:
-            for identification in pest_analysis["pest_identifications"]:
-                if identification["severity"] == "high" and identification["confidence"] > 0.7:
-                    schedule["immediate_actions"].append(f"Traitement urgent: {identification['pest_name']}")
+        for i, diagnosis in enumerate(diagnoses):
+            if isinstance(diagnosis, dict):
+                disease_name = diagnosis.get("disease_name", "Unknown")
+                confidence = diagnosis.get("confidence", 0.5)
+                severity = diagnosis.get("severity", "moderate")
+                treatments = diagnosis.get("treatment_recommendations", [])
+            else:
+                disease_name = diagnosis.disease_name
+                confidence = diagnosis.confidence
+                severity = diagnosis.severity.value if hasattr(diagnosis.severity, 'value') else diagnosis.severity
+                treatments = diagnosis.treatment_recommendations
+            
+            if confidence >= 0.5:
+                # Determine priority
+                if severity == "critical" or severity == "high":
+                    priority = TreatmentPriority.CRITICAL
+                    timing = TreatmentTiming.IMMEDIATE
+                elif severity == "moderate":
+                    priority = TreatmentPriority.HIGH
+                    timing = TreatmentTiming.WITHIN_24H
+                else:
+                    priority = TreatmentPriority.MODERATE
+                    timing = TreatmentTiming.WITHIN_WEEK
+                
+                # Select treatment type
+                treatment_type = TreatmentType.BIOLOGICAL if organic_farming else TreatmentType.CHEMICAL
+                
+                step = TreatmentStep(
+                    step_number=start_number + i,
+                    step_name=f"Traitement maladie: {disease_name}",
+                    description=f"Traitement contre {disease_name} sur {crop.name_fr}",
+                    treatment_type=treatment_type,
+                    priority=priority,
+                    timing=timing,
+                    target_issue=disease_name,
+                    products=treatments[:2] if treatments else ["Consulter expert"],
+                    dosage="Selon étiquette produit",
+                    application_method="Pulvérisation foliaire",
+                    cost_estimate_eur=TREATMENT_COSTS.get("biological" if organic_farming else "fungicide", 45.0),
+                    effectiveness_rating="high" if confidence > 0.7 else "moderate",
+                    safety_precautions=[
+                        "Port EPI obligatoire",
+                        "Respecter ZNT",
+                        "Conditions météo favorables"
+                    ],
+                    weather_requirements="Température < 25°C, vent < 15 km/h, pas de pluie 6h"
+                )
+                steps.append(step)
         
-        # Short-term actions (moderate priority)
-        if nutrient_analysis and "nutrient_deficiencies" in nutrient_analysis:
-            for deficiency in nutrient_analysis["nutrient_deficiencies"]:
-                if deficiency["confidence"] > 0.6:
-                    schedule["short_term_actions"].append(f"Correction carence: {deficiency['nutrient']}")
+        return steps
+    
+    def _generate_pest_steps(
+        self,
+        pest_analysis: Any,
+        crop: Crop,
+        start_number: int,
+        organic_farming: bool
+    ) -> List[TreatmentStep]:
+        """Generate pest treatment steps"""
+        steps = []
         
-        # Long-term actions (prevention)
-        schedule["long_term_actions"] = [
-            "Mise en place de mesures préventives",
-            "Surveillance accrue des cultures",
-            "Amélioration des pratiques culturales"
-        ]
+        # Extract pest identifications
+        pests = []
+        if isinstance(pest_analysis, PestIdentificationOutput):
+            pests = pest_analysis.pest_identifications
+        elif isinstance(pest_analysis, dict):
+            pests = pest_analysis.get("pest_identifications", [])
+        
+        for i, pest in enumerate(pests):
+            if isinstance(pest, dict):
+                pest_name = pest.get("pest_name", "Unknown")
+                confidence = pest.get("confidence", 0.5)
+                severity = pest.get("severity", "moderate")
+                treatments = pest.get("treatment_recommendations", [])
+                economic_threshold = pest.get("economic_threshold")
+                natural_enemies = pest.get("natural_enemies", [])
+            else:
+                pest_name = pest.pest_name
+                confidence = pest.confidence
+                severity = pest.severity.value if hasattr(pest.severity, 'value') else pest.severity
+                treatments = pest.treatment_recommendations
+                economic_threshold = getattr(pest, 'economic_threshold', None)
+                natural_enemies = getattr(pest, 'natural_enemies', [])
+
+            if confidence >= 0.5:
+                # Determine priority
+                if severity == "critical" or severity == "high":
+                    priority = TreatmentPriority.CRITICAL
+                    timing = TreatmentTiming.IMMEDIATE
+                elif severity == "moderate":
+                    priority = TreatmentPriority.HIGH
+                    timing = TreatmentTiming.WITHIN_24H
+                else:
+                    priority = TreatmentPriority.MODERATE
+                    timing = TreatmentTiming.WITHIN_WEEK
+                
+                # Select treatment type
+                treatment_type = TreatmentType.BIOLOGICAL if organic_farming else TreatmentType.INTEGRATED
+
+                # Build safety precautions with natural enemies warning
+                safety_precautions = ["Port EPI obligatoire", "Respecter ZNT"]
+                if natural_enemies:
+                    safety_precautions.insert(0, f"⚠️ Auxiliaires présents ({', '.join(natural_enemies[:2])}) - éviter insecticides à large spectre")
+                else:
+                    safety_precautions.append("Protéger auxiliaires")
+
+                # Build description with economic threshold
+                description = f"Lutte contre {pest_name} sur {crop.name_fr}"
+                if economic_threshold:
+                    description += f". Seuil d'intervention: {economic_threshold}"
+
+                step = TreatmentStep(
+                    step_number=start_number + i,
+                    step_name=f"Traitement ravageur: {pest_name}",
+                    description=description,
+                    treatment_type=treatment_type,
+                    priority=priority,
+                    timing=timing,
+                    target_issue=pest_name,
+                    products=treatments[:2] if treatments else ["Consulter expert"],
+                    dosage="Selon étiquette produit",
+                    application_method="Pulvérisation ou piégeage",
+                    cost_estimate_eur=TREATMENT_COSTS.get("biological" if organic_farming else "insecticide", 35.0),
+                    effectiveness_rating="high" if confidence > 0.7 else "moderate",
+                    safety_precautions=safety_precautions,
+                    weather_requirements="Température < 25°C, vent < 15 km/h"
+                )
+                steps.append(step)
+        
+        return steps
+    
+    def _generate_nutrient_steps(
+        self,
+        nutrient_analysis: Dict[str, Any],
+        crop: Crop,
+        start_number: int
+    ) -> List[TreatmentStep]:
+        """Generate nutrient treatment steps"""
+        steps = []
+        
+        deficiencies = nutrient_analysis.get("nutrient_deficiencies", [])
+        
+        for i, deficiency in enumerate(deficiencies):
+            nutrient = deficiency.get("nutrient", "Unknown")
+            severity = deficiency.get("severity", "moderate")
+            # Fix field name: nutrient tool uses "treatment_recommendations", not "recommendations"
+            recommendations = deficiency.get("treatment_recommendations", deficiency.get("recommendations", []))
+            
+            # Determine priority
+            if severity == "severe":
+                priority = TreatmentPriority.HIGH
+                timing = TreatmentTiming.WITHIN_WEEK
+            else:
+                priority = TreatmentPriority.MODERATE
+                timing = TreatmentTiming.SCHEDULED
+            
+            step = TreatmentStep(
+                step_number=start_number + i,
+                step_name=f"Correction carence: {nutrient}",
+                description=f"Apport de {nutrient} pour {crop.name_fr}",
+                treatment_type=TreatmentType.CULTURAL,
+                priority=priority,
+                timing=timing,
+                target_issue=f"Carence en {nutrient}",
+                products=recommendations[:2] if recommendations else [f"Engrais {nutrient}"],
+                dosage="Selon analyse de sol",
+                application_method="Épandage ou foliaire",
+                cost_estimate_eur=TREATMENT_COSTS.get("fertilizer", 50.0),
+                effectiveness_rating="high",
+                safety_precautions=[
+                    "Respecter doses",
+                    "Éviter lessivage",
+                    "Fractionnement si nécessaire"
+                ],
+                weather_requirements="Pas de pluie forte prévue"
+            )
+            steps.append(step)
+        
+        return steps
+    
+    def _generate_treatment_schedule(
+        self,
+        treatment_steps: List[TreatmentStep],
+        bbch_stage: Optional[int]
+    ) -> List[TreatmentSchedule]:
+        """Generate treatment schedule"""
+        schedule = []
+        
+        # Group by timing
+        immediate_steps = [s.step_number for s in treatment_steps if s.timing == TreatmentTiming.IMMEDIATE]
+        within_24h_steps = [s.step_number for s in treatment_steps if s.timing == TreatmentTiming.WITHIN_24H]
+        within_week_steps = [s.step_number for s in treatment_steps if s.timing == TreatmentTiming.WITHIN_WEEK]
+        scheduled_steps = [s.step_number for s in treatment_steps if s.timing == TreatmentTiming.SCHEDULED]
+        
+        if immediate_steps:
+            schedule.append(TreatmentSchedule(
+                scheduled_date="immediate",
+                treatment_steps=immediate_steps,
+                weather_dependent=True,
+                bbch_stage_dependent=False,
+                notes="Traitement urgent - intervenir dès que possible"
+            ))
+        
+        if within_24h_steps:
+            schedule.append(TreatmentSchedule(
+                scheduled_date="within_24h",
+                treatment_steps=within_24h_steps,
+                weather_dependent=True,
+                bbch_stage_dependent=False,
+                notes="Traitement prioritaire - dans les 24 heures"
+            ))
+        
+        if within_week_steps:
+            schedule.append(TreatmentSchedule(
+                scheduled_date="within_week",
+                treatment_steps=within_week_steps,
+                weather_dependent=True,
+                bbch_stage_dependent=False,
+                notes="Traitement à planifier cette semaine"
+            ))
+        
+        if scheduled_steps:
+            schedule.append(TreatmentSchedule(
+                scheduled_date="scheduled",
+                treatment_steps=scheduled_steps,
+                weather_dependent=False,
+                bbch_stage_dependent=True,
+                notes="Traitement à planifier selon stade cultural"
+            ))
         
         return schedule
     
-    def _generate_cost_analysis(self, disease_analysis: Dict = None, pest_analysis: Dict = None, nutrient_analysis: Dict = None) -> Dict[str, Any]:
-        """Generate cost analysis for treatment plan."""
-        total_cost = 0.0
-        cost_breakdown = {
-            "disease_treatments": 0.0,
-            "pest_treatments": 0.0,
-            "nutrient_treatments": 0.0
-        }
+    def _generate_cost_analysis(
+        self,
+        treatment_steps: List[TreatmentStep],
+        field_size_ha: Optional[float],
+        budget_constraint: Optional[float]
+    ) -> CostAnalysis:
+        """Generate cost analysis"""
+        # Calculate total cost
+        total_cost = sum(step.cost_estimate_eur or 0.0 for step in treatment_steps)
         
-        # Calculate disease treatment costs
-        if disease_analysis and "diagnoses" in disease_analysis:
-            for diagnosis in disease_analysis["diagnoses"]:
-                for treatment in diagnosis["treatment_recommendations"]:
-                    cost = self._estimate_treatment_cost(treatment)
-                    cost_breakdown["disease_treatments"] += cost
-                    total_cost += cost
+        # Calculate cost per hectare if field size provided
+        cost_per_ha = total_cost / field_size_ha if field_size_ha and field_size_ha > 0 else None
         
-        # Calculate pest treatment costs
-        if pest_analysis and "pest_identifications" in pest_analysis:
-            for identification in pest_analysis["pest_identifications"]:
-                for treatment in identification["treatment_recommendations"]:
-                    cost = self._estimate_treatment_cost(treatment)
-                    cost_breakdown["pest_treatments"] += cost
-                    total_cost += cost
+        # Cost breakdown by treatment type
+        cost_breakdown = {}
+        for step in treatment_steps:
+            treatment_type = step.treatment_type.value
+            cost_breakdown[treatment_type] = cost_breakdown.get(treatment_type, 0.0) + (step.cost_estimate_eur or 0.0)
+
+        # Validate breakdown sum matches total (within floating-point tolerance)
+        breakdown_sum = sum(cost_breakdown.values())
+        if abs(total_cost - breakdown_sum) > 0.01:
+            logger.warning(
+                f"Cost breakdown sum ({breakdown_sum:.2f}) doesn't match total ({total_cost:.2f}). "
+                f"Adjusting total to match breakdown."
+            )
+            total_cost = breakdown_sum
+
+        # Budget status
+        budget_status = "no_budget_set"
+        if budget_constraint:
+            if total_cost <= budget_constraint:
+                budget_status = "within_budget"
+            else:
+                budget_status = "over_budget"
         
-        # Calculate nutrient treatment costs
-        if nutrient_analysis and "nutrient_deficiencies" in nutrient_analysis:
-            for deficiency in nutrient_analysis["nutrient_deficiencies"]:
-                for treatment in deficiency["treatment_recommendations"]:
-                    cost = self._estimate_treatment_cost(treatment)
-                    cost_breakdown["nutrient_treatments"] += cost
-                    total_cost += cost
+        # Cost optimization suggestions
+        optimization_suggestions = []
+        if budget_status == "over_budget":
+            optimization_suggestions.append("Prioriser les traitements critiques")
+            optimization_suggestions.append("Considérer alternatives biologiques moins coûteuses")
+            optimization_suggestions.append("Fractionner les interventions")
         
-        return {
-            "total_cost": round(total_cost, 2),
-            "cost_breakdown": {k: round(v, 2) for k, v in cost_breakdown.items()},
-            "cost_per_hectare": round(total_cost / 10, 2)  # Assuming 10 hectares
-        }
+        return CostAnalysis(
+            total_estimated_cost_eur=total_cost,
+            cost_per_hectare_eur=cost_per_ha,
+            cost_breakdown=cost_breakdown,
+            budget_status=budget_status,
+            cost_optimization_suggestions=optimization_suggestions if optimization_suggestions else None
+        )
     
-    def _generate_monitoring_plan(self, disease_analysis: Dict = None, pest_analysis: Dict = None, nutrient_analysis: Dict = None) -> Dict[str, Any]:
-        """Generate monitoring plan."""
-        monitoring_plan = {
-            "monitoring_frequency": "quotidien",
-            "key_indicators": [],
-            "monitoring_duration": "2-4 semaines"
-        }
+    def _generate_monitoring_plan(
+        self,
+        treatment_steps: List[TreatmentStep],
+        crop: Crop
+    ) -> MonitoringPlan:
+        """Generate monitoring plan"""
+        # Determine monitoring frequency based on priority
+        has_critical = any(s.priority == TreatmentPriority.CRITICAL for s in treatment_steps)
+        has_high = any(s.priority == TreatmentPriority.HIGH for s in treatment_steps)
         
-        # Add monitoring indicators based on analyses
-        if disease_analysis and "diagnoses" in disease_analysis:
-            monitoring_plan["key_indicators"].extend(["symptômes_maladies", "progression_maladies"])
+        if has_critical:
+            frequency = "quotidien (3-5 jours)"
+        elif has_high:
+            frequency = "tous les 2-3 jours"
+        else:
+            frequency = "hebdomadaire"
         
-        if pest_analysis and "pest_identifications" in pest_analysis:
-            monitoring_plan["key_indicators"].extend(["présence_ravageurs", "dégâts_ravageurs"])
+        # Monitoring methods
+        methods = [
+            "Observation visuelle des symptômes",
+            "Comptage des ravageurs/maladies",
+            "Évaluation de l'efficacité des traitements"
+        ]
         
-        if nutrient_analysis and "nutrient_deficiencies" in nutrient_analysis:
-            monitoring_plan["key_indicators"].extend(["symptômes_carences", "croissance_plantes"])
+        # Success indicators
+        success_indicators = [
+            "Réduction des symptômes",
+            "Diminution de la pression parasitaire",
+            "Amélioration de la vigueur des plantes",
+            "Absence de nouveaux foyers"
+        ]
         
-        return monitoring_plan
+        # Warning signs
+        warning_signs = [
+            "Aggravation des symptômes",
+            "Extension des zones touchées",
+            "Apparition de nouveaux problèmes",
+            "Inefficacité des traitements"
+        ]
+        
+        # Reassessment date
+        reassessment = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
+        
+        return MonitoringPlan(
+            monitoring_frequency=frequency,
+            monitoring_methods=methods,
+            success_indicators=success_indicators,
+            warning_signs=warning_signs,
+            reassessment_date=reassessment
+        )
     
-    def _generate_prevention_measures(self, disease_analysis: Dict = None, pest_analysis: Dict = None, nutrient_analysis: Dict = None) -> List[str]:
-        """Generate prevention measures."""
-        prevention_measures = []
+    def _generate_prevention_measures(
+        self,
+        crop: Crop,
+        disease_analysis: Optional[Any],
+        pest_analysis: Optional[Any],
+        nutrient_analysis: Optional[Dict[str, Any]]
+    ) -> List[str]:
+        """Generate long-term prevention measures"""
+        measures = []
         
-        # Disease prevention
-        if disease_analysis and "diagnoses" in disease_analysis:
-            for diagnosis in disease_analysis["diagnoses"]:
-                prevention_measures.extend(diagnosis["prevention_measures"])
+        # Crop-specific measures
+        if crop.category == "cereal":
+            measures.extend([
+                "Rotation des cultures (3-4 ans)",
+                "Choix de variétés résistantes",
+                "Gestion des résidus de culture"
+            ])
+        elif crop.category == "oilseed":
+            measures.extend([
+                "Rotation avec céréales",
+                "Semis précoce pour éviter ravageurs",
+                "Gestion des adventices hôtes"
+            ])
         
-        # Pest prevention
-        if pest_analysis and "pest_identifications" in pest_analysis:
-            for identification in pest_analysis["pest_identifications"]:
-                prevention_measures.extend(identification["prevention_measures"])
+        # General prevention
+        measures.extend([
+            "Surveillance régulière des parcelles",
+            "Respect des bonnes pratiques culturales",
+            "Gestion équilibrée de la fertilisation",
+            "Favoriser la biodiversité fonctionnelle"
+        ])
         
-        # Nutrient prevention
-        if nutrient_analysis and "nutrient_deficiencies" in nutrient_analysis:
-            for deficiency in nutrient_analysis["nutrient_deficiencies"]:
-                prevention_measures.extend(deficiency["prevention_measures"])
-        
-        # Remove duplicates
-        prevention_measures = list(set(prevention_measures))
-        
-        return prevention_measures
+        return measures
     
-    def _estimate_treatment_cost(self, treatment: str) -> float:
-        """Estimate treatment cost based on treatment type."""
-        cost_estimates = {
-            "fongicide_systémique": 45.0,
-            "fongicide_contact": 35.0,
-            "insecticide_systémique": 40.0,
-            "insecticide_contact": 30.0,
-            "engrais_azoté": 25.0,
-            "engrais_phosphoré": 30.0,
-            "engrais_potassique": 35.0,
-            "compost": 15.0,
-            "chaulage": 20.0
-        }
+    def _estimate_duration(self, treatment_steps: List[TreatmentStep]) -> int:
+        """Estimate treatment duration in days"""
+        if not treatment_steps:
+            return 0
         
-        # Find matching treatment
-        for treatment_type, cost in cost_estimates.items():
-            if treatment_type in treatment.lower():
-                return cost
+        # Count by timing
+        has_immediate = any(s.timing == TreatmentTiming.IMMEDIATE for s in treatment_steps)
+        has_within_24h = any(s.timing == TreatmentTiming.WITHIN_24H for s in treatment_steps)
+        has_within_week = any(s.timing == TreatmentTiming.WITHIN_WEEK for s in treatment_steps)
+        has_scheduled = any(s.timing == TreatmentTiming.SCHEDULED for s in treatment_steps)
         
-        return 25.0  # Default cost
+        if has_scheduled:
+            return 21  # 3 weeks
+        elif has_within_week:
+            return 14  # 2 weeks
+        elif has_within_24h:
+            return 7   # 1 week
+        elif has_immediate:
+            return 3   # 3 days
+        else:
+            return 7   # Default 1 week
+
+
+
+# Create service instance
+_service = TreatmentService()
+
+
+# Async wrapper function
+async def generate_treatment_plan_enhanced(
+    crop_type: str,
+    eppo_code: Optional[str] = None,
+    disease_analysis: Optional[Dict[str, Any]] = None,
+    pest_analysis: Optional[Dict[str, Any]] = None,
+    nutrient_analysis: Optional[Dict[str, Any]] = None,
+    bbch_stage: Optional[int] = None,
+    organic_farming: Optional[bool] = False,
+    field_size_ha: Optional[float] = None,
+    budget_constraint: Optional[float] = None
+) -> str:
+    """
+    Generate comprehensive treatment plan integrating disease, pest, and nutrient analyses
+
+    Args:
+        crop_type: Type of crop (e.g., 'blé', 'maïs', 'colza')
+        eppo_code: Optional EPPO code for crop identification
+        disease_analysis: Optional disease diagnosis results
+        pest_analysis: Optional pest identification results
+        nutrient_analysis: Optional nutrient deficiency analysis results
+        bbch_stage: Optional BBCH growth stage (0-99)
+        organic_farming: Whether organic farming practices are required
+        field_size_ha: Optional field size in hectares
+        budget_constraint: Optional budget constraint in EUR
+
+    Returns:
+        JSON string with comprehensive treatment plan
+    """
+    try:
+        # Create input
+        input_data = TreatmentPlanInput(
+            crop_type=crop_type,
+            eppo_code=eppo_code,
+            disease_analysis=disease_analysis,
+            pest_analysis=pest_analysis,
+            nutrient_analysis=nutrient_analysis,
+            bbch_stage=bbch_stage,
+            organic_farming=organic_farming,
+            field_size_ha=field_size_ha,
+            budget_constraint=budget_constraint
+        )
+
+        # Execute treatment plan generation
+        result = await _service.generate_treatment_plan(input_data)
+
+        # Return JSON
+        return result.model_dump_json(indent=2)
+
+    except ValidationError as e:
+        logger.error(f"Treatment plan validation error: {e}")
+        error_result = TreatmentPlanOutput(
+            success=False,
+            crop_type=crop_type,
+            plan_metadata={},
+            executive_summary=ExecutiveSummary(
+                total_issues_identified=0,
+                priority_level=TreatmentPriority.LOW,
+                estimated_treatment_duration="unknown",
+                has_disease_issues=False,
+                has_pest_issues=False,
+                has_nutrient_issues=False,
+                key_recommendations=["Erreur de validation"]
+            ),
+            treatment_steps=[],
+            treatment_schedule=[],
+            cost_analysis=CostAnalysis(
+                total_estimated_cost_eur=0.0,
+                cost_breakdown={}
+            ),
+            monitoring_plan=MonitoringPlan(
+                monitoring_frequency="unknown",
+                monitoring_methods=[],
+                success_indicators=[],
+                warning_signs=[]
+            ),
+            prevention_measures=[],
+            total_steps=0,
+            error="Erreur de validation des paramètres. Vérifiez les analyses fournies.",
+            error_type="validation_error"
+        )
+        return error_result.model_dump_json(indent=2)
+
+    except Exception as e:
+        logger.error(f"Unexpected treatment plan error: {e}", exc_info=True)
+        error_result = TreatmentPlanOutput(
+            success=False,
+            crop_type=crop_type,
+            plan_metadata={},
+            executive_summary=ExecutiveSummary(
+                total_issues_identified=0,
+                priority_level=TreatmentPriority.LOW,
+                estimated_treatment_duration="unknown",
+                has_disease_issues=False,
+                has_pest_issues=False,
+                has_nutrient_issues=False,
+                key_recommendations=["Erreur inattendue"]
+            ),
+            treatment_steps=[],
+            treatment_schedule=[],
+            cost_analysis=CostAnalysis(
+                total_estimated_cost_eur=0.0,
+                cost_breakdown={}
+            ),
+            monitoring_plan=MonitoringPlan(
+                monitoring_frequency="unknown",
+                monitoring_methods=[],
+                success_indicators=[],
+                warning_signs=[]
+            ),
+            prevention_measures=[],
+            total_steps=0,
+            error="Erreur inattendue lors de la génération du plan de traitement. Veuillez réessayer.",
+            error_type="unknown"
+        )
+        return error_result.model_dump_json(indent=2)
+
+
+# Create structured tool
+generate_treatment_plan_tool = StructuredTool.from_function(
+    func=generate_treatment_plan_enhanced,
+    name="generate_treatment_plan",
+    description="""Génère un plan de traitement complet intégrant maladies, ravageurs et carences nutritionnelles.
+
+Retourne un plan détaillé avec:
+- Résumé exécutif des problèmes identifiés
+- Étapes de traitement prioritisées
+- Calendrier de traitement
+- Analyse des coûts
+- Plan de surveillance
+- Mesures préventives
+
+Utilisez cet outil pour créer un plan d'action complet après avoir identifié des problèmes de santé des cultures.""",
+    args_schema=TreatmentPlanInput,
+    return_direct=False,
+    coroutine=generate_treatment_plan_enhanced,
+    handle_validation_error=True
+)
+
