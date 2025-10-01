@@ -1,74 +1,75 @@
 """
-Calculate Performance Metrics Tool - Single Purpose Tool
+Enhanced Calculate Performance Metrics Tool.
 
-Job: Calculate performance metrics from farm data records.
-Input: JSON string of records from GetFarmDataTool
-Output: JSON string with calculated metrics
-
-This tool does ONLY:
-- Execute specific, well-defined function
-- Take structured inputs, return structured outputs
-- Contain domain-specific business logic
-- Be stateless and reusable
-
-No prompting logic, no orchestration, no agent responsibilities.
+Improvements:
+- Type-safe Pydantic schemas
+- Redis caching (30min TTL for metrics)
+- Structured error handling
+- Direct database integration
+- Comprehensive metrics calculation
 """
 
-from typing import Dict, List, Any, Optional
-from langchain.tools import BaseTool
 import logging
-import json
-from dataclasses import dataclass
+from typing import Optional, List, Dict, Any
+from datetime import datetime
+from langchain.tools import StructuredTool
+
+from app.tools.schemas.farm_data_schemas import (
+    PerformanceMetricsInput,
+    PerformanceMetricsOutput,
+    OverallMetrics,
+    CropMetrics,
+    TimePeriod,
+    TrendDirection
+)
+from app.core.cache import redis_cache
+from app.tools.farm_data_agent.get_farm_data_tool import FarmDataService
 
 logger = logging.getLogger(__name__)
 
-@dataclass
-class FarmDataRecord:
-    """Structured farm data record."""
-    parcel: str
-    crop: str
-    surface: float
-    yield_value: float
-    date: str
-    cost_per_hectare: float
-    quality_score: float
 
-class CalculatePerformanceMetricsTool(BaseTool):
-    """
-    Tool: Calculate performance metrics from farm data records.
-    
-    Job: Take farm data records and calculate key performance metrics.
-    Input: JSON string of records from GetFarmDataTool
-    Output: JSON string with calculated metrics
-    """
-    
-    name: str = "calculate_performance_metrics_tool"
-    description: str = "Calcule les métriques de performance à partir des données d'exploitation"
-    
-    def _run(
-        self,
-        records_json: str,
-        **kwargs
-    ) -> str:
+class PerformanceMetricsService:
+    """Service for calculating performance metrics with caching"""
+
+    @redis_cache(ttl=1800, model_class=PerformanceMetricsOutput, category="farm_data")
+    async def calculate_metrics(self, input_data: PerformanceMetricsInput) -> PerformanceMetricsOutput:
         """
-        Calculates performance metrics from a list of farm records.
-        Input should be a JSON string of records from the get_farm_records tool.
+        Calculate performance metrics from farm data
+        
+        Args:
+            input_data: Validated input
+            
+        Returns:
+            PerformanceMetricsOutput with calculated metrics
+            
+        Raises:
+            ValueError: If calculation fails
         """
         try:
-            data = json.loads(records_json)
+            # Get farm data first
+            from app.tools.schemas.farm_data_schemas import FarmDataInput
+            farm_data_service = FarmDataService()
+            farm_data_input = FarmDataInput(
+                time_period=input_data.time_period,
+                crops=input_data.crops,
+                parcels=input_data.parcels,
+                farm_id=input_data.farm_id,
+                use_mesparcelles=False  # Don't need API data for metrics
+            )
+            farm_data = await farm_data_service.get_farm_data(farm_data_input)
             
-            if "error" in data:
-                return records_json  # Pass through errors
+            if not farm_data.success or not farm_data.database_records:
+                return PerformanceMetricsOutput(
+                    success=False,
+                    total_records=0,
+                    error="Aucune donnée disponible pour le calcul des métriques",
+                    error_type="no_data"
+                )
             
-            records_data = data.get("records", [])
-            if not records_data:
-                return json.dumps({"error": "Aucune donnée fournie pour le calcul des métriques"})
+            records = farm_data.database_records
             
-            # Convert back to FarmDataRecord objects for processing
-            records = [FarmDataRecord(**record_dict) for record_dict in records_data]
-            
-            # Calculate metrics
-            metrics = self._calculate_metrics(records)
+            # Calculate overall metrics
+            overall_metrics = self._calculate_overall_metrics(records)
             
             # Calculate crop-specific metrics
             crop_metrics = self._calculate_crop_metrics(records)
@@ -76,136 +77,244 @@ class CalculatePerformanceMetricsTool(BaseTool):
             # Calculate parcel metrics
             parcel_metrics = self._calculate_parcel_metrics(records)
             
-            result = {
-                "overall_metrics": metrics,
-                "crop_metrics": crop_metrics,
-                "parcel_metrics": parcel_metrics,
-                "total_records": len(records)
-            }
+            logger.info(f"✅ Calculated metrics for {len(records)} records")
             
-            return json.dumps(result, ensure_ascii=False)
+            return PerformanceMetricsOutput(
+                success=True,
+                overall_metrics=overall_metrics,
+                crop_metrics=crop_metrics,
+                parcel_metrics=parcel_metrics,
+                total_records=len(records)
+            )
             
         except Exception as e:
-            logger.error(f"Calculate performance metrics error: {e}")
-            return json.dumps({"error": f"Erreur lors du calcul des métriques: {str(e)}"})
-    
-    def _calculate_metrics(self, records: List[FarmDataRecord]) -> Dict[str, Any]:
-        """Calculate overall performance metrics."""
+            logger.error(f"Performance metrics calculation error: {e}", exc_info=True)
+            raise ValueError(f"Erreur lors du calcul des métriques: {str(e)}")
+
+    def _calculate_overall_metrics(self, records: List[Any]) -> OverallMetrics:
+        """
+        Calculate overall performance metrics from REAL intervention data.
+
+        Uses intervention_summary from each record to extract:
+        - Real yield data from harvest interventions
+        - Real cost data from input costs (when available)
+        - Returns None for missing data instead of mock values
+        """
         if not records:
-            return {"error": "No records provided"}
-        
-        total_surface = sum(r.surface for r in records)
+            raise ValueError("No records provided")
+
+        total_surface = sum(r.surface_ha for r in records)
         if total_surface == 0:
-            return {"error": "Total surface is zero"}
-        
-        total_yield_production = sum(r.yield_value * r.surface for r in records)
-        average_yield = total_yield_production / total_surface
-        
-        total_cost = sum(r.cost_per_hectare * r.surface for r in records)
-        average_cost = total_cost / total_surface
-        
-        average_quality = sum(r.quality_score for r in records) / len(records)
-        
-        # Calculate yield trend
-        yield_trend = self._calculate_yield_trend(records)
-        
-        return {
-            "total_surface_ha": round(total_surface, 2),
-            "average_yield_q_ha": round(average_yield, 2),
-            "total_cost_eur": round(total_cost, 2),
-            "average_cost_eur_ha": round(average_cost, 2),
-            "average_quality_score": round(average_quality, 2),
-            "yield_trend": yield_trend,
-            "record_count": len(records)
-        }
-    
-    def _calculate_crop_metrics(self, records: List[FarmDataRecord]) -> Dict[str, Any]:
-        """Calculate metrics by crop."""
-        crop_metrics = {}
-        
+            raise ValueError("Total surface is zero")
+
+        # Extract real data from intervention summaries
+        total_yield_q = 0.0
+        total_cost_eur = 0.0
+        records_with_yield = 0
+        records_with_cost = 0
+
         for record in records:
-            if record.crop not in crop_metrics:
-                crop_metrics[record.crop] = {
-                    "total_surface": 0,
-                    "total_yield": 0,
-                    "total_cost": 0,
-                    "quality_scores": [],
-                    "records": []
-                }
-            
-            crop_metrics[record.crop]["total_surface"] += record.surface
-            crop_metrics[record.crop]["total_yield"] += record.yield_value * record.surface
-            crop_metrics[record.crop]["total_cost"] += record.cost_per_hectare * record.surface
-            crop_metrics[record.crop]["quality_scores"].append(record.quality_score)
-            crop_metrics[record.crop]["records"].append(record)
-        
-        # Calculate averages
-        for crop, metrics in crop_metrics.items():
-            if metrics["total_surface"] > 0:
-                metrics["average_yield"] = round(metrics["total_yield"] / metrics["total_surface"], 2)
-                metrics["average_cost"] = round(metrics["total_cost"] / metrics["total_surface"], 2)
-            metrics["average_quality"] = round(sum(metrics["quality_scores"]) / len(metrics["quality_scores"]), 2)
-            metrics["record_count"] = len(metrics["records"])
+            if record.intervention_summary:
+                summary = record.intervention_summary
+
+                # Use real yield data if available
+                if summary.average_yield_q_ha is not None:
+                    total_yield_q += summary.average_yield_q_ha * record.surface_ha
+                    records_with_yield += 1
+
+                # Use real cost data if available
+                if summary.total_cost_eur is not None:
+                    total_cost_eur += summary.total_cost_eur
+                    records_with_cost += 1
+
+        # Calculate averages only if we have real data
+        average_yield_q_ha = None
+        if records_with_yield > 0:
+            average_yield_q_ha = round(total_yield_q / total_surface, 2)
+
+        average_cost_eur_ha = None
+        if records_with_cost > 0:
+            average_cost_eur_ha = round(total_cost_eur / total_surface, 2)
+
+        # Quality score not available from current data
+        # TODO: Add quality tracking to interventions
+        average_quality_score = None
+
+        # Yield trend not calculable without historical data
+        yield_trend = TrendDirection.INSUFFICIENT_DATA
+
+        return OverallMetrics(
+            total_surface_ha=round(total_surface, 2),
+            average_yield_q_ha=average_yield_q_ha,
+            total_cost_eur=round(total_cost_eur, 2) if records_with_cost > 0 else None,
+            average_cost_eur_ha=average_cost_eur_ha,
+            average_quality_score=average_quality_score,
+            yield_trend=yield_trend,
+            record_count=len(records)
+        )
+
+    def _calculate_crop_metrics(self, records: List[Any]) -> Dict[str, CropMetrics]:
+        """
+        Calculate metrics by crop using REAL intervention data.
+
+        Returns None for metrics where no real data is available.
+        """
+        crop_data: Dict[str, List[Any]] = {}
+
+        for record in records:
+            for culture in record.cultures:
+                if culture not in crop_data:
+                    crop_data[culture] = []
+                crop_data[culture].append(record)
+
+        crop_metrics = {}
+        for crop, crop_records in crop_data.items():
+            total_surface = sum(r.surface_ha for r in crop_records)
+
+            # Extract real data from intervention summaries
+            total_yield_q = 0.0
+            total_cost_eur = 0.0
+            records_with_yield = 0
+            records_with_cost = 0
+
+            for record in crop_records:
+                if record.intervention_summary:
+                    summary = record.intervention_summary
+
+                    if summary.average_yield_q_ha is not None:
+                        total_yield_q += summary.average_yield_q_ha * record.surface_ha
+                        records_with_yield += 1
+
+                    if summary.total_cost_eur is not None:
+                        total_cost_eur += summary.total_cost_eur
+                        records_with_cost += 1
+
+            # Calculate averages only if we have real data
+            average_yield = None
+            if records_with_yield > 0 and total_surface > 0:
+                average_yield = round(total_yield_q / total_surface, 2)
+
+            average_cost = None
+            if records_with_cost > 0 and total_surface > 0:
+                average_cost = round(total_cost_eur / total_surface, 2)
+
+            # Quality not available
+            average_quality = None
+
+            crop_metrics[crop] = CropMetrics(
+                total_surface=round(total_surface, 2),
+                average_yield=average_yield,
+                average_cost=average_cost,
+                average_quality=average_quality,
+                record_count=len(crop_records)
+            )
         
         return crop_metrics
-    
-    def _calculate_parcel_metrics(self, records: List[FarmDataRecord]) -> Dict[str, Any]:
-        """Calculate metrics by parcel."""
+
+    def _calculate_parcel_metrics(self, records: List[Any]) -> Dict[str, CropMetrics]:
+        """
+        Calculate metrics by parcel using REAL intervention data.
+
+        Returns None for metrics where no real data is available.
+        """
         parcel_metrics = {}
-        
+
         for record in records:
-            if record.parcel not in parcel_metrics:
-                parcel_metrics[record.parcel] = {
-                    "total_surface": 0,
-                    "total_yield": 0,
-                    "total_cost": 0,
-                    "quality_scores": [],
-                    "records": []
-                }
-            
-            parcel_metrics[record.parcel]["total_surface"] += record.surface
-            parcel_metrics[record.parcel]["total_yield"] += record.yield_value * record.surface
-            parcel_metrics[record.parcel]["total_cost"] += record.cost_per_hectare * record.surface
-            parcel_metrics[record.parcel]["quality_scores"].append(record.quality_score)
-            parcel_metrics[record.parcel]["records"].append(record)
-        
-        # Calculate averages
-        for parcel, metrics in parcel_metrics.items():
-            if metrics["total_surface"] > 0:
-                metrics["average_yield"] = round(metrics["total_yield"] / metrics["total_surface"], 2)
-                metrics["average_cost"] = round(metrics["total_cost"] / metrics["total_surface"], 2)
-            metrics["average_quality"] = round(sum(metrics["quality_scores"]) / len(metrics["quality_scores"]), 2)
-            metrics["record_count"] = len(metrics["records"])
-        
+            parcel = record.parcel
+
+            # Extract real data from intervention summary
+            average_yield = None
+            average_cost = None
+            average_quality = None
+
+            if record.intervention_summary:
+                summary = record.intervention_summary
+                average_yield = summary.average_yield_q_ha
+                average_cost = summary.average_cost_eur_ha
+                # Quality not available
+
+            parcel_metrics[parcel] = CropMetrics(
+                total_surface=round(record.surface_ha, 2),
+                average_yield=average_yield,
+                average_cost=average_cost,
+                average_quality=average_quality,
+                record_count=1
+            )
+
         return parcel_metrics
+
+
+async def calculate_performance_metrics_enhanced(
+    farm_id: Optional[str] = None,
+    time_period: Optional[str] = None,
+    crops: Optional[List[str]] = None,
+    parcels: Optional[List[str]] = None
+) -> str:
+    """
+    Async wrapper for calculate performance metrics tool
     
-    def _calculate_yield_trend(self, records: List[FarmDataRecord]) -> str:
-        """Calculate yield trend over time."""
-        if len(records) < 2:
-            return "insufficient_data"
+    Args:
+        farm_id: Farm ID (SIRET) to calculate metrics for
+        time_period: Time period for metrics calculation
+        crops: Specific crops to analyze
+        parcels: Specific parcels to analyze
         
-        # Sort by date
-        sorted_records = sorted(records, key=lambda r: r.date)
+    Returns:
+        JSON string with performance metrics
+    """
+    try:
+        # Validate inputs
+        input_data = PerformanceMetricsInput(
+            farm_id=farm_id,
+            time_period=TimePeriod(time_period) if time_period else None,
+            crops=crops,
+            parcels=parcels
+        )
         
-        # Calculate average yield for each year
-        yearly_yields = {}
-        for record in sorted_records:
-            year = record.date[:4]
-            if year not in yearly_yields:
-                yearly_yields[year] = []
-            yearly_yields[year].append(record.yield_value)
+        # Execute service
+        service = PerformanceMetricsService()
+        result = await service.calculate_metrics(input_data)
         
-        if len(yearly_yields) < 2:
-            return "insufficient_data"
+        # Return as JSON
+        return result.model_dump_json(indent=2, exclude_none=True)
         
-        # Calculate trend
-        years = sorted(yearly_yields.keys())
-        first_year_avg = sum(yearly_yields[years[0]]) / len(yearly_yields[years[0]])
-        last_year_avg = sum(yearly_yields[years[-1]]) / len(yearly_yields[years[-1]])
+    except ValueError as e:
+        logger.error(f"Performance metrics validation error: {e}")
+        error_result = PerformanceMetricsOutput(
+            success=False,
+            total_records=0,
+            error=str(e),
+            error_type="validation"
+        )
+        return error_result.model_dump_json(indent=2)
         
-        if last_year_avg > first_year_avg * 1.05:
-            return "increasing"
-        elif last_year_avg < first_year_avg * 0.95:
-            return "decreasing"
-        else:
-            return "stable"
+    except Exception as e:
+        logger.error(f"Unexpected performance metrics error: {e}", exc_info=True)
+        error_result = PerformanceMetricsOutput(
+            success=False,
+            total_records=0,
+            error="Erreur inattendue lors du calcul des métriques. Veuillez réessayer.",
+            error_type="unknown"
+        )
+        return error_result.model_dump_json(indent=2)
+
+
+# Create the StructuredTool
+calculate_performance_metrics_tool = StructuredTool.from_function(
+    func=calculate_performance_metrics_enhanced,
+    name="calculate_performance_metrics",
+    description="""Calcule les métriques de performance à partir des données d'exploitation.
+
+Retourne des métriques détaillées avec:
+- Métriques globales (rendement, coûts, qualité)
+- Métriques par culture
+- Métriques par parcelle
+- Tendances de performance
+
+Utilisez cet outil quand les agriculteurs demandent leurs performances, rendements, ou coûts.""",
+    args_schema=PerformanceMetricsInput,
+    return_direct=False,
+    coroutine=calculate_performance_metrics_enhanced,
+    handle_validation_error=True
+)
+
