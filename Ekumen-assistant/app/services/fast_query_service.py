@@ -12,7 +12,7 @@ from langchain_openai import ChatOpenAI
 from langchain.schema import HumanMessage, SystemMessage
 
 from app.core.config import settings
-from app.tools.weather_agent.get_weather_data_tool import GetWeatherDataTool
+from app.tools.weather_agent.get_weather_data_tool import get_weather_data_tool
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class FastQueryService:
     
     def __init__(self):
         self.llm = None
-        self.weather_tool = GetWeatherDataTool()
+        self.weather_tool = get_weather_data_tool
         self._initialize()
     
     def _initialize(self):
@@ -147,9 +147,9 @@ class FastQueryService:
         try:
             # Extract location from query or context
             location = self._extract_location(query, context)
-            
-            # Get weather data directly
-            weather_data = await self.weather_tool._arun(location=location)
+
+            # Get weather data directly using ainvoke
+            weather_data = await self.weather_tool.ainvoke({"location": location})
             
             # Generate concise response
             system_prompt = """Tu es un assistant agricole rapide et concis.

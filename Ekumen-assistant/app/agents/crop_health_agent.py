@@ -25,7 +25,8 @@ from ..tools.crop_health_agent import (
     generate_treatment_plan_tool
 )
 from ..prompts.crop_health_prompts import get_crop_health_react_prompt
-from ..prompts.prompt_manager import PromptManager
+# PromptManager deleted - using prompt_registry instead
+from ..prompts.prompt_registry import get_agent_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +52,6 @@ class CropHealthIntelligenceAgent:
         llm: Optional[ChatOpenAI] = None,
         tools: Optional[List] = None,
         config: Optional[Dict[str, Any]] = None,
-        prompt_manager: Optional[PromptManager] = None,
         enable_dynamic_examples: bool = False,  # Default to False for token optimization
         max_iterations: int = 10,  # Increased for complex multi-step diagnosis
         enable_metrics: bool = True
@@ -63,7 +63,6 @@ class CropHealthIntelligenceAgent:
             llm: Language model to use (if None, creates default ChatOpenAI)
             tools: List of tools to use (if None, uses 4 production crop health tools)
             config: Additional configuration (optional)
-            prompt_manager: PromptManager for advanced prompt features (optional)
             enable_dynamic_examples: Whether to include few-shot examples (default False for token optimization)
             max_iterations: Maximum ReAct iterations (default 10 for complex crop health diagnosis)
             enable_metrics: Whether to track performance metrics
@@ -83,7 +82,6 @@ class CropHealthIntelligenceAgent:
         ]
 
         self.config = config or {}
-        self.prompt_manager = prompt_manager or PromptManager()
         self.enable_dynamic_examples = enable_dynamic_examples
         self.max_iterations = max_iterations
         self.enable_metrics = enable_metrics

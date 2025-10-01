@@ -16,7 +16,7 @@ from langchain.schema import BaseMessage
 
 from app.services.advanced_langchain_service import AdvancedLangChainService
 from app.services.langgraph_workflow_service import LangGraphWorkflowService
-from app.services.conditional_routing_service import ConditionalRoutingService
+# ConditionalRoutingService deleted - routing now handled by orchestrator agent
 from app.services.fast_query_service import FastQueryService
 
 logger = logging.getLogger(__name__)

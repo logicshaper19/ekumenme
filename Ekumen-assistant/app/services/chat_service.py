@@ -11,7 +11,6 @@ from sqlalchemy.orm import selectinload
 from app.models.conversation import Conversation, Message, ConversationStatus
 from app.models.user import User
 from app.schemas.chat import ConversationCreate, ChatMessage
-from app.agents import orchestrator
 from app.services.advanced_langchain_service import AdvancedLangChainService
 from app.services.langgraph_workflow_service import LangGraphWorkflowService
 from app.services.memory_service import MemoryService
@@ -495,24 +494,14 @@ class ChatService:
                 except Exception as e:
                     logger.warning(f"LangGraph workflow processing failed: {e}")
 
-            # Fallback to basic orchestrator (last resort)
+            # Fallback to error message (last resort)
             if not result:
-                logger.info("⚡ Using BASIC ORCHESTRATOR (last resort)")
-                from app.services.agent_orchestrator import AgentOrchestrator
-                basic_orchestrator = AgentOrchestrator()
-
-                basic_result = basic_orchestrator.process_message(
-                    message=message_content,
-                    user_id=user_id,
-                    farm_id=farm_siret,
-                    context=context
-                )
-
+                logger.warning("All processing methods failed - returning error message")
                 result = {
-                    "response": basic_result.get("response", ""),
-                    "agent_type": basic_result.get("agent", conversation.agent_type),
-                    "confidence": 0.5,
-                    "processing_method": "basic_orchestrator_fallback",
+                    "response": "Je suis désolé, je rencontre des difficultés techniques. Veuillez réessayer dans quelques instants.",
+                    "agent_type": conversation.agent_type,
+                    "confidence": 0.0,
+                    "processing_method": "error_fallback",
                     "metadata": basic_result.get("metadata", {})
                 }
 
@@ -678,16 +667,22 @@ class ChatService:
     def get_available_agents(self) -> List[dict]:
         """Get list of available AI agents"""
         try:
-            agent_names = orchestrator.get_available_agents()
+            # Use AgentManager to get agent profiles
+            from app.agents.agent_manager import AgentManager
+            agent_manager = AgentManager()
+
+            # Return agent profiles from AgentManager
             agents = []
-            
-            for name in agent_names:
-                agent_info = orchestrator.get_agent_info(name)
-                if agent_info:
-                    agents.append(agent_info)
-            
+            for agent_type, profile in agent_manager.agent_profiles.items():
+                agents.append({
+                    "name": profile.name,
+                    "type": agent_type.value,  # Convert enum to string
+                    "description": profile.description,
+                    "capabilities": profile.capabilities
+                })
+
             return agents
-            
+
         except Exception as e:
             logger.error(f"Error getting available agents: {e}")
             return []

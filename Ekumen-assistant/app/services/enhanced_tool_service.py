@@ -38,12 +38,20 @@ class ToolValidationError(Exception):
 
 class EnhancedAgriculturalTool(BaseTool):
     """Base class for enhanced agricultural tools"""
-    
+
+    # Define as class attributes to avoid Pydantic field validation issues
+    regulatory_service: Optional[UnifiedRegulatoryService] = None
+    execution_count: int = 0
+    last_execution: Optional[datetime] = None
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.regulatory_service = UnifiedRegulatoryService()
-        self.execution_count = 0
-        self.last_execution = None
+        # Initialize services after Pydantic validation
+        if self.regulatory_service is None:
+            object.__setattr__(self, 'regulatory_service', UnifiedRegulatoryService())
+        if self.execution_count == 0:
+            object.__setattr__(self, 'execution_count', 0)
+        object.__setattr__(self, 'last_execution', None)
     
     def _validate_inputs(self, **kwargs) -> Dict[str, Any]:
         """Validate tool inputs"""

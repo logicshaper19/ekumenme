@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 
 from app.core.config import settings
 from app.services.unified_regulatory_service import UnifiedRegulatoryService
-from app.services.semantic_routing_service import SemanticRoutingService
+# SemanticRoutingService deleted - routing now handled by orchestrator agent
 from app.services.memory_persistence_service import MemoryPersistenceService
 from app.services.langgraph_workflow_service import LangGraphWorkflowService
 
@@ -72,12 +72,33 @@ class AdvancedLangChainService:
                 openai_api_key=settings.OPENAI_API_KEY
             )
             
-            # Initialize memory
-            self.memory = ConversationBufferWindowMemory(
-                k=10,
-                memory_key="chat_history",
-                return_messages=True
-            )
+            # Initialize memory - using updated approach
+            # ConversationBufferWindowMemory is deprecated, use ChatMessageHistory instead
+            try:
+                from langchain.memory import ChatMessageHistory
+                from langchain_core.runnables.history import RunnableWithMessageHistory
+
+                # Create message history store
+                self.message_history = {}
+
+                def get_session_history(session_id: str):
+                    if session_id not in self.message_history:
+                        self.message_history[session_id] = ChatMessageHistory()
+                    return self.message_history[session_id]
+
+                self.get_session_history = get_session_history
+                self.memory = None  # Will use RunnableWithMessageHistory pattern instead
+                logger.info("✅ Using updated ChatMessageHistory pattern")
+
+            except ImportError:
+                # Fallback to deprecated version
+                from langchain.memory import ConversationBufferWindowMemory
+                self.memory = ConversationBufferWindowMemory(
+                    k=10,
+                    memory_key="chat_history",
+                    return_messages=True
+                )
+                logger.warning("⚠️  Using deprecated ConversationBufferWindowMemory - see migration guide")
             
             # Initialize tools
             self._initialize_tools()
@@ -90,9 +111,6 @@ class AdvancedLangChainService:
             
             # Initialize agent executor
             self._initialize_agent_executor()
-
-            # Initialize semantic routing
-            self._initialize_semantic_routing()
 
             # Initialize memory persistence
             self._initialize_memory_persistence()
@@ -392,15 +410,6 @@ UTILISE CES OUTILS de manière proactive pour enrichir tes réponses avec des do
         except Exception as e:
             logger.error(f"Failed to initialize agent executor: {e}")
 
-    def _initialize_semantic_routing(self):
-        """Initialize semantic routing service"""
-        try:
-            self.semantic_router = SemanticRoutingService()
-            logger.info("Semantic routing initialized successfully")
-        except Exception as e:
-            logger.error(f"Failed to initialize semantic routing: {e}")
-            self.semantic_router = None
-
     def _initialize_memory_persistence(self):
         """Initialize memory persistence service"""
         try:
@@ -585,7 +594,7 @@ UTILISE CES OUTILS de manière proactive pour enrichir tes réponses avec des do
             "word_count": len(query.split()),
             "secondary_agents": secondary_agents,
             "routing_explanation": routing_explanation,
-            "semantic_routing_used": routing_result is not None
+            "orchestrator_routing_used": routing_result is not None
         }
 
     async def _get_rag_context(self, query: str) -> Dict[str, Any]:

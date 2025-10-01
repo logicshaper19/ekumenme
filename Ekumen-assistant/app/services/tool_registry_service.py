@@ -8,46 +8,44 @@ import logging
 from typing import Dict, Any, Optional
 from langchain.tools import BaseTool
 
-# Import all tools
+# Import all tools (as instances, not classes)
 from app.tools import (
     # Weather tools
-    GetWeatherDataTool,
-    AnalyzeWeatherRisksTool,
-    IdentifyInterventionWindowsTool,
-    CalculateEvapotranspirationTool,
-    
+    get_weather_data_tool,
+    analyze_weather_risks_tool,
+    identify_intervention_windows_tool,
+    calculate_evapotranspiration_tool,
+
     # Planning tools
-    GeneratePlanningTasksTool,
-    OptimizeTaskSequenceTool,
-    CalculatePlanningCostsTool,
-    AnalyzeResourceRequirementsTool,
-    GeneratePlanningReportTool,
-    
+    generate_planning_tasks_tool,
+    optimize_task_sequence_tool,
+    calculate_planning_costs_tool,
+    analyze_resource_requirements_tool,
+    check_crop_feasibility_tool,
+
     # Farm data tools
-    GetFarmDataTool,
-    CalculatePerformanceMetricsTool,
-    BenchmarkCropPerformanceTool,
-    AnalyzeTrendsTool,
-    GenerateFarmReportTool,
-    
+    get_farm_data_tool,
+    calculate_performance_metrics_tool,
+    benchmark_crop_performance_tool,
+    analyze_trends_tool,
+
     # Crop health tools
-    DiagnoseDiseaseTool,
-    IdentifyPestTool,
-    AnalyzeNutrientDeficiencyTool,
-    GenerateTreatmentPlanTool,
-    
+    diagnose_disease_tool,
+    identify_pest_tool,
+    analyze_nutrient_deficiency_tool,
+    generate_treatment_plan_tool,
+
     # Regulatory tools
-    DatabaseIntegratedAMMLookupTool,
-    CheckRegulatoryComplianceTool,
-    GetSafetyGuidelinesTool,
-    CheckEnvironmentalRegulationsTool,
-    
+    database_integrated_amm_tool,
+    check_regulatory_compliance_tool,
+    get_safety_guidelines_tool,
+    check_environmental_regulations_tool,
+
     # Sustainability tools
-    CalculateCarbonFootprintTool,
-    AssessBiodiversityTool,
-    AnalyzeSoilHealthTool,
-    AssessWaterManagementTool,
-    GenerateSustainabilityReportTool
+    calculate_carbon_footprint_tool,
+    assess_biodiversity_tool,
+    analyze_soil_health_tool,
+    assess_water_management_tool
 )
 
 logger = logging.getLogger(__name__)
@@ -71,46 +69,44 @@ class ToolRegistryService:
         logger.info(f"Initialized Tool Registry with {len(self.tools)} tools")
     
     def _register_all_tools(self):
-        """Register all available tools"""
-        
+        """Register all available tools (using pre-instantiated tool instances)"""
+
         # Weather tools
-        self._register_tool("get_weather_data", GetWeatherDataTool())
-        self._register_tool("analyze_weather_risks", AnalyzeWeatherRisksTool())
-        self._register_tool("identify_intervention_windows", IdentifyInterventionWindowsTool())
-        self._register_tool("calculate_evapotranspiration", CalculateEvapotranspirationTool())
-        
+        self._register_tool("get_weather_data", get_weather_data_tool)
+        self._register_tool("analyze_weather_risks", analyze_weather_risks_tool)
+        self._register_tool("identify_intervention_windows", identify_intervention_windows_tool)
+        self._register_tool("calculate_evapotranspiration", calculate_evapotranspiration_tool)
+
         # Planning tools
-        self._register_tool("generate_planning_tasks", GeneratePlanningTasksTool())
-        self._register_tool("optimize_task_sequence", OptimizeTaskSequenceTool())
-        self._register_tool("calculate_planning_costs", CalculatePlanningCostsTool())
-        self._register_tool("analyze_resource_requirements", AnalyzeResourceRequirementsTool())
-        self._register_tool("generate_planning_report", GeneratePlanningReportTool())
-        
+        self._register_tool("generate_planning_tasks", generate_planning_tasks_tool)
+        self._register_tool("optimize_task_sequence", optimize_task_sequence_tool)
+        self._register_tool("calculate_planning_costs", calculate_planning_costs_tool)
+        self._register_tool("analyze_resource_requirements", analyze_resource_requirements_tool)
+        self._register_tool("check_crop_feasibility", check_crop_feasibility_tool)
+
         # Farm data tools
-        self._register_tool("get_farm_data", GetFarmDataTool())
-        self._register_tool("calculate_performance_metrics", CalculatePerformanceMetricsTool())
-        self._register_tool("benchmark_crop_performance", BenchmarkCropPerformanceTool())
-        self._register_tool("analyze_trends", AnalyzeTrendsTool())
-        self._register_tool("generate_farm_report", GenerateFarmReportTool())
-        
+        self._register_tool("get_farm_data", get_farm_data_tool)
+        self._register_tool("calculate_performance_metrics", calculate_performance_metrics_tool)
+        self._register_tool("benchmark_crop_performance", benchmark_crop_performance_tool)
+        self._register_tool("analyze_trends", analyze_trends_tool)
+
         # Crop health tools
-        self._register_tool("diagnose_disease", DiagnoseDiseaseTool())
-        self._register_tool("identify_pest", IdentifyPestTool())
-        self._register_tool("analyze_nutrient_deficiency", AnalyzeNutrientDeficiencyTool())
-        self._register_tool("generate_treatment_plan", GenerateTreatmentPlanTool())
-        
+        self._register_tool("diagnose_disease", diagnose_disease_tool)
+        self._register_tool("identify_pest", identify_pest_tool)
+        self._register_tool("analyze_nutrient_deficiency", analyze_nutrient_deficiency_tool)
+        self._register_tool("generate_treatment_plan", generate_treatment_plan_tool)
+
         # Regulatory tools
-        self._register_tool("lookup_amm", DatabaseIntegratedAMMLookupTool())
-        self._register_tool("check_regulatory_compliance", CheckRegulatoryComplianceTool())
-        self._register_tool("get_safety_guidelines", GetSafetyGuidelinesTool())
-        self._register_tool("check_environmental_regulations", CheckEnvironmentalRegulationsTool())
-        
+        self._register_tool("lookup_amm", database_integrated_amm_tool)
+        self._register_tool("check_regulatory_compliance", check_regulatory_compliance_tool)
+        self._register_tool("get_safety_guidelines", get_safety_guidelines_tool)
+        self._register_tool("check_environmental_regulations", check_environmental_regulations_tool)
+
         # Sustainability tools
-        self._register_tool("calculate_carbon_footprint", CalculateCarbonFootprintTool())
-        self._register_tool("assess_biodiversity", AssessBiodiversityTool())
-        self._register_tool("analyze_soil_health", AnalyzeSoilHealthTool())
-        self._register_tool("assess_water_management", AssessWaterManagementTool())
-        self._register_tool("generate_sustainability_report", GenerateSustainabilityReportTool())
+        self._register_tool("calculate_carbon_footprint", calculate_carbon_footprint_tool)
+        self._register_tool("assess_biodiversity", assess_biodiversity_tool)
+        self._register_tool("analyze_soil_health", analyze_soil_health_tool)
+        self._register_tool("assess_water_management", assess_water_management_tool)
     
     def _register_tool(self, name: str, tool: BaseTool):
         """Register a single tool"""
@@ -120,6 +116,10 @@ class ToolRegistryService:
     def get_tool(self, tool_name: str) -> Optional[BaseTool]:
         """Get tool by name"""
         return self.tools.get(tool_name)
+
+    def get_all_tools(self) -> list[BaseTool]:
+        """Get all registered tools as a list"""
+        return list(self.tools.values())
     
     async def execute_tool(
         self,
