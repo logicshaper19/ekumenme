@@ -89,6 +89,17 @@ class EnhancedWaterManagementService:
     RAINFALL_LOW_THRESHOLD = 400  # Below this: arid/semi-arid
     RAINFALL_MEDIUM_THRESHOLD = 800  # 400-800: moderate rainfall
     RAINFALL_HIGH_THRESHOLD = 1200  # Above 800: high rainfall
+
+    # Soil type water holding capacity adjustments
+    # Affects irrigation frequency and efficiency
+    SOIL_WATER_ADJUSTMENTS = {
+        "sandy": {"retention": 0.7, "note": "faible rétention, irrigation fréquente"},
+        "sableux": {"retention": 0.7, "note": "faible rétention, irrigation fréquente"},
+        "loamy": {"retention": 1.0, "note": "rétention optimale"},
+        "limoneux": {"retention": 1.0, "note": "rétention optimale"},
+        "clay": {"retention": 1.2, "note": "forte rétention, drainage important"},
+        "argileux": {"retention": 1.2, "note": "forte rétention, drainage important"},
+    }
     
     @redis_cache(ttl=7200, model_class=WaterManagementOutput, category="sustainability")
     async def assess_water_management(self, input_data: WaterManagementInput) -> WaterManagementOutput:
@@ -119,7 +130,8 @@ class EnhancedWaterManagementService:
                     input_data.annual_water_usage_m3,
                     input_data.surface_ha,
                     input_data.crop,
-                    input_data.rainfall_mm_annual
+                    input_data.rainfall_mm_annual,
+                    input_data.soil_type
                 )
                 indicator_scores.append(usage_score)
 
@@ -180,9 +192,15 @@ class EnhancedWaterManagementService:
             if input_data.annual_water_usage_m3:
                 water_use_efficiency = input_data.annual_water_usage_m3 / input_data.surface_ha
 
+            # Calculate economic savings (if water cost provided)
+            annual_cost_savings = None
+            if savings_potential > 0 and input_data.water_cost_eur_per_m3:
+                annual_cost_savings = savings_potential * input_data.water_cost_eur_per_m3
+
             logger.info(
                 f"✅ Water management assessed: {input_data.surface_ha} ha, "
-                f"score {overall_score:.1f}/10 ({overall_status})"
+                f"score {overall_score:.1f}/10 ({overall_status}), "
+                f"savings potential: {savings_potential:.0f} m³/year"
             )
 
             return WaterManagementOutput(
@@ -194,6 +212,7 @@ class EnhancedWaterManagementService:
                 indicator_scores=indicator_scores,
                 water_use_efficiency=round(water_use_efficiency, 1) if water_use_efficiency else None,
                 estimated_water_savings_potential_m3=round(savings_potential, 0) if savings_potential > 0 else None,
+                estimated_annual_cost_savings_eur=round(annual_cost_savings, 0) if annual_cost_savings else None,
                 improvement_recommendations=recommendations,
                 critical_issues=[]  # Could add critical issues logic later
             )
@@ -259,19 +278,18 @@ class EnhancedWaterManagementService:
         annual_usage_m3: float,
         surface_ha: float,
         crop: str,
-        rainfall_mm: Optional[float] = None
+        rainfall_mm: Optional[float] = None,
+        soil_type: Optional[str] = None
     ) -> WaterIndicatorScore:
         """
         Score water usage efficiency compared to crop requirements.
 
-        Adjusts benchmarks based on rainfall:
-        - High rainfall (>800mm): Reduces irrigation needs by 20%
-        - Moderate rainfall (400-800mm): Reduces by 10%
-        - Low rainfall (<400mm): No adjustment (full irrigation needed)
+        Adjusts benchmarks based on:
+        - Rainfall: High (>800mm) reduces needs by 20%, Moderate (400-800mm) by 10%
+        - Soil type: Sandy soils need 30% more water (low retention), clay 20% less (high retention)
 
         LIMITATION: Uses temperate climate benchmarks. Actual requirements vary by:
         - Climate zone (Mediterranean vs Continental)
-        - Soil type (sandy vs clay)
         - Rainfall distribution
         - Crop variety
         """
@@ -290,49 +308,61 @@ class EnhancedWaterManagementService:
             elif rainfall_mm < self.RAINFALL_LOW_THRESHOLD:
                 rainfall_note = f" (climat aride {rainfall_mm:.0f}mm/an)"
 
+        # Determine soil type adjustment factor
+        soil_adjustment = 1.0
+        soil_note = ""
+        if soil_type:
+            soil_lower = soil_type.lower()
+            if soil_lower in self.SOIL_WATER_ADJUSTMENTS:
+                soil_data = self.SOIL_WATER_ADJUSTMENTS[soil_lower]
+                soil_adjustment = soil_data["retention"]
+                soil_note = f", sol {soil_lower} ({soil_data['note']})"
+
         crop_lower = crop.lower()
         if crop_lower in self.CROP_WATER_REQUIREMENTS:
             requirements = self.CROP_WATER_REQUIREMENTS[crop_lower]
-            # Adjust requirements based on rainfall
-            optimal = requirements["optimal"] * rainfall_adjustment
-            max_acceptable = requirements["max"] * rainfall_adjustment
+            # Adjust requirements based on rainfall AND soil type
+            # Rainfall reduces needs (more rain = less irrigation)
+            # Soil affects retention (sandy needs more, clay needs less)
+            optimal = requirements["optimal"] * rainfall_adjustment * soil_adjustment
+            max_acceptable = requirements["max"] * rainfall_adjustment * soil_adjustment
 
             # Calculate efficiency
             if usage_per_ha <= optimal:
                 # Under or at optimal - excellent
                 score = 10.0
                 status = "excellent"
-                description = f"Usage {usage_per_ha:.0f} m³/ha ≤ optimal {optimal:.0f} m³/ha pour {crop}{rainfall_note} - Excellent"
+                description = f"Usage {usage_per_ha:.0f} m³/ha ≤ optimal {optimal:.0f} m³/ha pour {crop}{rainfall_note}{soil_note} - Excellent"
             elif usage_per_ha <= max_acceptable:
                 # Between optimal and max - good
                 excess_pct = ((usage_per_ha - optimal) / optimal) * 100
                 score = max(7.0 - (excess_pct / self.USAGE_SCORE_DECAY_FACTOR), 5.0)
                 status = "good"
-                description = f"Usage {usage_per_ha:.0f} m³/ha acceptable pour {crop}{rainfall_note} (+{excess_pct:.0f}% vs optimal)"
+                description = f"Usage {usage_per_ha:.0f} m³/ha acceptable pour {crop}{rainfall_note}{soil_note} (+{excess_pct:.0f}% vs optimal)"
             elif usage_per_ha <= max_acceptable * self.USAGE_EXCESS_MODERATE_THRESHOLD:
                 # 30% over max - moderate
                 excess_pct = ((usage_per_ha - optimal) / optimal) * 100
                 score = 4.0
                 status = "moderate"
-                description = f"Usage {usage_per_ha:.0f} m³/ha élevé pour {crop}{rainfall_note} (+{excess_pct:.0f}% vs optimal)"
+                description = f"Usage {usage_per_ha:.0f} m³/ha élevé pour {crop}{rainfall_note}{soil_note} (+{excess_pct:.0f}% vs optimal)"
             else:
                 # Very high usage - poor
                 excess_pct = ((usage_per_ha - optimal) / optimal) * 100
                 score = 2.0
                 status = "poor"
-                description = f"Usage {usage_per_ha:.0f} m³/ha très élevé pour {crop}{rainfall_note} (+{excess_pct:.0f}% vs optimal)"
+                description = f"Usage {usage_per_ha:.0f} m³/ha très élevé pour {crop}{rainfall_note}{soil_note} (+{excess_pct:.0f}% vs optimal)"
         else:
             # Unknown crop - use generic benchmark
-            generic_optimal = self.GENERIC_CROP_OPTIMAL_M3 * rainfall_adjustment
+            generic_optimal = self.GENERIC_CROP_OPTIMAL_M3 * rainfall_adjustment * soil_adjustment
             if usage_per_ha <= generic_optimal:
                 score = 7.0
                 status = "good"
-                description = f"Usage {usage_per_ha:.0f} m³/ha (culture {crop} non référencée, benchmark générique{rainfall_note})"
+                description = f"Usage {usage_per_ha:.0f} m³/ha (culture {crop} non référencée, benchmark générique{rainfall_note}{soil_note})"
             else:
                 excess_pct = ((usage_per_ha - generic_optimal) / generic_optimal) * 100
                 score = max(5.0 - (excess_pct / 30), 2.0)
                 status = "moderate"
-                description = f"Usage {usage_per_ha:.0f} m³/ha (culture {crop} non référencée, +{excess_pct:.0f}% vs benchmark{rainfall_note})"
+                description = f"Usage {usage_per_ha:.0f} m³/ha (culture {crop} non référencée, +{excess_pct:.0f}% vs benchmark{rainfall_note}{soil_note})"
 
         return WaterIndicatorScore(
             indicator=WaterManagementIndicator.WATER_CONSERVATION,
@@ -534,21 +564,37 @@ class EnhancedWaterManagementService:
         usage_score: WaterIndicatorScore,
         conservation_score: WaterIndicatorScore
     ) -> List[str]:
-        """Generate prioritized water management recommendations"""
+        """Generate prioritized water management recommendations with ROI when possible"""
         recommendations = []
+
+        # Calculate potential savings for ROI estimates
+        water_cost = input_data.water_cost_eur_per_m3
+        annual_usage = input_data.annual_water_usage_m3
 
         # Irrigation system recommendations
         if input_data.irrigation_method:
             system_lower = input_data.irrigation_method.lower()
             if system_lower in ["flood", "gravitaire", "submersion"]:
+                roi_note = ""
+                if water_cost and annual_usage:
+                    # Estimate 35% savings from system upgrade
+                    annual_savings_m3 = annual_usage * 0.35
+                    annual_savings_eur = annual_savings_m3 * water_cost
+                    roi_note = f", économie ~{annual_savings_eur:.0f}€/an"
                 recommendations.append(
-                    "💧 PRIORITÉ 1: Upgrade système irrigation gravitaire → goutte-à-goutte "
-                    "(économie 30-40%, ROI 3-5 ans)"
+                    f"💧 PRIORITÉ 1: Upgrade système irrigation gravitaire → goutte-à-goutte "
+                    f"(économie 30-40%{roi_note}, ROI 3-5 ans)"
                 )
             elif system_lower in ["sprinkler", "aspersion"]:
+                roi_note = ""
+                if water_cost and annual_usage:
+                    # Estimate 17% savings from system upgrade
+                    annual_savings_m3 = annual_usage * 0.17
+                    annual_savings_eur = annual_savings_m3 * water_cost
+                    roi_note = f", économie ~{annual_savings_eur:.0f}€/an"
                 recommendations.append(
-                    "💧 Considérer upgrade aspersion → goutte-à-goutte "
-                    "(économie 15-20%, meilleure uniformité)"
+                    f"💧 Considérer upgrade aspersion → goutte-à-goutte "
+                    f"(économie 15-20%{roi_note}, meilleure uniformité)"
                 )
 
         # Conservation practices recommendations
@@ -611,7 +657,9 @@ async def assess_water_management_enhanced(
     buffer_strips: bool = False,
     contour_farming: bool = False,
     location: Optional[str] = None,
-    rainfall_mm_annual: Optional[float] = None
+    rainfall_mm_annual: Optional[float] = None,
+    soil_type: Optional[str] = None,
+    water_cost_eur_per_m3: Optional[float] = None
 ) -> str:
     """
     Async wrapper for assess water management tool
@@ -631,9 +679,11 @@ async def assess_water_management_enhanced(
         contour_farming: Whether contour farming is practiced
         location: Location for regional context (optional)
         rainfall_mm_annual: Annual rainfall in mm (optional)
+        soil_type: Soil type (sandy, loamy, clay) for water retention adjustment (optional)
+        water_cost_eur_per_m3: Cost of water in €/m³ for ROI calculations (optional)
 
     Returns:
-        JSON string with water management assessment
+        JSON string with water management assessment including economic savings if water cost provided
 
     LIMITATION: Water requirements based on temperate climate.
     Mediterranean: +50%, Oceanic: -30%, Arid: irrigation essential.
@@ -654,7 +704,9 @@ async def assess_water_management_enhanced(
             buffer_strips=buffer_strips,
             contour_farming=contour_farming,
             location=location,
-            rainfall_mm_annual=rainfall_mm_annual
+            rainfall_mm_annual=rainfall_mm_annual,
+            soil_type=soil_type,
+            water_cost_eur_per_m3=water_cost_eur_per_m3
         )
         
         # Execute service

@@ -249,6 +249,8 @@ class WaterManagementInput(BaseModel):
     # Optional context
     location: Optional[str] = Field(default=None, max_length=100)
     rainfall_mm_annual: Optional[float] = Field(default=None, ge=0, description="Annual rainfall (mm)")
+    soil_type: Optional[str] = Field(default=None, description="sandy, loamy, clay, etc.")
+    water_cost_eur_per_m3: Optional[float] = Field(default=None, ge=0, description="Cost of water (€/m³) for ROI calculation")
 
 
 class WaterManagementOutput(BaseModel):
@@ -262,6 +264,7 @@ class WaterManagementOutput(BaseModel):
     indicator_scores: List[WaterIndicatorScore] = Field(default_factory=list)
     water_use_efficiency: Optional[float] = Field(default=None, description="m³/ha if data available")
     estimated_water_savings_potential_m3: Optional[float] = Field(default=None, ge=0)
+    estimated_annual_cost_savings_eur: Optional[float] = Field(default=None, ge=0, description="Annual cost savings (€/year)")
     improvement_recommendations: List[str] = Field(default_factory=list)
     critical_issues: List[str] = Field(default_factory=list)
     timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
