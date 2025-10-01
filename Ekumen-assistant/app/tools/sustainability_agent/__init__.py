@@ -11,14 +11,14 @@ Tools:
 - assess_water_management_tool: Assess water management with economic ROI
 """
 
-from .calculate_carbon_footprint_tool import carbon_footprint_tool
-from .assess_biodiversity_tool import biodiversity_tool
-from .analyze_soil_health_tool import soil_health_tool
-from .assess_water_management_tool import water_management_tool
+from .calculate_carbon_footprint_tool import calculate_carbon_footprint_tool
+from .assess_biodiversity_tool import assess_biodiversity_tool
+from .analyze_soil_health_tool import analyze_soil_health_tool
+from .assess_water_management_tool import assess_water_management_tool
 
 __all__ = [
-    "carbon_footprint_tool",
-    "biodiversity_tool",
-    "soil_health_tool",
-    "water_management_tool"
+    "calculate_carbon_footprint_tool",
+    "assess_biodiversity_tool",
+    "analyze_soil_health_tool",
+    "assess_water_management_tool"
 ]

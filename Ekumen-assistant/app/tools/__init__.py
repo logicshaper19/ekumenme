@@ -47,10 +47,10 @@ from .regulatory_agent import (
     check_environmental_regulations_tool
 )
 from .sustainability_agent import (
-    carbon_footprint_tool,
-    biodiversity_tool,
-    soil_health_tool,
-    water_management_tool
+    calculate_carbon_footprint_tool,
+    assess_biodiversity_tool,
+    analyze_soil_health_tool,
+    assess_water_management_tool
 )
 
 __all__ = [
@@ -87,8 +87,8 @@ __all__ = [
     "check_environmental_regulations_tool",
 
     # Sustainability Agent Tools (Production-Ready with Uncertainty Quantification & Economic ROI)
-    "carbon_footprint_tool",
-    "biodiversity_tool",
-    "soil_health_tool",
-    "water_management_tool"
+    "calculate_carbon_footprint_tool",
+    "assess_biodiversity_tool",
+    "analyze_soil_health_tool",
+    "assess_water_management_tool"
 ]

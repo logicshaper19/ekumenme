@@ -99,15 +99,11 @@ class WeatherService:
         logger.debug(f"Using TTL of {ttl}s for {days}-day forecast")
 
         try:
-            # Get weather forecast
-            if use_real_api:
-                try:
-                    weather_data = await self._get_real_weather_data(location, days, coordinates)
-                except Exception as e:
-                    logger.warning(f"Real weather API failed, falling back to mock: {e}")
-                    weather_data = self._get_mock_weather_data(location, days)
-            else:
-                weather_data = self._get_mock_weather_data(location, days)
+            # Get weather forecast from real API only
+            if not use_real_api:
+                raise WeatherAPIError("Mock data disabled - real weather API required for production use")
+
+            weather_data = await self._get_real_weather_data(location, days, coordinates)
             
             # Analyze agricultural risks
             risks = self._analyze_agricultural_risks(weather_data["weather_conditions"])
@@ -144,8 +140,10 @@ class WeatherService:
         days: int,
         coordinates: Optional[Coordinates] = None
     ) -> dict:
-        """Get weather data from real APIs"""
-        
+        """Get weather data from real APIs - NO MOCK FALLBACK"""
+
+        errors = []
+
         # Try WeatherAPI.com first
         api_key = os.getenv("WEATHER_API_KEY")
         if api_key:
@@ -154,20 +152,32 @@ class WeatherService:
             except requests.HTTPError as e:
                 if e.response.status_code == 404:
                     raise WeatherLocationNotFoundError(location)
-                logger.warning(f"WeatherAPI.com failed: {e}")
-        
-        # Try OpenWeatherMap
+                error_msg = f"WeatherAPI.com failed: {e}"
+                logger.warning(error_msg)
+                errors.append(error_msg)
+        else:
+            errors.append("WEATHER_API_KEY not configured")
+
+        # Try OpenWeatherMap as backup
         api_key = os.getenv("OPENWEATHER_API_KEY")
         if api_key:
             try:
                 coords_dict = coordinates.model_dump() if coordinates else None
                 return self._get_openweather_data(location, days, api_key, coords_dict)
             except Exception as e:
-                logger.warning(f"OpenWeatherMap failed: {e}")
-        
-        # Fallback to mock data
-        logger.info("No weather API available, using mock data")
-        return self._get_mock_weather_data(location, days)
+                error_msg = f"OpenWeatherMap failed: {e}"
+                logger.warning(error_msg)
+                errors.append(error_msg)
+        else:
+            errors.append("OPENWEATHER_API_KEY not configured")
+
+        # No API available - FAIL (do not use mock data)
+        error_summary = "; ".join(errors)
+        logger.error(f"All weather APIs failed: {error_summary}")
+        raise WeatherAPIError(
+            f"Service météo indisponible. Veuillez configurer WEATHER_API_KEY ou OPENWEATHER_API_KEY. "
+            f"Erreurs: {error_summary}"
+        )
     
     def _get_weatherapi_data(self, location: str, days: int, api_key: str) -> dict:
         """Get weather data from WeatherAPI.com"""
@@ -279,45 +289,10 @@ class WeatherService:
             "retrieved_at": datetime.utcnow().isoformat() + "Z"
         }
     
-    def _get_mock_weather_data(self, location: str, days: int) -> dict:
-        """Get mock weather data for testing"""
-        
-        base_conditions = {
-            "normandie": {"temp_min": 8, "temp_max": 18, "humidity": 75},
-            "calvados": {"temp_min": 8, "temp_max": 18, "humidity": 75},
-            "paris": {"temp_min": 10, "temp_max": 20, "humidity": 65},
-            "lyon": {"temp_min": 12, "temp_max": 22, "humidity": 60}
-        }
-        
-        base = base_conditions.get(location.lower(), base_conditions["normandie"])
-        forecast_conditions = []
-        current_date = datetime.now()
-        
-        for i in range(days):
-            date_str = (current_date + timedelta(days=i)).strftime("%Y-%m-%d")
-            temp_variation = (i % 3 - 1) * 2
-            
-            condition = WeatherCondition(
-                date=date_str,
-                temperature_min=base["temp_min"] + temp_variation,
-                temperature_max=base["temp_max"] + temp_variation,
-                humidity=max(30, min(95, base["humidity"] + (i % 4 - 1.5) * 10)),
-                wind_speed=8 + (i % 5) * 2,
-                wind_direction=["N", "NE", "E", "SE", "S", "SO", "O", "NO"][i % 8],
-                precipitation=0 if (i % 3) != 0 else (2 + i % 8),
-                cloud_cover=30 + (i % 7) * 10,
-                uv_index=max(1, min(8, 4 + (i % 3) - 1))
-            )
-            forecast_conditions.append(condition)
-        
-        return {
-            "location": location,
-            "coordinates": {"lat": 49.18, "lon": 0.37},
-            "weather_conditions": forecast_conditions,
-            "data_source": "mock_data",
-            "retrieved_at": datetime.utcnow().isoformat() + "Z"
-        }
-    
+    # REMOVED: _get_mock_weather_data()
+    # Mock weather data is DANGEROUS for farmers - removed entirely.
+    # Production system must use real weather APIs only.
+
     def _degrees_to_direction(self, degrees: float) -> str:
         """Convert wind degrees to direction"""
         directions = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"]
