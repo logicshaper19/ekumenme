@@ -59,7 +59,7 @@ class EnhancedCarbonFootprintService:
     EMISSION_FACTORS = {
         "diesel": 2.68,  # kg CO2eq/L
         "gasoline": 2.31,  # kg CO2eq/L
-        "nitrogen": 5.5,  # kg CO2eq/kg N (includes production + N2O)
+        "nitrogen": 5.5,  # kg CO2eq/kg N (range: 5-11 depending on type and N2O emissions)
         "phosphorus": 1.2,  # kg CO2eq/kg P2O5
         "potassium": 0.6,  # kg CO2eq/kg K2O
         "organic_fertilizer": 0.3,  # kg CO2eq/kg (much lower)
@@ -99,70 +99,44 @@ class EnhancedCarbonFootprintService:
             ValueError: If calculation fails
         """
         try:
-            emissions_by_source = []
             total_emissions = 0.0
             data_completeness_notes = []
-            
-            # Calculate fuel emissions
+
+            # Track emissions by source (calculate totals first, then create Pydantic objects)
+            fuel_emissions_total = 0.0
+            fertilizer_emissions_total = 0.0
+            pesticide_emissions_total = 0.0
+
+            # Calculate fuel emissions (diesel + gasoline combined)
             if input_data.diesel_liters is not None and input_data.diesel_liters > 0:
-                diesel_emissions = input_data.diesel_liters * self.EMISSION_FACTORS["diesel"]
-                total_emissions += diesel_emissions
-                emissions_by_source.append(CarbonEmission(
-                    source=CarbonSource.FUEL,
-                    emissions_kg_co2eq=round(diesel_emissions, 1),
-                    percentage_of_total=0.0,  # Will calculate later
-                    reduction_potential_percent=20.0  # Precision agriculture, route optimization
-                ))
-            else:
-                data_completeness_notes.append("Consommation diesel non fournie - émissions carburant non calculées")
-            
+                fuel_emissions_total += input_data.diesel_liters * self.EMISSION_FACTORS["diesel"]
             if input_data.gasoline_liters is not None and input_data.gasoline_liters > 0:
-                gasoline_emissions = input_data.gasoline_liters * self.EMISSION_FACTORS["gasoline"]
-                total_emissions += gasoline_emissions
-                # Add to existing fuel emission or create new
-                fuel_emission = next((e for e in emissions_by_source if e.source == CarbonSource.FUEL), None)
-                if fuel_emission:
-                    fuel_emission.emissions_kg_co2eq += round(gasoline_emissions, 1)
-                else:
-                    emissions_by_source.append(CarbonEmission(
-                        source=CarbonSource.FUEL,
-                        emissions_kg_co2eq=round(gasoline_emissions, 1),
-                        percentage_of_total=0.0,
-                        reduction_potential_percent=20.0
-                    ))
-            
-            # Calculate fertilizer emissions
-            fertilizer_emissions = 0.0
-            if input_data.nitrogen_kg is not None and input_data.nitrogen_kg > 0:
-                fertilizer_emissions += input_data.nitrogen_kg * self.EMISSION_FACTORS["nitrogen"]
-            if input_data.phosphorus_kg is not None and input_data.phosphorus_kg > 0:
-                fertilizer_emissions += input_data.phosphorus_kg * self.EMISSION_FACTORS["phosphorus"]
-            if input_data.potassium_kg is not None and input_data.potassium_kg > 0:
-                fertilizer_emissions += input_data.potassium_kg * self.EMISSION_FACTORS["potassium"]
-            if input_data.organic_fertilizer_kg is not None and input_data.organic_fertilizer_kg > 0:
-                fertilizer_emissions += input_data.organic_fertilizer_kg * self.EMISSION_FACTORS["organic_fertilizer"]
-            
-            if fertilizer_emissions > 0:
-                total_emissions += fertilizer_emissions
-                emissions_by_source.append(CarbonEmission(
-                    source=CarbonSource.FERTILIZER,
-                    emissions_kg_co2eq=round(fertilizer_emissions, 1),
-                    percentage_of_total=0.0,
-                    reduction_potential_percent=30.0  # Precision fertilization, organic alternatives
-                ))
+                fuel_emissions_total += input_data.gasoline_liters * self.EMISSION_FACTORS["gasoline"]
+
+            if fuel_emissions_total == 0:
+                data_completeness_notes.append("Consommation carburant non fournie - émissions carburant non calculées")
             else:
+                total_emissions += fuel_emissions_total
+
+            # Calculate fertilizer emissions (all types combined)
+            if input_data.nitrogen_kg is not None and input_data.nitrogen_kg > 0:
+                fertilizer_emissions_total += input_data.nitrogen_kg * self.EMISSION_FACTORS["nitrogen"]
+            if input_data.phosphorus_kg is not None and input_data.phosphorus_kg > 0:
+                fertilizer_emissions_total += input_data.phosphorus_kg * self.EMISSION_FACTORS["phosphorus"]
+            if input_data.potassium_kg is not None and input_data.potassium_kg > 0:
+                fertilizer_emissions_total += input_data.potassium_kg * self.EMISSION_FACTORS["potassium"]
+            if input_data.organic_fertilizer_kg is not None and input_data.organic_fertilizer_kg > 0:
+                fertilizer_emissions_total += input_data.organic_fertilizer_kg * self.EMISSION_FACTORS["organic_fertilizer"]
+
+            if fertilizer_emissions_total == 0:
                 data_completeness_notes.append("Quantités engrais non fournies - émissions fertilisation non calculées")
-            
+            else:
+                total_emissions += fertilizer_emissions_total
+
             # Calculate pesticide emissions
             if input_data.pesticide_kg is not None and input_data.pesticide_kg > 0:
-                pesticide_emissions = input_data.pesticide_kg * self.EMISSION_FACTORS["pesticide"]
-                total_emissions += pesticide_emissions
-                emissions_by_source.append(CarbonEmission(
-                    source=CarbonSource.PESTICIDES,
-                    emissions_kg_co2eq=round(pesticide_emissions, 1),
-                    percentage_of_total=0.0,
-                    reduction_potential_percent=40.0  # IPM, biological control
-                ))
+                pesticide_emissions_total = input_data.pesticide_kg * self.EMISSION_FACTORS["pesticide"]
+                total_emissions += pesticide_emissions_total
             else:
                 data_completeness_notes.append("Quantités pesticides non fournies - émissions phyto non calculées")
             
@@ -174,22 +148,44 @@ class EnhancedCarbonFootprintService:
                 sequestration += self.SEQUESTRATION_FACTORS["reduced_tillage"] * input_data.surface_ha
             if input_data.organic_amendments:
                 sequestration += self.SEQUESTRATION_FACTORS["organic_amendments"] * input_data.surface_ha
-            
+
+            # Now create Pydantic emission objects with percentages calculated
+            emissions_by_source = []
+
+            if fuel_emissions_total > 0:
+                fuel_pct = (fuel_emissions_total / total_emissions) * 100 if total_emissions > 0 else 0
+                emissions_by_source.append(CarbonEmission(
+                    source=CarbonSource.FUEL,
+                    emissions_kg_co2eq=round(fuel_emissions_total, 1),
+                    percentage_of_total=round(fuel_pct, 1),
+                    reduction_potential_percent=20.0  # Precision agriculture, route optimization
+                ))
+
+            if fertilizer_emissions_total > 0:
+                fertilizer_pct = (fertilizer_emissions_total / total_emissions) * 100 if total_emissions > 0 else 0
+                emissions_by_source.append(CarbonEmission(
+                    source=CarbonSource.FERTILIZER,
+                    emissions_kg_co2eq=round(fertilizer_emissions_total, 1),
+                    percentage_of_total=round(fertilizer_pct, 1),
+                    reduction_potential_percent=30.0  # Precision fertilization, organic alternatives
+                ))
+
+            if pesticide_emissions_total > 0:
+                pesticide_pct = (pesticide_emissions_total / total_emissions) * 100 if total_emissions > 0 else 0
+                emissions_by_source.append(CarbonEmission(
+                    source=CarbonSource.PESTICIDES,
+                    emissions_kg_co2eq=round(pesticide_emissions_total, 1),
+                    percentage_of_total=round(pesticide_pct, 1),
+                    reduction_potential_percent=40.0  # IPM, biological control
+                ))
+
             if sequestration > 0:
                 emissions_by_source.append(CarbonEmission(
                     source=CarbonSource.SEQUESTRATION,
                     emissions_kg_co2eq=-round(sequestration, 1),  # Negative = removal
-                    percentage_of_total=0.0,
+                    percentage_of_total=0.0,  # Not a percentage of emissions
                     reduction_potential_percent=None
                 ))
-            
-            # Calculate percentages
-            if total_emissions > 0:
-                for emission in emissions_by_source:
-                    if emission.source != CarbonSource.SEQUESTRATION:
-                        emission.percentage_of_total = round(
-                            (emission.emissions_kg_co2eq / total_emissions) * 100, 1
-                        )
             
             # Net emissions
             net_emissions = total_emissions - sequestration
@@ -210,7 +206,6 @@ class EnhancedCarbonFootprintService:
             
             # Data quality note
             data_quality_note = self._generate_data_quality_note(
-                input_data,
                 data_completeness_notes
             )
             
@@ -307,7 +302,6 @@ class EnhancedCarbonFootprintService:
     
     def _generate_data_quality_note(
         self,
-        input_data: CarbonFootprintInput,
         notes: List[str]
     ) -> str:
         """Generate data quality disclaimer"""
@@ -315,15 +309,17 @@ class EnhancedCarbonFootprintService:
             "⚠️ LIMITATION: Calcul basé sur facteurs d'émission ADEME 2023. "
             "Émissions réelles varient selon pratiques, équipement, conditions. "
         )
-        
+
         if notes:
             base_note += "Données manquantes: " + "; ".join(notes) + ". "
-        
+
         base_note += (
-            "Calcul ne inclut PAS: fabrication équipement, transport produits, "
-            "émissions indirectes. Pour bilan carbone complet, consulter expert certifié."
+            "PÉRIMÈTRE: Inclut uniquement émissions opérationnelles directes (carburant véhicules ferme, intrants appliqués). "
+            "NON INCLUS: transport intrants vers ferme, transport récolte vers marché, "
+            "fabrication/amortissement équipement, émissions indirectes (scope 3). "
+            "Pour bilan carbone complet certifié, consulter expert agréé."
         )
-        
+
         return base_note
 
 
