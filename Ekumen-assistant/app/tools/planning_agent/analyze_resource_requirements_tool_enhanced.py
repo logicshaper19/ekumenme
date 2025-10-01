@@ -1,0 +1,365 @@
+"""
+Enhanced Analyze Resource Requirements Tool.
+
+Improvements:
+- Type-safe Pydantic schemas
+- Redis caching (30min TTL for resource analysis)
+- Realistic resource extraction from task data
+- Critical resource identification
+- Bottleneck detection
+- Availability warnings
+"""
+
+import logging
+import re
+from typing import Optional, List, Dict, Any
+from langchain.tools import StructuredTool
+
+from app.tools.schemas.planning_schemas import (
+    ResourceRequirementsInput,
+    ResourceRequirementsOutput,
+    ResourceRequirement,
+    ResourceType
+)
+from app.core.cache import redis_cache
+
+logger = logging.getLogger(__name__)
+
+
+class EnhancedResourceRequirementsService:
+    """
+    Service for analyzing resource requirements with caching.
+    
+    Features:
+    - Extract resources from task data (equipment, labor, materials)
+    - Identify critical resources (bottlenecks, high utilization)
+    - Calculate resource quantities and timing
+    - Provide availability warnings
+    
+    Cache Strategy:
+    - TTL: 30 minutes (1800s) - resource needs change with task updates
+    - Category: planning
+    - Keys include crop, surface, and task count
+    """
+    
+    @redis_cache(ttl=1800, model_class=ResourceRequirementsOutput, category="planning")
+    async def analyze_resources(self, input_data: ResourceRequirementsInput) -> ResourceRequirementsOutput:
+        """
+        Analyze resource requirements for tasks.
+        
+        Args:
+            input_data: Validated input with crop, surface, and tasks
+            
+        Returns:
+            ResourceRequirementsOutput with resource requirements and warnings
+            
+        Raises:
+            ValueError: If resource analysis fails
+        """
+        try:
+            warnings = []
+            
+            # Validate tasks have required fields
+            for idx, task in enumerate(input_data.tasks):
+                if 'task_name' not in task:
+                    raise ValueError(f"Tâche {idx}: doit avoir 'task_name'")
+            
+            # Extract resource requirements from tasks
+            resource_requirements = self._extract_resource_requirements(
+                input_data.tasks,
+                input_data.surface_ha
+            )
+            
+            # Identify critical resources
+            critical_resources = self._identify_critical_resources(
+                resource_requirements,
+                input_data.tasks
+            )
+            
+            # Generate availability warnings
+            availability_warnings = self._generate_availability_warnings(
+                resource_requirements,
+                critical_resources,
+                input_data.surface_ha
+            )
+            
+            logger.info(f"✅ Analyzed resources for {input_data.crop}: {len(resource_requirements)} resources identified")
+            
+            return ResourceRequirementsOutput(
+                success=True,
+                crop=input_data.crop,
+                surface_ha=input_data.surface_ha,
+                resource_requirements=resource_requirements,
+                total_resources=len(resource_requirements),
+                critical_resources=critical_resources,
+                resource_availability_warnings=availability_warnings
+            )
+            
+        except Exception as e:
+            logger.error(f"Resource requirements analysis error: {e}", exc_info=True)
+            raise ValueError(f"Erreur lors de l'analyse des ressources: {str(e)}")
+    
+    def _extract_resource_requirements(
+        self,
+        tasks: List[Dict[str, Any]],
+        surface_ha: float
+    ) -> List[ResourceRequirement]:
+        """
+        Extract resource requirements from tasks.
+        
+        Parses resources_required field from each task.
+        """
+        requirements = []
+        resource_tracker = {}  # Track cumulative quantities
+        
+        for task in tasks:
+            task_name = task.get('task_name', '')
+            resources = task.get('resources_required', [])
+            duration_days = task.get('estimated_duration_days', 1)
+            
+            # Timing for this task
+            timing = f"Tâche: {task_name}"
+            
+            for resource_str in resources:
+                # Parse resource string (e.g., "Équipement: tracteur_120cv")
+                if 'Équipement:' in resource_str:
+                    equipment_name = resource_str.split('Équipement:')[1].strip()
+                    
+                    # Calculate equipment hours (30% utilization of task duration)
+                    equipment_hours = duration_days * 8 * 0.3
+                    
+                    key = f"equipment_{equipment_name}"
+                    if key not in resource_tracker:
+                        resource_tracker[key] = {
+                            'type': ResourceType.EQUIPMENT,
+                            'name': equipment_name,
+                            'quantity': 0.0,
+                            'unit': 'heures',
+                            'timing': [],
+                            'critical': False
+                        }
+                    
+                    resource_tracker[key]['quantity'] += equipment_hours
+                    resource_tracker[key]['timing'].append(task_name)
+                
+                elif 'Personnel:' in resource_str:
+                    personnel_str = resource_str.split('Personnel:')[1].strip()
+                    
+                    # Extract personnel count
+                    personnel_count = self._extract_personnel_count(personnel_str)
+                    
+                    # Calculate labor hours (50% utilization of task duration)
+                    labor_hours = duration_days * 8 * 0.5 * personnel_count
+                    
+                    key = f"labor_{personnel_str}"
+                    if key not in resource_tracker:
+                        resource_tracker[key] = {
+                            'type': ResourceType.LABOR,
+                            'name': personnel_str,
+                            'quantity': 0.0,
+                            'unit': 'heures',
+                            'timing': [],
+                            'critical': False
+                        }
+                    
+                    resource_tracker[key]['quantity'] += labor_hours
+                    resource_tracker[key]['timing'].append(task_name)
+                
+                elif 'Matériaux:' in resource_str:
+                    materials = resource_str.split('Matériaux:')[1].strip()
+                    
+                    # Materials are typically per hectare
+                    key = f"materials_{materials}"
+                    if key not in resource_tracker:
+                        resource_tracker[key] = {
+                            'type': ResourceType.MATERIALS,
+                            'name': materials,
+                            'quantity': surface_ha,
+                            'unit': 'hectares',
+                            'timing': [task_name],
+                            'critical': True  # Materials are often critical
+                        }
+        
+        # Convert tracker to ResourceRequirement objects
+        for key, data in resource_tracker.items():
+            timing_str = ', '.join(data['timing'][:3])  # Show first 3 tasks
+            if len(data['timing']) > 3:
+                timing_str += f" (+{len(data['timing']) - 3} autres)"
+            
+            requirements.append(ResourceRequirement(
+                resource_type=data['type'],
+                resource_name=data['name'],
+                quantity=round(data['quantity'], 1),
+                unit=data['unit'],
+                timing=timing_str,
+                critical=data['critical']
+            ))
+        
+        return requirements
+    
+    def _extract_personnel_count(self, personnel_str: str) -> int:
+        """Extract personnel count from string"""
+        numbers = re.findall(r'\d+', personnel_str)
+        if numbers:
+            return sum(int(n) for n in numbers)
+        return 1
+    
+    def _identify_critical_resources(
+        self,
+        requirements: List[ResourceRequirement],
+        tasks: List[Dict[str, Any]]
+    ) -> List[str]:
+        """
+        Identify critical resources based on:
+        - High utilization (>80 hours for equipment)
+        - Materials (always critical)
+        - Specialized equipment
+        """
+        critical = []
+        
+        for req in requirements:
+            # Materials are always critical
+            if req.resource_type == ResourceType.MATERIALS:
+                critical.append(req.resource_name)
+                continue
+            
+            # Equipment with high utilization
+            if req.resource_type == ResourceType.EQUIPMENT:
+                if req.quantity > 80:  # >80 hours = >10 days of use
+                    critical.append(req.resource_name)
+                    continue
+                
+                # Specialized equipment (moissonneuse, etc.)
+                if 'moissonneuse' in req.resource_name.lower():
+                    critical.append(req.resource_name)
+                    continue
+            
+            # Labor with high hours
+            if req.resource_type == ResourceType.LABOR:
+                if req.quantity > 200:  # >200 hours = >25 days
+                    critical.append(req.resource_name)
+        
+        return critical
+    
+    def _generate_availability_warnings(
+        self,
+        requirements: List[ResourceRequirement],
+        critical_resources: List[str],
+        surface_ha: float
+    ) -> List[str]:
+        """Generate warnings about resource availability"""
+        warnings = []
+        
+        # Warn about critical resources
+        if critical_resources:
+            warnings.append(f"⚠️ {len(critical_resources)} ressource(s) critique(s) identifiée(s) - Vérifier disponibilité")
+        
+        # Check equipment utilization
+        equipment_reqs = [r for r in requirements if r.resource_type == ResourceType.EQUIPMENT]
+        total_equipment_hours = sum(r.quantity for r in equipment_reqs)
+        
+        if total_equipment_hours > 400:
+            warnings.append(f"⚠️ Utilisation équipement élevée ({total_equipment_hours:.0f}h) - Planifier maintenance")
+        
+        # Check labor requirements
+        labor_reqs = [r for r in requirements if r.resource_type == ResourceType.LABOR]
+        total_labor_hours = sum(r.quantity for r in labor_reqs)
+        
+        if total_labor_hours > 500:
+            warnings.append(f"⚠️ Besoins en main-d'œuvre élevés ({total_labor_hours:.0f}h) - Prévoir recrutement saisonnier")
+        
+        # Warn about large surface
+        if surface_ha > 100:
+            warnings.append(f"ℹ️ Grande surface ({surface_ha} ha) - Vérifier capacité logistique")
+        
+        # Seasonal availability warnings
+        for req in requirements:
+            if 'moissonneuse' in req.resource_name.lower():
+                warnings.append("⚠️ Moissonneuse - Réserver à l'avance (forte demande en saison)")
+        
+        if not warnings:
+            warnings.append("✅ Aucun problème de disponibilité identifié")
+        
+        return warnings
+
+
+async def analyze_resource_requirements_enhanced(
+    crop: str,
+    surface_ha: float,
+    tasks: List[Dict[str, Any]]
+) -> str:
+    """
+    Async wrapper for analyze resource requirements tool
+    
+    Args:
+        crop: Crop name (e.g., 'blé', 'maïs')
+        surface_ha: Surface area in hectares
+        tasks: List of tasks from generate_planning_tasks
+        
+    Returns:
+        JSON string with resource analysis
+    """
+    try:
+        # Validate inputs
+        input_data = ResourceRequirementsInput(
+            crop=crop,
+            surface_ha=surface_ha,
+            tasks=tasks
+        )
+        
+        # Execute service
+        service = EnhancedResourceRequirementsService()
+        result = await service.analyze_resources(input_data)
+        
+        return result.model_dump_json(indent=2, exclude_none=True)
+        
+    except ValueError as e:
+        # Validation or business logic error
+        error_result = ResourceRequirementsOutput(
+            success=False,
+            crop=crop,
+            surface_ha=surface_ha,
+            total_resources=0,
+            error=str(e),
+            error_type="validation"
+        )
+        return error_result.model_dump_json(indent=2)
+    except Exception as e:
+        # Unexpected error
+        logger.error(f"Unexpected error in analyze_resource_requirements_enhanced: {e}", exc_info=True)
+        error_result = ResourceRequirementsOutput(
+            success=False,
+            crop=crop,
+            surface_ha=surface_ha,
+            total_resources=0,
+            error=f"Erreur inattendue: {str(e)}",
+            error_type="unknown"
+        )
+        return error_result.model_dump_json(indent=2)
+
+
+# Create the StructuredTool
+analyze_resource_requirements_tool_enhanced = StructuredTool.from_function(
+    func=analyze_resource_requirements_enhanced,
+    name="analyze_resource_requirements",
+    description="""Analyse les besoins en ressources pour la planification agricole.
+
+Analyse:
+- Équipement nécessaire (tracteurs, semoirs, moissonneuses, etc.)
+- Main-d'œuvre requise (heures, personnel)
+- Matériaux (semences, engrais, produits phyto)
+- Ressources critiques (goulots d'étranglement)
+- Avertissements de disponibilité
+
+Calculs basés sur:
+- Utilisation équipement: 30% du temps calendaire
+- Utilisation main-d'œuvre: 50% du temps calendaire
+- Identification automatique des ressources critiques
+
+Retourne une analyse détaillée avec recommandations de disponibilité.""",
+    args_schema=ResourceRequirementsInput,
+    return_direct=False,
+    coroutine=analyze_resource_requirements_enhanced,
+    handle_validation_error=True
+)
+
