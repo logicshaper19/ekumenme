@@ -17,13 +17,10 @@ import time
 from typing import Dict, Any, Optional, AsyncGenerator, List
 from dataclasses import dataclass
 from fastapi import WebSocket
-from langchain.agents import create_react_agent, AgentExecutor
-from langchain_openai import ChatOpenAI
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain.callbacks.base import AsyncCallbackHandler
 
-from app.prompts.prompt_registry import get_agent_prompt
-from app.services.tool_registry_service import get_tool_registry
+from app.agents.orchestrator import OrchestratorAgent
 from app.services.multi_layer_cache_service import MultiLayerCacheService
 from app.services.parallel_executor_service import ParallelExecutorService
 from app.core.config import settings
@@ -88,7 +85,7 @@ class OptimizedStreamingService:
     """
 
     def __init__(self, tool_executor: Optional[Any] = None):
-        """Initialize optimized streaming service with orchestrator"""
+        """Initialize optimized streaming service"""
 
         # Initialize caching
         self.cache = MultiLayerCacheService()
@@ -96,27 +93,8 @@ class OptimizedStreamingService:
         # Initialize parallel executor
         self.parallel_executor = ParallelExecutorService()
 
-        # Get tool registry
-        self.tool_registry = get_tool_registry()
-        self.tools = self.tool_registry.get_all_tools()
-
-        # Initialize LLM with streaming
-        self.llm = ChatOpenAI(
-            model=settings.OPENAI_DEFAULT_MODEL,
-            temperature=0,
-            streaming=True,
-            openai_api_key=settings.OPENAI_API_KEY
-        )
-
-        # Get orchestrator prompt
-        self.orchestrator_prompt = get_agent_prompt("orchestrator", include_examples=True)
-
-        # Create orchestrator agent
-        self.orchestrator = create_react_agent(
-            llm=self.llm,
-            tools=self.tools,
-            prompt=self.orchestrator_prompt
-        )
+        # Orchestrator will be created on-demand with callbacks
+        self.orchestrator = None
 
         # Statistics
         self.total_queries = 0
@@ -128,7 +106,7 @@ class OptimizedStreamingService:
 
         logger.info("=" * 80)
         logger.info("✅ Optimized Streaming Service Initialized")
-        logger.info(f"✅ Orchestrator agent created with {len(self.tools)} tools")
+        logger.info(f"✅ Orchestrator: Created on-demand with callbacks")
         logger.info(f"✅ Model: {settings.OPENAI_DEFAULT_MODEL}")
         logger.info(f"✅ Caching: Multi-layer (Redis + Memory)")
         logger.info(f"✅ Streaming: Enabled")
@@ -252,23 +230,13 @@ class OptimizedStreamingService:
         orchestrator_start = time.time()
 
         try:
-            # Create agent executor with streaming callback
-            ws_callback = WebSocketCallback(websocket)
+            # Create WebSocket callback
+            ws_callback = WebSocketCallback(websocket) if websocket else None
 
-            agent_executor = AgentExecutor(
-                agent=self.orchestrator,
-                tools=self.tools,
-                verbose=True,
-                handle_parsing_errors=True,
-                max_iterations=10,
-                callbacks=[ws_callback] if websocket else []
+            # Create orchestrator with callbacks
+            orchestrator = OrchestratorAgent(
+                callbacks=[ws_callback] if ws_callback else []
             )
-
-            # Prepare input with context
-            agent_input = {
-                "input": query,
-                **context
-            }
 
             # Send orchestrator start message
             orchestrator_msg = {
@@ -284,14 +252,17 @@ class OptimizedStreamingService:
 
             yield orchestrator_msg
 
-            # Execute orchestrator
-            result = await agent_executor.ainvoke(agent_input)
+            # Process query through orchestrator
+            result = await orchestrator.process(query, context)
 
             orchestrator_time = time.time() - orchestrator_start
             total_time = time.time() - start_time
 
             # Extract response
-            response_text = result.get("output", "Désolé, je n'ai pas pu générer une réponse.")
+            response_text = result.get("response", "Désolé, je n'ai pas pu générer une réponse.")
+
+            # Get metadata from orchestrator
+            orchestrator_metadata = result.get("metadata", {})
 
             # Cache the response
             await self.cache.set(cache_key, response_text)
@@ -301,9 +272,9 @@ class OptimizedStreamingService:
                 total_time=total_time,
                 orchestrator_time=orchestrator_time,
                 cache_hit=False,
-                tools_executed=len(result.get("intermediate_steps", [])),
-                model_used=settings.OPENAI_DEFAULT_MODEL,
-                tokens_used=len(ws_callback.tokens)
+                tools_executed=orchestrator_metadata.get("tools_executed", 0),
+                model_used=orchestrator_metadata.get("model_used", settings.OPENAI_DEFAULT_MODEL),
+                tokens_used=len(ws_callback.tokens) if ws_callback else 0
             )
 
             # Send final response
@@ -315,6 +286,7 @@ class OptimizedStreamingService:
                     "total_time": total_time,
                     "orchestrator_time": orchestrator_time,
                     "tools_executed": metrics.tools_executed,
+                    "tools_called": orchestrator_metadata.get("tools_called", []),
                     "model_used": metrics.model_used,
                     "tokens_used": metrics.tokens_used
                 }

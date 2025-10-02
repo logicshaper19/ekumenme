@@ -56,8 +56,8 @@ class VoiceJournalEntry(Base):
     
     # Foreign keys
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
-    farm_siret = Column(String(14), ForeignKey("farms.siret"), nullable=False, index=True)
-    parcel_id = Column(UUID(as_uuid=True), ForeignKey("parcels.id"), nullable=True, index=True)
+    farm_siret = Column(String(14), nullable=False, index=True)  # SIRET from agri_db
+    parcel_id = Column(UUID(as_uuid=True), nullable=True, index=True)  # Parcel ID from agri_db
     
     # Entry information
     content = Column(Text, nullable=False)  # Transcribed text
@@ -93,8 +93,7 @@ class VoiceJournalEntry(Base):
     
     # Relationships
     user = relationship("User", back_populates="interventions", lazy="select")
-    farm = relationship("Farm", back_populates="interventions", lazy="select")
-    parcel = relationship("Parcel", back_populates="interventions", lazy="select")
+    # Note: farm_siret and parcel_id reference data in agri_db
     
     def __repr__(self):
         return f"<VoiceJournalEntry(id={self.id}, type={self.intervention_type}, status={self.validation_status})>"
@@ -175,8 +174,8 @@ class InterventionHistory(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     
     # Foreign keys
-    farm_siret = Column(String(14), ForeignKey("farms.siret"), nullable=False, index=True)
-    parcel_id = Column(UUID(as_uuid=True), ForeignKey("parcels.id"), nullable=True, index=True)
+    farm_siret = Column(String(14), nullable=False, index=True)  # SIRET from agri_db
+    parcel_id = Column(UUID(as_uuid=True), nullable=True, index=True)  # Parcel ID from agri_db
     
     # Intervention information
     intervention_type = Column(SQLEnum(InterventionType), nullable=False, index=True)
@@ -205,8 +204,7 @@ class InterventionHistory(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     
     # Relationships
-    farm = relationship("Farm", lazy="select")
-    parcel = relationship("Parcel", lazy="select")
+    # Note: farm_siret and parcel_id reference data in agri_db
     
     def __repr__(self):
         return f"<InterventionHistory(id={self.id}, type={self.intervention_type}, date={self.intervention_date})>"

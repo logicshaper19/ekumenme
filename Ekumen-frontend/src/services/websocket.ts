@@ -81,8 +81,36 @@ class WebSocketService {
       case 'connection':
         this.emit('connect', data)
         break
+
+      // Unified streaming events (SSE + WS)
+      case 'token': {
+        const text = data.text ?? data.token ?? data.content ?? ''
+        if (!text) return
+        this.emit('chat:streaming_chunk', {
+          message_id: data.message_id || 'current',
+          chunk: text,
+          is_complete: false
+        })
+        break
+      }
+      case 'done': {
+        // Unified completion event
+        this.emit('chat:streaming_complete', {
+          message_id: data.message_id || 'current',
+          sources: data.sources || [],
+          citation_count: data.citation_count
+        })
+        this.emit('chat:streaming_end', {
+          message_id: data.message_id || 'current'
+        })
+        break
+      }
+      case 'error':
+        this.emit('error', { message: data.message, code: data.code })
+        break
+
+      // Backward-compatibility: legacy workflow events
       case 'start':
-        // Handle workflow start message
         this.emit('chat:workflow_start', {
           message_id: data.message_id || 'current',
           message: data.message,
@@ -90,14 +118,12 @@ class WebSocketService {
         })
         break
       case 'workflow_start':
-        // Handle workflow initialization
         this.emit('chat:workflow_init', {
           message_id: data.message_id || 'current',
           message: data.message
         })
         break
       case 'workflow_step':
-        // Handle workflow step updates
         this.emit('chat:workflow_step', {
           message_id: data.message_id || 'current',
           step: data.step,
@@ -105,7 +131,6 @@ class WebSocketService {
         })
         break
       case 'workflow_result':
-        // Handle final workflow result - this contains the actual AI response
         console.log('Received workflow_result:', data)
         this.emit('chat:streaming_complete', {
           message_id: data.message_id || 'current',
@@ -122,13 +147,6 @@ class WebSocketService {
           message_id: data.message_id || 'current'
         })
         break
-      case 'token':
-        this.emit('chat:streaming_chunk', {
-          message_id: data.message_id || 'current',
-          chunk: data.token,
-          is_complete: false
-        })
-        break
       case 'complete':
         this.emit('chat:streaming_end', {
           message_id: data.message_id || 'current'
@@ -139,12 +157,6 @@ class WebSocketService {
           agent_type: data.agent_type,
           agent_name: data.agent_name,
           reasoning: data.reasoning
-        })
-        break
-      case 'error':
-        this.emit('error', {
-          message: data.message,
-          code: data.code
         })
         break
       default:

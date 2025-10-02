@@ -1,6 +1,9 @@
 # Testing Guide
 
 **Last Updated:** 2025-10-01
+**Scope:** Phase 1 (Existing System - 9 Agents, 25 Tools)
+
+> **Note:** For Phase 2 testing (Multi-Tenancy, Knowledge Base, Voice Journal), see **[QUICK_START.md](QUICK_START.md)** section "Testing Strategy"
 
 ---
 

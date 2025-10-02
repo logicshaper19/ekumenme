@@ -222,54 +222,52 @@ const ChatInterface: React.FC = () => {
       }
     })
 
-    // Handle workflow completion with final response
+    // Handle completion (unified 'done' or legacy 'workflow_result')
     webSocket.onStreamingComplete((data) => {
       console.log('Received streaming complete:', data)
       setMessages(prev => {
-        // First try to find streaming assistant message by message_id
+        // Find existing streaming assistant message
         let streamingMessage = data.message_id
           ? prev.find(msg => msg.id === data.message_id && msg.isStreaming && msg.sender === 'assistant')
-          : null
-
-        // If not found by message_id, try to find any streaming assistant message
-        if (!streamingMessage) {
-          streamingMessage = prev.find(msg => msg.isStreaming && msg.sender === 'assistant')
-        }
+          : prev.find(msg => msg.isStreaming && msg.sender === 'assistant')
 
         if (streamingMessage) {
-          // Update the existing streaming message
+          // Update existing message: mark complete and attach sources/metadata
           return prev.map(msg =>
-            msg.id === streamingMessage.id
+            msg.id === streamingMessage!.id
               ? {
                   ...msg,
-                  content: data.message,
+                  // If backend included a final message for legacy path, prefer it; otherwise keep accumulated content
+                  content: (data as any).message ?? msg.content,
                   isStreaming: false,
-                  sources: data.sources || [],  // Add sources from response
+                  sources: data.sources || msg.sources || [],
                   metadata: {
-                    agent_type: data.agent_type,
-                    confidence: data.confidence,
-                    recommendations: data.recommendations,
-                    thread_id: data.thread_id,
-                    ...data.metadata
+                    ...(msg.metadata || {}),
+                    // Keep legacy fields if provided; otherwise leave existing metadata
+                    agent_type: (data as any).agent_type ?? msg.metadata?.agent_type,
+                    confidence: (data as any).confidence ?? msg.metadata?.confidence,
+                    recommendations: (data as any).recommendations ?? msg.metadata?.recommendations,
+                    thread_id: (data as any).thread_id ?? msg.metadata?.thread_id,
+                    ...(data as any).metadata
                   }
                 }
               : msg
           )
         } else {
-          // No streaming message found, create a new assistant message
+          // No streaming message found, create a new assistant message (fallback)
           const newMessage: Message = {
             id: data.message_id || `response-${Date.now()}`,
-            content: data.message,
+            content: (data as any).message || '',
             sender: 'assistant',
             timestamp: new Date(),
             isStreaming: false,
-            sources: data.sources || [],  // Add sources from response
+            sources: data.sources || [],
             metadata: {
-              agent_type: data.agent_type,
-              confidence: data.confidence,
-              recommendations: data.recommendations,
-              thread_id: data.thread_id,
-              ...data.metadata
+              agent_type: (data as any).agent_type,
+              confidence: (data as any).confidence,
+              recommendations: (data as any).recommendations,
+              thread_id: (data as any).thread_id,
+              ...(data as any).metadata
             }
           }
           return [...prev, newMessage]

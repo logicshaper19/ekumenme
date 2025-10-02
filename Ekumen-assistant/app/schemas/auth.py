@@ -19,7 +19,7 @@ class UserCreate(BaseModel):
     role: UserRole = UserRole.FARMER
     language_preference: str = Field(default="fr", max_length=10)
     region_code: Optional[str] = Field(None, max_length=20)
-    
+
     @validator('password')
     def validate_password(cls, v):
         if len(v) < 8:
@@ -66,6 +66,7 @@ class TokenData(BaseModel):
     """Schema for token data"""
     user_id: Optional[UUID] = None
     email: Optional[str] = None
+    org_id: Optional[UUID] = None
 
 
 class PasswordReset(BaseModel):
@@ -77,7 +78,7 @@ class PasswordResetConfirm(BaseModel):
     """Schema for password reset confirmation"""
     token: str
     new_password: str = Field(..., min_length=8, max_length=100)
-    
+
     @validator('new_password')
     def validate_password(cls, v):
         if len(v) < 8:
@@ -99,3 +100,8 @@ class UserUpdate(BaseModel):
     region_code: Optional[str] = Field(None, max_length=20)
     bio: Optional[str] = None
     specialization: Optional[list[str]] = None
+
+class OrganizationSelectRequest(BaseModel):
+    """Schema for selecting an organization and issuing a new token"""
+    org_id: UUID
+
