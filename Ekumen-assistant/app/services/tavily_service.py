@@ -6,8 +6,14 @@ Provides real-time web search for Internet mode, Supplier mode, and Market price
 import os
 import logging
 from typing import List, Dict, Optional, Any
-from tavily import TavilyClient
 from datetime import datetime
+
+try:
+    from tavily import TavilyClient
+    TAVILY_AVAILABLE = True
+except ImportError:
+    TAVILY_AVAILABLE = False
+    TavilyClient = None
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +28,11 @@ class TavilyService:
     """
     
     def __init__(self):
+        if not TAVILY_AVAILABLE:
+            logger.warning("Tavily package not installed. Web search features will be disabled.")
+            self.client = None
+            return
+
         self.api_key = os.getenv("TAVILY_API_KEY")
         if not self.api_key:
             logger.warning("TAVILY_API_KEY not found in environment variables")
