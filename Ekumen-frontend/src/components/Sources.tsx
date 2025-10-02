@@ -42,6 +42,15 @@ const Sources: React.FC<SourcesProps> = ({ sources }) => {
     return 'bg-orange-500'
   }
 
+  const getHostname = (url: string): string => {
+    try {
+      return new URL(url).hostname
+    } catch {
+      // If URL is invalid, return a fallback (e.g., "Knowledge Base")
+      return 'Base de connaissances'
+    }
+  }
+
   const displayedSources = isExpanded ? sources : sources.slice(0, 3)
 
   return (
@@ -108,7 +117,7 @@ const Sources: React.FC<SourcesProps> = ({ sources }) => {
                 
                 <div className="flex items-center gap-2 mt-2">
                   <span className="text-xs text-gray-500 truncate">
-                    {new URL(source.url).hostname}
+                    {getHostname(source.url)}
                   </span>
                   <ExternalLink className="h-3 w-3 text-gray-400 group-hover:text-primary-500 transition-colors flex-shrink-0" />
                 </div>

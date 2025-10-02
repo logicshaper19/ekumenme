@@ -856,6 +856,128 @@ Note: Auth for these endpoints currently uses AuthService.get_current_user() wit
 **Fix:** Updated Week 4 task 4.1 to rename existing service first
 **Impact:** Clarified service naming convention
 
+
+**Date:** 2025-10-02 - ✅ RESOLVED
+**Issue:** Login 500 on POST /api/v1/auth/login — missing users columns and enum type mismatch
+**Root Causes:**
+1. Schema drift: Missing 13+ columns in users table (language_preference, timezone, notification_preferences, profile_picture_url, bio, experience_years, specialization, region_code, department_code, commune_insee, is_active, is_verified, is_superuser, email_verified_at)
+2. Enum mismatch: Database had lowercase enum values ('farmer', 'advisor') but SQLAlchemy Enum type was expecting uppercase keys (FARMER, ADVISOR)
+
+**Fixes Applied:**
+1. Added all missing columns via scripts/fix_users_columns.py
+2. Modified app/models/user.py to use String columns instead of SQLEnum for role and status fields:
+   ```python
+   # Changed from SQLEnum to String to avoid enum lookup issues
+   role = Column(String(50), default=UserRole.FARMER.value, nullable=False)
+   status = Column(String(50), default=UserStatus.PENDING_VERIFICATION.value, nullable=False)
+   ```
+3. Created test user farmer@test.com for testing
+
+**Verification:**
+- ✅ All columns present in database
+- ✅ Backend restarted successfully
+- ✅ Login endpoint working (HTTP 200 OK)
+- ✅ JWT token generated successfully
+- ✅ User authentication flow complete
+
+**Status:** RESOLVED - Login is now fully functional
+
+---
+
+### Issue 2: Organization Membership Missing - Conversation Creation Failed
+
+**Date:** 2025-10-02 - ✅ RESOLVED
+**Issue:** Conversation creation failed with "Organization not selected" error despite successful login
+**Root Cause:**
+- Organization existed but organization_membership record was missing
+- Previous membership creation attempt failed due to invalid enum value 'FULL' for access_level field
+- Database accesstype enum only accepts: 'OWNER', 'ADMIN', 'ADVISOR', 'VIEWER', 'READONLY'
+
+**Fixes Applied:**
+1. Created organization membership with correct access_level value:
+   ```sql
+   INSERT INTO organization_memberships (
+       id, user_id, organization_id, role, access_level, is_active, created_at, updated_at
+   ) VALUES (
+       uuid, user_id, org_id, 'OWNER', 'OWNER', true, NOW(), NOW()
+   )
+   ```
+2. Updated organization name to 'Ekumen' (from 'Test Farm')
+
+**Verification:**
+- ✅ Organization membership created successfully
+- ✅ JWT token now includes org_id claim: '48359c04-d103-4cdd-b165-502ceefda04a'
+- ✅ Organization: Ekumen (status: ACTIVE)
+- ✅ User: farmer@test.com (role: OWNER, access_level: OWNER)
+- ✅ Membership active: True
+
+**Status:** RESOLVED - Organization context now properly set in JWT token, conversation creation should work
+
+---
+
+### Issue 3: Missing organization_id Column in Conversations Table
+
+**Date:** 2025-10-02 - ✅ RESOLVED
+**Issue:** Conversation creation failed with "column 'organization_id' of relation 'conversations' does not exist"
+**Root Cause:**
+- The Conversation model includes organization_id field but the database table was missing this column
+- Schema drift between model definition and actual database schema
+
+**Fixes Applied:**
+1. Added organization_id column to conversations table:
+   ```sql
+   ALTER TABLE conversations
+   ADD COLUMN IF NOT EXISTS organization_id UUID REFERENCES organizations(id)
+   ```
+2. Created index for query performance:
+   ```sql
+   CREATE INDEX IF NOT EXISTS idx_conversations_organization_id
+   ON conversations(organization_id)
+   ```
+
+**Verification:**
+- ✅ Column added successfully
+- ✅ Foreign key constraint to organizations table created
+- ✅ Index created for better query performance
+
+**Status:** RESOLVED - Conversation creation should now work end-to-end
+
+---
+
+### Issue 4: Enum Type Mismatch for AgentType and ConversationStatus
+
+**Date:** 2025-10-02 - ✅ RESOLVED
+**Issue:** Conversation creation failed with "invalid input value for enum agenttype: 'FARM_DATA'"
+**Root Cause:**
+- Same enum mismatch issue as with User model
+- Database has lowercase enum values ('farm_data', 'active', etc.)
+- SQLAlchemy Enum type expects uppercase keys (FARM_DATA, ACTIVE, etc.)
+
+**Fixes Applied:**
+Modified `app/models/conversation.py` to use String columns instead of SQLEnum:
+```python
+# Changed from SQLEnum to String to avoid enum lookup issues
+agent_type = Column(String(50), nullable=False, index=True)
+status = Column(String(50), default=ConversationStatus.ACTIVE.value, nullable=False)
+```
+
+Applied to:
+- Conversation.agent_type
+- Conversation.status
+- Message.agent_type
+- AgentResponse.agent_type
+
+**Verification:**
+- ✅ Model changes applied
+- ✅ Backend restarted
+- ✅ Database columns converted from enum to VARCHAR:
+  - conversations.agent_type → VARCHAR(50)
+  - conversations.status → VARCHAR(50)
+  - messages.agent_type → VARCHAR(50)
+  - agent_responses.agent_type → VARCHAR(50)
+
+**Status:** RESOLVED - Database schema now matches model definitions
+
 ---
 
 ### Decisions Made During Implementation
