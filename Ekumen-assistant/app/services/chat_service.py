@@ -18,6 +18,8 @@ from app.services.multi_agent_service import MultiAgentService
 from app.services.performance_optimization_service import PerformanceOptimizationService, performance_monitor
 from app.services.lcel_chat_service import get_lcel_chat_service
 import logging
+from datetime import datetime
+
 
 logger = logging.getLogger(__name__)
 
@@ -72,70 +74,88 @@ class ChatService:
             self.workflow_service = None
             self.memory_service = None
             self.multi_agent_service = None
-    
+
     async def create_conversation(
         self,
         db: AsyncSession,
         user_id: str,
         agent_type: str,
         farm_siret: Optional[str] = None,
-        title: Optional[str] = None
+        title: Optional[str] = None,
+        organization_id: str = None
     ) -> Conversation:
         """Create a new conversation"""
         # Generate title if not provided
         if not title:
             title = f"Conversation avec {agent_type.replace('_', ' ').title()}"
-        
+
         conversation = Conversation(
             user_id=user_id,
             agent_type=agent_type,
             farm_siret=farm_siret,
             title=title,
-            status=ConversationStatus.ACTIVE
+            status=ConversationStatus.ACTIVE,
+            organization_id=organization_id
         )
-        
+
         db.add(conversation)
         await db.commit()
         await db.refresh(conversation)
-        
+
         return conversation
-    
+
     async def get_conversation(
         self,
         db: AsyncSession,
         conversation_id: str,
-        user_id: str
+        user_id: str,
+        organization_id: str
     ) -> Optional[Conversation]:
-        """Get a conversation by ID for a specific user"""
+        """Get a conversation by ID for a specific user, scoped by organization"""
         result = await db.execute(
             select(Conversation)
             .where(
                 and_(
                     Conversation.id == conversation_id,
-                    Conversation.user_id == user_id
+                    Conversation.user_id == user_id,
+                    Conversation.organization_id == organization_id
                 )
             )
             .options(selectinload(Conversation.messages))
         )
         return result.scalar_one_or_none()
-    
+
     async def get_user_conversations(
         self,
         db: AsyncSession,
         user_id: str,
         skip: int = 0,
-        limit: int = 50
+        limit: int = 50,
+        organization_id: str = None
     ) -> List[Conversation]:
-        """Get user's conversations"""
-        result = await db.execute(
+        """Get user's conversations scoped by organization"""
+        query = (
             select(Conversation)
-            .where(Conversation.user_id == user_id)
-            .order_by(desc(Conversation.updated_at))
-            .offset(skip)
-            .limit(limit)
+            .where(
+                and_(
+                    Conversation.user_id == user_id,
+                    Conversation.organization_id == organization_id
+                )
+            )
         )
+        query = query.order_by(desc(Conversation.updated_at)).offset(skip).limit(limit)
+        result = await db.execute(query)
         return result.scalars().all()
-    
+
+    async def get_message_by_id(
+        self,
+        db: AsyncSession,
+        message_id: str
+    ) -> Optional[Message]:
+        """Get a message by ID"""
+        result = await db.execute(select(Message).where(Message.id == message_id))
+        return result.scalar_one_or_none()
+
     async def get_conversation_messages(
         self,
         db: AsyncSession,
@@ -152,7 +172,7 @@ class ChatService:
             .limit(limit)
         )
         return result.scalars().all()
-    
+
     async def save_message(
         self,
         db: AsyncSession,
@@ -176,19 +196,49 @@ class ChatService:
             thread_id=thread_id,
             parent_message_id=parent_message_id
         )
-        
+
         db.add(message)
-        
+
         # Update conversation's last message timestamp
         conversation = await db.get(Conversation, conversation_id)
         if conversation:
             conversation.last_message_at = message.created_at
-        
+
         await db.commit()
         await db.refresh(message)
-        
+
         return message
-    
+    async def _update_latest_agent_message_metadata(self, db: AsyncSession, conversation_id: str, metadata_update: Dict[str, Any]) -> Optional[Message]:
+        """Attach/merge metadata to the latest assistant message in a conversation.
+        Keeps existing metadata and overwrites keys provided in metadata_update.
+        """
+        try:
+            result = await db.execute(
+                select(Message)
+                .where(
+                    and_(
+                        Message.conversation_id == conversation_id,
+                        Message.sender == "agent"
+                    )
+                )
+                .order_by(desc(Message.created_at))
+                .limit(1)
+            )
+            latest = result.scalars().first()
+            if not latest:
+                return None
+            existing = latest.message_metadata or {}
+            # Shallow merge is sufficient for our keys
+            existing.update(metadata_update or {})
+            latest.message_metadata = existing
+            await db.commit()
+            await db.refresh(latest)
+            return latest
+        except Exception:
+            await db.rollback()
+            return None
+
+
     async def update_conversation_title(
         self,
         db: AsyncSession,
@@ -202,7 +252,7 @@ class ChatService:
             await db.commit()
             await db.refresh(conversation)
         return conversation
-    
+
     async def archive_conversation(
         self,
         db: AsyncSession,
@@ -216,21 +266,22 @@ class ChatService:
             await db.commit()
             await db.refresh(conversation)
         return conversation
-    
+
     async def delete_conversation(
         self,
         db: AsyncSession,
         conversation_id: str,
-        user_id: str
+        user_id: str,
+        organization_id: str
     ) -> bool:
         """Delete a conversation (soft delete)"""
-        conversation = await self.get_conversation(db, conversation_id, user_id)
+        conversation = await self.get_conversation(db, conversation_id, user_id, organization_id=organization_id)
         if conversation:
             conversation.status = ConversationStatus.DELETED
             await db.commit()
             return True
         return False
-    
+
     async def get_conversation_summary(
         self,
         db: AsyncSession,
@@ -240,14 +291,14 @@ class ChatService:
         conversation = await db.get(Conversation, conversation_id)
         if not conversation:
             return None
-        
+
         # Get message count
         result = await db.execute(
             select(Message)
             .where(Message.conversation_id == conversation_id)
         )
         messages = result.scalars().all()
-        
+
         return {
             "id": str(conversation.id),
             "title": conversation.title,
@@ -257,38 +308,40 @@ class ChatService:
             "created_at": conversation.created_at,
             "status": conversation.status
         }
-    
+
     async def search_conversations(
         self,
         db: AsyncSession,
         user_id: str,
         query: str,
         agent_type: Optional[str] = None,
-        limit: int = 20
+        limit: int = 20,
+        organization_id: str = None
     ) -> List[Conversation]:
-        """Search conversations by title or content"""
+        """Search conversations by title or content, scoped by organization"""
         search_query = select(Conversation).where(
             and_(
                 Conversation.user_id == user_id,
-                Conversation.status == ConversationStatus.ACTIVE
+                Conversation.status == ConversationStatus.ACTIVE,
+                Conversation.organization_id == organization_id
             )
         )
-        
+
         if query:
             search_query = search_query.where(
                 Conversation.title.ilike(f"%{query}%")
             )
-        
+
         if agent_type:
             search_query = search_query.where(
                 Conversation.agent_type == agent_type
             )
-        
+
         search_query = search_query.order_by(desc(Conversation.updated_at)).limit(limit)
-        
+
         result = await db.execute(search_query)
         return result.scalars().all()
-    
+
     async def get_conversation_statistics(
         self,
         db: AsyncSession,
@@ -301,7 +354,7 @@ class ChatService:
             .where(Conversation.user_id == user_id)
         )
         total_conversations = len(total_result.scalars().all())
-        
+
         # Active conversations
         active_result = await db.execute(
             select(Conversation)
@@ -313,7 +366,7 @@ class ChatService:
             )
         )
         active_conversations = len(active_result.scalars().all())
-        
+
         # Messages count
         messages_result = await db.execute(
             select(Message)
@@ -321,13 +374,13 @@ class ChatService:
             .where(Conversation.user_id == user_id)
         )
         total_messages = len(messages_result.scalars().all())
-        
+
         return {
             "total_conversations": total_conversations,
             "active_conversations": active_conversations,
             "total_messages": total_messages
         }
-    
+
     @performance_monitor("process_message_with_lcel")
     async def process_message_with_lcel(
         self,
@@ -335,7 +388,8 @@ class ChatService:
         conversation_id: str,
         user_id: str,
         message_content: str,
-        use_rag: bool = False
+        use_rag: bool = False,
+        organization_id: Optional[str] = None
     ) -> dict:
         """
         Process message using LCEL service with automatic history management
@@ -359,8 +413,44 @@ class ChatService:
                 db_session=db,
                 conversation_id=conversation_id,
                 message=message_content,
-                use_rag=use_rag
+                use_rag=use_rag,
+                organization_id=organization_id
             )
+
+            # Extract answer and sources if RAG was used
+            if use_rag and isinstance(response, dict):
+                answer = response.get("answer", "")
+                source_docs = response.get("context", []) or []
+
+                # Map documents to metadata schema expected in docs (documents_retrieved)
+                documents_retrieved = []
+                for idx, doc in enumerate(source_docs):
+                    try:
+                        meta = getattr(doc, "metadata", {}) or {}
+                        documents_retrieved.append({
+                            "document_id": meta.get("document_id"),
+                            "filename": meta.get("filename"),
+                            "relevance_score": meta.get("score"),
+                            "chunk_index": meta.get("chunk_index"),
+                            "page_number": meta.get("page") or meta.get("page_number"),
+                            "chunk_text": (getattr(doc, "page_content", "") or "")[:500],
+                            "rank": idx + 1
+                        })
+                    except Exception:
+                        continue
+
+                # Best-effort: attach citations to latest assistant message saved by history
+                await self._update_latest_agent_message_metadata(
+                    db=db,
+                    conversation_id=conversation_id,
+                    metadata_update={
+                        "knowledge_base_used": len(documents_retrieved) > 0,
+                        "documents_retrieved": documents_retrieved
+                    }
+                )
+            else:
+                answer = response
+                documents_retrieved = []
 
             # Return formatted response
             return {
@@ -369,12 +459,14 @@ class ChatService:
                     "created_at": datetime.now().isoformat()
                 },
                 "ai_response": {
-                    "content": response,
+                    "content": answer,
                     "agent": "lcel_agent",
                     "created_at": datetime.now().isoformat(),
                     "metadata": {
                         "processing_method": "lcel_with_automatic_history",
-                        "use_rag": use_rag
+                        "use_rag": use_rag,
+                        "documents_retrieved": documents_retrieved,
+                        "knowledge_base_used": len(documents_retrieved) > 0
                     },
                     "processing_method": "lcel_with_automatic_history",
                     "confidence": 0.95
