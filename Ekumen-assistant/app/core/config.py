@@ -4,6 +4,7 @@ Centralized configuration management for the agricultural chatbot system
 """
 
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
 from typing import List, Optional, Dict, Any
 import os
 from pathlib import Path
@@ -11,13 +12,20 @@ from pathlib import Path
 
 class Settings(BaseSettings):
     """Application settings with agricultural chatbot specific configurations"""
-    
+
+    # Pydantic v2 settings: ignore extra env vars like SUPABASE_* in dev
+    model_config = ConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra='ignore'
+    )
+
     # API Configuration
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "Ekumen Assistant"
     VERSION: str = "1.0.0"
     DESCRIPTION: str = "Intelligent Agricultural Assistant with Voice Interface"
-    
+
     # Server Configuration
     HOST: str = "0.0.0.0"
     PORT: int = 8000
@@ -168,9 +176,6 @@ class Settings(BaseSettings):
     DEFAULT_ORG_TYPE: str = "farm"
     SUPPORTED_ORG_TYPES: List[str] = ["farm", "cooperative", "input_company", "advisor"]
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
 
     def __post_init__(self):
         """Validate critical settings after initialization"""
