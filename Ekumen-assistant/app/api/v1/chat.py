@@ -415,7 +415,7 @@ async def send_message_stream(
                     # Token streaming (string chunks)
                     if isinstance(event, str):
                         final_response += event
-                        yield f"data: {json.dumps({\"type\": \"token\", \"text\": event})}\n\n"
+                        yield f"data: {json.dumps({'type': 'token', 'text': event})}\n\n"
 
                 # Map citations from source_docs
                 def _map_citations(docs):
@@ -479,7 +479,7 @@ async def send_message_stream(
                 )
 
                 # Final SSE event indicating completion (unified format)
-                yield f"data: {json.dumps({\"type\": \"done\", \"message_id\": str(saved.id), \"citation_count\": len(documents_retrieved), \"sources\": sources})}\n\n"
+                yield f"data: {json.dumps({'type': 'done', 'message_id': str(saved.id), 'citation_count': len(documents_retrieved), 'sources': sources})}\n\n"
 
             except Exception as e:
                 logger.error(f"Streaming error: {e}")
