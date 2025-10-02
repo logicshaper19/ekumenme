@@ -278,7 +278,16 @@ Utilise l'historique de la conversation pour fournir des réponses cohérentes e
 
                     # 1) Stream raw LLM tokens ONLY from chat_model_stream
                     # DO NOT also listen to on_llm_stream or on_chain_stream to avoid duplicates!
+                    # FILTER: Only stream from the final answer generation (seq:step:3),
+                    # NOT the query reformulation (seq:step:2)
                     if kind == "on_chat_model_stream":
+                        event_tags = event.get("tags", [])
+
+                        # Skip the question reformulation step (seq:step:2)
+                        # Only stream the final answer generation (seq:step:3)
+                        if "seq:step:2" in event_tags:
+                            continue
+
                         chunk = event.get("data", {}).get("chunk")
                         # chunk may be a BaseMessageChunk or str depending on backend
                         if chunk is not None:
