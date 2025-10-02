@@ -4,7 +4,7 @@ Modern LangChain implementation using RunnableWithMessageHistory
 """
 
 import logging
-from typing import Dict, Any, Optional, AsyncIterator
+from typing import Dict, Any, Optional, List, AsyncIterator
 from datetime import datetime
 
 from langchain_core.runnables.history import RunnableWithMessageHistory
@@ -111,7 +111,7 @@ Si l'utilisateur fait référence à quelque chose mentionné précédemment, ut
         
         return chain_with_history
     
-    def create_rag_chain(self, db_session: AsyncSession):
+    def create_rag_chain(self, db_session: AsyncSession, organization_id: Optional[str] = None, accessible_document_ids: Optional[List[str]] = None):
         """
         Create RAG chain with context-aware retrieval and automatic history
         
@@ -140,11 +140,23 @@ Exemples:
             ("human", "{input}"),
         ])
         
+        # Build Chroma search kwargs with org/document filter
+        search_kwargs = {"k": 5}
+        filter_obj = None
+        if accessible_document_ids:
+            filter_obj = {"document_id": {"$in": accessible_document_ids}}
+        elif organization_id:
+            filter_obj = {"organization_id": {"$eq": organization_id}}
+        if filter_obj:
+            # Support both new langchain-chroma (where) and legacy langchain (filter)
+            search_kwargs["where"] = filter_obj
+            search_kwargs["filter"] = filter_obj
+
         history_aware_retriever = create_history_aware_retriever(
             llm=self.llm,
             retriever=self.vectorstore.as_retriever(
                 search_type="similarity",
-                search_kwargs={"k": 5}
+                search_kwargs=search_kwargs
             ),
             prompt=contextualize_q_prompt
         )
@@ -188,7 +200,9 @@ Utilise l'historique de la conversation pour fournir des réponses cohérentes e
         db_session: AsyncSession,
         conversation_id: str,
         message: str,
-        use_rag: bool = False
+        use_rag: bool = False,
+        organization_id: Optional[str] = None,
+        accessible_document_ids: Optional[List[str]] = None
     ) -> str:
         """
         Process message with automatic history management
@@ -205,12 +219,13 @@ Utilise l'historique de la conversation pour fournir des réponses cohérentes e
         try:
             # Create appropriate chain
             if use_rag:
-                chain = self.create_rag_chain(db_session)
+                chain = self.create_rag_chain(db_session, organization_id=organization_id, accessible_document_ids=accessible_document_ids)
                 result = await chain.ainvoke(
                     {"input": message},
                     config={"configurable": {"session_id": conversation_id}}
                 )
-                return result["answer"]
+                # Return full result to allow callers to access both answer and context
+                return result
             else:
                 chain = self.create_basic_chat_chain(db_session)
                 result = await chain.ainvoke(
@@ -228,7 +243,9 @@ Utilise l'historique de la conversation pour fournir des réponses cohérentes e
         db_session: AsyncSession,
         conversation_id: str,
         message: str,
-        use_rag: bool = False
+        use_rag: bool = False,
+        organization_id: Optional[str] = None,
+        accessible_document_ids: Optional[List[str]] = None
     ) -> AsyncIterator[str]:
         """
         Stream message response with automatic history management
@@ -245,15 +262,27 @@ Utilise l'historique de la conversation pour fournir des réponses cohérentes e
         try:
             # Create appropriate chain
             if use_rag:
-                chain = self.create_rag_chain(db_session)
+                chain = self.create_rag_chain(db_session, organization_id=organization_id, accessible_document_ids=accessible_document_ids)
+                full_answer = ""
+                source_docs = []
                 async for chunk in chain.astream(
                     {"input": message},
                     config={"configurable": {"session_id": conversation_id}}
                 ):
-                    if isinstance(chunk, dict) and "answer" in chunk:
-                        yield chunk["answer"]
+                    if isinstance(chunk, dict):
+                        # Token chunks
+                        if "answer" in chunk and isinstance(chunk["answer"], str):
+                            token = chunk["answer"]
+                            full_answer += token
+                            yield token
+                        # Context arrives in a separate event
+                        if "context" in chunk and isinstance(chunk["context"], list):
+                            source_docs = chunk["context"]
                     elif isinstance(chunk, str):
+                        full_answer += chunk
                         yield chunk
+                # Emit final event so callers can persist citations
+                yield {"final": {"answer": full_answer, "context": source_docs}}
             else:
                 chain = self.create_basic_chat_chain(db_session)
                 async for chunk in chain.astream(
