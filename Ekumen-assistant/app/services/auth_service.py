@@ -110,13 +110,15 @@ class AuthService:
             payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
             user_id_str: str = payload.get("sub")
             email: str = payload.get("email")
+            org_id_str: Optional[str] = payload.get("org_id")
 
             if user_id_str is None or email is None:
                 return None
 
             # Convert string UUID to UUID object
             user_id = UUID(user_id_str)
-            return TokenData(user_id=user_id, email=email)
+            org_id = UUID(org_id_str) if org_id_str else None
+            return TokenData(user_id=user_id, email=email, org_id=org_id)
         except (JWTError, ValueError):
             return None
     

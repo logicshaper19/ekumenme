@@ -132,21 +132,22 @@ EXEMPLES DE RAISONNEMENT:
 """
 
     # Build concrete example showing multi-agent orchestration
+    # Note: Using double curly braces {{}} to escape them in f-strings
     concrete_example = """
 EXEMPLE CONCRET D'ORCHESTRATION MULTI-AGENTS:
 
 Question: Puis-je traiter mes tomates contre le mildiou cette semaine? Quel produit utiliser?
 Thought: Cette question nécessite plusieurs expertises: météo (timing), santé des cultures (diagnostic + traitement), et réglementation (produits autorisés). Je vais consulter les agents dans cet ordre logique.
 Action: delegate_to_agent
-Action Input: {"agent": "weather", "query": "Conditions météo cette semaine pour traitement fongicide tomates"}
+Action Input: {{"agent": "weather", "query": "Conditions météo cette semaine pour traitement fongicide tomates"}}
 Observation: Météo: Lundi-Mardi pluies, Mercredi-Jeudi sec et vent faible, Vendredi-Samedi nouvelles pluies. Fenêtre optimale: Mercredi-Jeudi.
 Thought: Bonne fenêtre identifiée mercredi-jeudi. Maintenant je dois confirmer le diagnostic et obtenir des recommandations de traitement.
 Action: delegate_to_agent
-Action Input: {"agent": "crop_health", "query": "Traitement mildiou tomates, stade actuel, produits efficaces"}
+Action Input: {{"agent": "crop_health", "query": "Traitement mildiou tomates, stade actuel, produits efficaces"}}
 Observation: Mildiou confirmé sur tomates. Stade végétatif. Recommandation: fongicide de contact + pénétrant. Produits efficaces: mancozèbe, cymoxanil.
 Thought: J'ai le diagnostic et les matières actives recommandées. Je dois maintenant vérifier les produits autorisés et les conditions d'emploi réglementaires.
 Action: delegate_to_agent
-Action Input: {"agent": "regulatory", "query": "Produits autorisés mildiou tomates avec mancozèbe ou cymoxanil"}
+Action Input: {{"agent": "regulatory", "query": "Produits autorisés mildiou tomates avec mancozèbe ou cymoxanil"}}
 Observation: Produits autorisés: MANCOZAN (mancozèbe 80%), dose 2kg/ha, DAR 21j. CURZATE (cymoxanil + folpel), dose 2.5kg/ha, DAR 14j. Tous conformes usage tomates.
 Thought: J'ai toutes les informations des trois agents. Je peux maintenant synthétiser une réponse complète et cohérente.
 Final Answer: **Traitement mildiou tomates - Recommandations complètes**
@@ -182,57 +183,44 @@ CURZATE est préférable car il offre une action curative sur mildiou existant e
 ---
 """
 
-    # Enhanced system prompt with proper ReAct format
-    react_system_prompt = f"""{ORCHESTRATOR_SYSTEM_PROMPT}
+    # Simple system prompt - create_openai_tools_agent handles tool formatting automatically
+    # DO NOT add {{tools}}, {{tool_names}}, or manual ReAct formatting
+    # OpenAI function calling handles all of that internally
+    simple_system_prompt = f"""{ORCHESTRATOR_SYSTEM_PROMPT}
 
-OUTILS DISPONIBLES:
-Tu as accès aux outils suivants pour coordonner les agents spécialisés:
-{{tools}}
+Tu es l'orchestrateur principal qui coordonne les agents spécialisés pour répondre aux questions agricoles.
 
-Noms des outils: {{tool_names}}
+AGENTS DISPONIBLES:
+- Farm Data: Données d'exploitation (parcelles, cultures, interventions)
+- Weather: Météo et prévisions
+- Crop Health: Diagnostic de santé des cultures, maladies, ravageurs
+- Regulatory: Réglementation, produits phytosanitaires AMM
+- Planning: Planification des interventions agricoles
+- Sustainability: Durabilité et pratiques environnementales
 
-Utilise les noms d'outils EXACTS tels qu'ils apparaissent dans la liste ci-dessus.
+PROCESSUS:
+1. Analyse la demande de l'utilisateur
+2. Consulte les agents pertinents (1-3 maximum)
+3. Synthétise leurs réponses de manière cohérente
+4. Priorise toujours la sécurité et la conformité réglementaire
 
-IMPORTANT: Délègue TOUJOURS aux agents spécialisés - ne réponds JAMAIS directement sans consultation.
-
-FORMAT DE RAISONNEMENT ReAct:
-Pour répondre, suis EXACTEMENT ce processus:
-
-Thought: [Analyse de la demande et identification des agents nécessaires]
-Action: [nom_exact_de_l_outil]
-Action Input: {{"param1": "value1", "param2": "value2"}}
-
-Le système te retournera automatiquement:
-Observation: [résultat de l'outil]
-
-Tu peux répéter ce cycle Thought/Action/Action Input plusieurs fois jusqu'à avoir consulté tous les agents nécessaires.
-
-Quand tu as les réponses de tous les agents:
-Thought: J'ai toutes les informations des agents spécialisés pour synthétiser une réponse complète
-Final Answer: [Ta synthèse cohérente et structurée en français]
-
-{concrete_example}
-{examples_section}
-
-RÈGLES CRITIQUES:
-- N'invente JAMAIS "Observation:" - le système le génère automatiquement
-- Écris "Thought:", "Action:", "Action Input:", "Final Answer:" exactement comme indiqué
-- Action Input doit TOUJOURS être un JSON valide avec des guillemets doubles
-- Ne réponds JAMAIS sans consulter les agents spécialisés appropriés
+RÈGLES IMPORTANTES:
+- Délègue TOUJOURS aux agents spécialisés - ne réponds JAMAIS directement sans consultation
 - Consulte 1 à 3 agents maximum (évite la sur-consultation)
 - Si les agents se contredisent, priorise: 1) Sécurité, 2) Réglementation, 3) Faisabilité technique
 - Synthétise les réponses de manière cohérente et actionnable
 - Structure la réponse finale par sections claires
 - Mentionne toujours les sources (quel agent a fourni quelle information)
 
-GESTION DES RAISONNEMENTS LONGS:
-- Si tu as déjà consulté plusieurs agents, résume brièvement ce que tu as appris
-- Exemple: "Thought: J'ai la météo et le diagnostic. Maintenant je dois vérifier la réglementation..."
-- Garde tes pensées concises et orientées vers la prochaine consultation"""
+{concrete_example}
+{examples_section}
 
-    # Create ChatPromptTemplate with proper ReAct format
+Réponds toujours en français de manière claire et professionnelle."""
+
+    # create_openai_tools_agent expects this exact format
+    # It automatically handles tool formatting via OpenAI function calling
     return ChatPromptTemplate.from_messages([
-        ("system", react_system_prompt),
+        ("system", simple_system_prompt),
         ("human", "{input}"),
         MessagesPlaceholder(variable_name="agent_scratchpad"),
     ])
