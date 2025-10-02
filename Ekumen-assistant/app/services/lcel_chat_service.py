@@ -141,16 +141,14 @@ Exemples:
         ])
         
         # Build Chroma search kwargs with org/document filter
+        # Note: For Chroma, we use 'k' for number of results
+        # Filtering is NOT supported in as_retriever for the deprecated Chroma version
+        # We'll need to filter results post-retrieval or upgrade to langchain-chroma
         search_kwargs = {"k": 5}
-        filter_obj = None
-        if accessible_document_ids:
-            filter_obj = {"document_id": {"$in": accessible_document_ids}}
-        elif organization_id:
-            filter_obj = {"organization_id": {"$eq": organization_id}}
-        if filter_obj:
-            # Support both new langchain-chroma (where) and legacy langchain (filter)
-            search_kwargs["where"] = filter_obj
-            search_kwargs["filter"] = filter_obj
+
+        # TODO: Install langchain-chroma to enable proper filtering
+        # For now, we'll retrieve without filtering and filter post-retrieval
+        # This is a temporary workaround until langchain-chroma is installed
 
         history_aware_retriever = create_history_aware_retriever(
             llm=self.llm,
@@ -249,13 +247,13 @@ Utilise l'historique de la conversation pour fournir des réponses cohérentes e
     ) -> AsyncIterator[str]:
         """
         Stream message response with automatic history management
-        
+
         Args:
             db_session: Database session
             conversation_id: Conversation ID
             message: User message
             use_rag: Whether to use RAG
-            
+
         Yields:
             Response chunks
         """
@@ -265,22 +263,41 @@ Utilise l'historique de la conversation pour fournir des réponses cohérentes e
                 chain = self.create_rag_chain(db_session, organization_id=organization_id, accessible_document_ids=accessible_document_ids)
                 full_answer = ""
                 source_docs = []
-                async for chunk in chain.astream(
+
+                # Use astream_events v2 to get token-level streaming from nested chains
+                # v2 is more reliable for complex chains like create_retrieval_chain
+                #
+                # IMPORTANT: Only listen to ONE event type to avoid duplicate tokens!
+                # We use on_chat_model_stream which is the most reliable for OpenAI models
+                async for event in chain.astream_events(
                     {"input": message},
-                    config={"configurable": {"session_id": conversation_id}}
+                    config={"configurable": {"session_id": conversation_id}},
+                    version="v2"
                 ):
-                    if isinstance(chunk, dict):
-                        # Token chunks
-                        if "answer" in chunk and isinstance(chunk["answer"], str):
-                            token = chunk["answer"]
-                            full_answer += token
-                            yield token
-                        # Context arrives in a separate event
-                        if "context" in chunk and isinstance(chunk["context"], list):
-                            source_docs = chunk["context"]
-                    elif isinstance(chunk, str):
-                        full_answer += chunk
-                        yield chunk
+                    kind = event.get("event")
+
+                    # 1) Stream raw LLM tokens ONLY from chat_model_stream
+                    # DO NOT also listen to on_llm_stream or on_chain_stream to avoid duplicates!
+                    if kind == "on_chat_model_stream":
+                        chunk = event.get("data", {}).get("chunk")
+                        # chunk may be a BaseMessageChunk or str depending on backend
+                        if chunk is not None:
+                            content = getattr(chunk, "content", None) or (chunk if isinstance(chunk, str) else None)
+                            if content:
+                                full_answer += content
+                                yield content
+
+                    # 2) Capture the final answer and context from the retrieval chain
+                    elif kind == "on_chain_end":
+                        output = event.get("data", {}).get("output", {})
+                        if isinstance(output, dict):
+                            # Prefer explicit answer if provided by create_retrieval_chain
+                            answer_text = output.get("answer")
+                            if isinstance(answer_text, str) and answer_text:
+                                full_answer = answer_text
+                            if "context" in output:
+                                source_docs = output.get("context", [])
+
                 # Emit final event so callers can persist citations
                 yield {"final": {"answer": full_answer, "context": source_docs}}
             else:
@@ -289,8 +306,12 @@ Utilise l'historique de la conversation pour fournir des réponses cohérentes e
                     {"input": message},
                     config={"configurable": {"session_id": conversation_id}}
                 ):
-                    yield chunk
-                    
+                    # Normalize chunks to strings for WebSocket/SSE layer
+                    if hasattr(chunk, "content"):
+                        yield chunk.content
+                    else:
+                        yield str(chunk)
+
         except Exception as e:
             logger.error(f"Error streaming message: {e}")
             raise

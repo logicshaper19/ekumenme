@@ -46,8 +46,9 @@ class Conversation(Base):
 
     # Conversation information
     title = Column(String(255), nullable=False)
-    agent_type = Column(SQLEnum(AgentType), nullable=False, index=True)
-    status = Column(SQLEnum(ConversationStatus), default=ConversationStatus.ACTIVE, nullable=False)
+    # Changed from SQLEnum to String to avoid enum lookup issues (database has lowercase, Python has uppercase)
+    agent_type = Column(String(50), nullable=False, index=True)
+    status = Column(String(50), default=ConversationStatus.ACTIVE.value, nullable=False)
 
     # Context and metadata
     context_data = Column(JSONB, nullable=True)  # Additional context for the agent
@@ -91,7 +92,8 @@ class Message(Base):
     # Message information
     content = Column(Text, nullable=False)
     sender = Column(String(20), nullable=False, index=True)  # "user" or "agent"
-    agent_type = Column(SQLEnum(AgentType), nullable=True)  # Only for agent messages
+    # Changed from SQLEnum to String to avoid enum lookup issues
+    agent_type = Column(String(50), nullable=True)  # Only for agent messages
 
     # Threading information
     thread_id = Column(String(100), nullable=True, index=True)  # For tracking message threads
@@ -139,7 +141,8 @@ class AgentResponse(Base):
     conversation_id = Column(UUID(as_uuid=True), ForeignKey("conversations.id"), nullable=False, index=True)
 
     # Agent information
-    agent_type = Column(SQLEnum(AgentType), nullable=False, index=True)
+    # Changed from SQLEnum to String to avoid enum lookup issues
+    agent_type = Column(String(50), nullable=False, index=True)
     model_used = Column(String(100), nullable=True)  # OpenAI model used
 
     # Response metrics

@@ -85,7 +85,11 @@ class WebSocketService {
       // Unified streaming events (SSE + WS)
       case 'token': {
         const text = data.text ?? data.token ?? data.content ?? ''
-        if (!text) return
+        console.log('🔵 WebSocket received token:', { text, message_id: data.message_id, data })
+        if (!text) {
+          console.warn('⚠️ Token event with no text:', data)
+          return
+        }
         this.emit('chat:streaming_chunk', {
           message_id: data.message_id || 'current',
           chunk: text,

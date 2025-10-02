@@ -54,6 +54,10 @@ logs/
 *.db
 *.sqlite3
 
+# Vector Database
+chroma_db/
+**/chroma_db/
+
 # Coverage
 .coverage
 htmlcov/

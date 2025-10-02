@@ -168,14 +168,18 @@ const ChatInterface: React.FC = () => {
     }
   }, []) // Empty dependency array - run once only
 
-  // Set up WebSocket event listeners (separate effect)
+  // Set up WebSocket event listeners (run when authentication changes)
   useEffect(() => {
     if (!isAuthenticated) {
+      console.log('⏭️ Skipping WebSocket listener setup - not authenticated')
       return
     }
 
-    // Set up WebSocket event listeners
-    webSocket.onMessageResponse((data) => {
+    console.log('🔧 Setting up WebSocket event listeners')
+
+    // Define all handlers with stable references
+    // Using functional state updates ensures we don't need dependencies
+    const handleMessageResponse = (data: any) => {
       const assistantMessage: Message = {
         id: data.message.id,
         content: data.message.content,
@@ -189,9 +193,9 @@ const ChatInterface: React.FC = () => {
       setMessages(prev => [...prev, assistantMessage])
       setIsLoading(false)
       setIsStreaming(false)
-    })
+    }
 
-    webSocket.onStreamingStart((data) => {
+    const handleStreamingStart = (data: any) => {
       const assistantMessage: Message = {
         id: data.message_id,
         content: '🌾 Traitement en cours...',
@@ -202,14 +206,24 @@ const ChatInterface: React.FC = () => {
       }
 
       setMessages(prev => [...prev, assistantMessage])
-    })
+    }
 
-    webSocket.onStreamingChunk((data) => {
-      setMessages(prev => prev.map(msg =>
-        msg.id === data.message_id
-          ? { ...msg, content: msg.content + data.chunk }
-          : msg
-      ))
+    const handleStreamingChunk = (data: any) => {
+      console.log('📦 Received streaming chunk:', data)
+
+      setMessages(prev => prev.map(msg => {
+        if (msg.id === data.message_id) {
+          // If this is the first chunk, replace the placeholder
+          const isFirstChunk = msg.content === '🌾 Traitement en cours...'
+          const newContent = isFirstChunk ? data.chunk : msg.content + data.chunk
+          console.log(`📝 Updating message ${msg.id}: isFirstChunk=${isFirstChunk}, chunk="${data.chunk}", newContent="${newContent.substring(0, 50)}..."`)
+          return {
+            ...msg,
+            content: newContent
+          }
+        }
+        return msg
+      }))
 
       if (data.is_complete) {
         setMessages(prev => prev.map(msg =>
@@ -220,23 +234,22 @@ const ChatInterface: React.FC = () => {
         setIsLoading(false)
         setIsStreaming(false)
       }
-    })
+    }
 
     // Handle completion (unified 'done' or legacy 'workflow_result')
-    webSocket.onStreamingComplete((data) => {
+    const handleStreamingComplete = (data: any) => {
       console.log('Received streaming complete:', data)
       setMessages(prev => {
-        // Find existing streaming assistant message
-        let streamingMessage = data.message_id
-          ? prev.find(msg => msg.id === data.message_id && msg.isStreaming && msg.sender === 'assistant')
-          : prev.find(msg => msg.isStreaming && msg.sender === 'assistant')
+        // Find existing streaming assistant message (by ID or just any streaming message)
+        let streamingMessage = prev.find(msg => msg.isStreaming && msg.sender === 'assistant')
 
         if (streamingMessage) {
-          // Update existing message: mark complete and attach sources/metadata
+          // Update existing message: mark complete, update ID to DB ID, and attach sources/metadata
           return prev.map(msg =>
             msg.id === streamingMessage!.id
               ? {
                   ...msg,
+                  id: data.message_id || msg.id, // Update to real DB message ID
                   // If backend included a final message for legacy path, prefer it; otherwise keep accumulated content
                   content: (data as any).message ?? msg.content,
                   isStreaming: false,
@@ -275,10 +288,10 @@ const ChatInterface: React.FC = () => {
       })
       setIsLoading(false)
       setIsStreaming(false)
-    })
+    }
 
     // Handle workflow status updates
-    webSocket.onWorkflowStart((data) => {
+    const handleWorkflowStart = (data: any) => {
       console.log('Workflow started:', data.message)
 
       // Check if there's already a streaming assistant message
@@ -304,9 +317,9 @@ const ChatInterface: React.FC = () => {
           return [...prev, newMessage]
         }
       })
-    })
+    }
 
-    webSocket.onWorkflowInit((data) => {
+    const handleWorkflowInit = (data: any) => {
       console.log('Workflow initialized:', data.message)
       // Update the existing assistant message with initialization status
       setMessages(prev => prev.map(msg =>
@@ -314,9 +327,9 @@ const ChatInterface: React.FC = () => {
           ? { ...msg, content: data.message }
           : msg
       ))
-    })
+    }
 
-    webSocket.onWorkflowStep((data) => {
+    const handleWorkflowStep = (data: any) => {
       console.log('Workflow step:', data.step, data.message)
       // Update the existing assistant message with step progress
       setMessages(prev => prev.map(msg =>
@@ -324,18 +337,18 @@ const ChatInterface: React.FC = () => {
           ? { ...msg, content: data.message }
           : msg
       ))
-    })
+    }
 
-    webSocket.onAgentSelected((data) => {
+    const handleAgentSelected = (data: any) => {
       setCurrentAgent({
         type: data.agent_type,
         name: data.agent_name,
         icon: agents[data.agent_type]?.icon || '🤖',
         description: agents[data.agent_type]?.description || ''
       })
-    })
+    }
 
-    webSocket.onError((data) => {
+    const handleError = (data: any) => {
       console.error('WebSocket error:', data)
       const errorMessage: Message = {
         id: Date.now().toString(),
@@ -347,20 +360,32 @@ const ChatInterface: React.FC = () => {
       setMessages(prev => [...prev, errorMessage])
       setIsLoading(false)
       setIsStreaming(false)
-    })
+    }
+
+    // Register all handlers
+    webSocket.onMessageResponse(handleMessageResponse)
+    webSocket.onStreamingStart(handleStreamingStart)
+    webSocket.onStreamingChunk(handleStreamingChunk)
+    webSocket.onStreamingComplete(handleStreamingComplete)
+    webSocket.onWorkflowStart(handleWorkflowStart)
+    webSocket.onWorkflowInit(handleWorkflowInit)
+    webSocket.onWorkflowStep(handleWorkflowStep)
+    webSocket.onAgentSelected(handleAgentSelected)
+    webSocket.onError(handleError)
 
     return () => {
-      webSocket.off('chat:message_response')
-      webSocket.off('chat:streaming_start')
-      webSocket.off('chat:streaming_chunk')
-      webSocket.off('chat:streaming_complete')
-      webSocket.off('chat:workflow_start')
-      webSocket.off('chat:workflow_init')
-      webSocket.off('chat:workflow_step')
-      webSocket.off('chat:agent_selected')
-      webSocket.off('error')
+      console.log('🧹 Cleaning up WebSocket event listeners')
+      webSocket.off('chat:message_response', handleMessageResponse)
+      webSocket.off('chat:streaming_start', handleStreamingStart)
+      webSocket.off('chat:streaming_chunk', handleStreamingChunk)
+      webSocket.off('chat:streaming_complete', handleStreamingComplete)
+      webSocket.off('chat:workflow_start', handleWorkflowStart)
+      webSocket.off('chat:workflow_init', handleWorkflowInit)
+      webSocket.off('chat:workflow_step', handleWorkflowStep)
+      webSocket.off('chat:agent_selected', handleAgentSelected)
+      webSocket.off('error', handleError)
     }
-  }, [isAuthenticated])
+  }, [isAuthenticated]) // Re-run only when authentication status changes
 
   // Smart agent selection based on message content
   const selectAgentForMessage = (message: string): AgentInfo => {

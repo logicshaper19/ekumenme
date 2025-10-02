@@ -44,8 +44,8 @@ class User(Base):
     phone = Column(String(20), nullable=True)
     
     # Role and permissions
-    role = Column(SQLEnum(UserRole), default=UserRole.FARMER, nullable=False)
-    status = Column(SQLEnum(UserStatus), default=UserStatus.PENDING_VERIFICATION, nullable=False)
+    role = Column(String(50), default=UserRole.FARMER.value, nullable=False)
+    status = Column(String(50), default=UserStatus.PENDING_VERIFICATION.value, nullable=False)
     
     # Preferences
     language_preference = Column(String(10), default="fr", nullable=False)

@@ -92,8 +92,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Login failed')
+        let detail = 'Login failed'
+        try {
+          const ct = response.headers.get('content-type') || ''
+          if (ct.includes('application/json')) {
+            const errorData = await response.json()
+            detail = (errorData && (errorData.detail || errorData.message)) || detail
+          } else {
+            const text = await response.text()
+            detail = text || detail
+          }
+        } catch (_) {
+          // swallow parse errors and use default detail
+        }
+        throw new Error(detail)
       }
 
       const tokenData = await response.json()

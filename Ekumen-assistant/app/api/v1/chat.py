@@ -393,6 +393,7 @@ async def send_message_stream(
             try:
                 final_response = ""
                 source_docs = []
+                tokens_emitted = 0
 
                 async for event in chat_service.lcel_service.stream_message(
                     db_session=db,
@@ -415,7 +416,15 @@ async def send_message_stream(
                     # Token streaming (string chunks)
                     if isinstance(event, str):
                         final_response += event
-                        yield f"data: {json.dumps({'type': 'token', 'text': event})}\n\n"
+                        tokens_emitted += 1
+                        token_data = {"type": "token", "text": event}
+                        yield f"data: {json.dumps(token_data)}\n\n"
+
+                # If no incremental tokens were emitted but we have a final answer,
+                # send it as a single token so the UI displays the message.
+                if tokens_emitted == 0 and isinstance(final_response, str) and final_response:
+                    fallback_token = {"type": "token", "text": final_response}
+                    yield f"data: {json.dumps(fallback_token)}\n\n"
 
                 # Map citations from source_docs
                 def _map_citations(docs):
@@ -647,6 +656,10 @@ async def websocket_chat(
     """
     connection_id = None
 
+    # Accept the WebSocket connection FIRST before any verification
+    await websocket.accept()
+    logger.info(f"WebSocket connection accepted for conversation {conversation_id}")
+
     try:
         # Verify token and get user
         user = await auth_service.verify_websocket_token(token)
@@ -660,21 +673,21 @@ async def websocket_chat(
         if not org_id:
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return
-        async for db in get_async_db():
+
+        # Get initial database session to verify conversation
+        from app.core.database import AsyncSessionLocal
+        async with AsyncSessionLocal() as db:
             conversation = await chat_service.get_conversation(
                 db=db,
                 conversation_id=conversation_id,
                 user_id=user.id,
                 organization_id=org_id
             )
-            break
 
         if not conversation:
             await websocket.close(code=1008, reason="Conversation not found")
             return
 
-        # Accept the WebSocket connection BEFORE any send operations
-        await websocket.accept()
         logger.info(f"Unified WebSocket connection established for conversation {conversation_id}")
 
         while True:
@@ -691,9 +704,9 @@ async def websocket_chat(
             # Get thread_id from message data (frontend should provide this)
             thread_id = message_data.get("thread_id") or message_data.get("message_id") or f"thread-{int(time.time() * 1000)}"
 
-            # Save user message and get message ID
-            user_message_id = None
-            async for db in get_async_db():
+            # Create a new database session for this message processing
+            async with AsyncSessionLocal() as db:
+                # Save user message and get message ID
                 user_message = await chat_service.save_message(
                     db=db,
                     conversation_id=conversation_id,
@@ -703,83 +716,91 @@ async def websocket_chat(
                     thread_id=thread_id
                 )
                 user_message_id = str(user_message.id)
-                break
+                await db.commit()  # Commit the user message
 
-            # Stream LCEL response with unified events
-            final_response = ""
-            source_docs = []
+                # Stream LCEL response with unified events
+                final_response = ""
+                source_docs = []
+                tokens_emitted = 0
 
-            # Signal streaming start so frontend creates placeholder message
-            await websocket.send_json({"type": "llm_start", "message_id": user_message_id})
+                # Create assistant message ID upfront for streaming
+                assistant_message_id = f"msg-{int(time.time() * 1000)}"
 
-            # Use org-scoped LCEL astream
-            async for event in chat_service.lcel_service.stream_message(
-                db_session=db,
-                conversation_id=conversation_id,
-                message=message_content,
-                use_rag=True,
-                organization_id=org_id
-            ):
-                # Final event carries full answer and context
-                if isinstance(event, dict) and "final" in event:
-                    final_payload = event.get("final") or {}
-                    ans = final_payload.get("answer")
-                    if isinstance(ans, str) and ans:
-                        final_response = ans
-                    ctx = final_payload.get("context")
-                    if isinstance(ctx, list):
-                        source_docs = ctx
-                    continue
+                # Signal streaming start so frontend creates placeholder message
+                await websocket.send_json({"type": "llm_start", "message_id": assistant_message_id})
 
-                # Token streaming (string chunks)
-                if isinstance(event, str):
-                    final_response += event
-                    await websocket.send_json({"type": "token", "text": event})
-
-            # Map citations from source_docs (persisted + frontend-friendly)
-            def _map_citations(docs):
-                items = []
-                for idx, doc in enumerate(docs):
-                    try:
-                        meta = getattr(doc, "metadata", {}) or {}
-                        page_number = meta.get("page") or meta.get("page_number")
-                        filename = meta.get("filename") or "Document"
-                        chunk_text = (getattr(doc, "page_content", "") or "")[:500]
-                        relevance = meta.get("score")
-                        items.append({
-                            "document_id": meta.get("document_id"),
-                            "filename": filename,
-                            "relevance_score": relevance,
-                            "chunk_index": meta.get("chunk_index"),
-                            "page_number": page_number,
-                            "chunk_text": chunk_text,
-                            "rank": idx + 1
-                        })
-                    except Exception:
+                # Use org-scoped LCEL astream
+                async for event in chat_service.lcel_service.stream_message(
+                    db_session=db,
+                    conversation_id=conversation_id,
+                    message=message_content,
+                    use_rag=True,
+                    organization_id=org_id
+                ):
+                    # Final event carries full answer and context
+                    if isinstance(event, dict) and "final" in event:
+                        final_payload = event.get("final") or {}
+                        ans = final_payload.get("answer")
+                        if isinstance(ans, str) and ans:
+                            final_response = ans
+                        ctx = final_payload.get("context")
+                        if isinstance(ctx, list):
+                            source_docs = ctx
                         continue
-                return items
 
-            def _map_sources(docs):
-                src = []
-                for d in docs:
-                    try:
-                        title = f"{d.get('filename') or 'Document'}" + (f" (p. {d.get('page_number')})" if d.get('page_number') else "")
-                        src.append({
-                            "title": title,
-                            "url": "#",
-                            "snippet": d.get("chunk_text") or "",
-                            "relevance": d.get("relevance_score"),
-                            "type": "document"
-                        })
-                    except Exception:
-                        continue
-                return src
+                    # Token streaming (string chunks) - INCLUDE message_id!
+                    if isinstance(event, str):
+                        final_response += event
+                        tokens_emitted += 1
+                        await websocket.send_json({"type": "token", "text": event, "message_id": assistant_message_id})
 
-            documents_retrieved = _map_citations(source_docs)
-            sources = _map_sources(documents_retrieved)
+                # If no tokens were emitted but we have a final answer, emit it once
+                if tokens_emitted == 0 and isinstance(final_response, str) and final_response:
+                    await websocket.send_json({"type": "token", "text": final_response, "message_id": assistant_message_id})
 
-            # Persist assistant message with citations
-            async for db in get_async_db():
+                # Map citations from source_docs (persisted + frontend-friendly)
+                def _map_citations(docs):
+                    items = []
+                    for idx, doc in enumerate(docs):
+                        try:
+                            meta = getattr(doc, "metadata", {}) or {}
+                            page_number = meta.get("page") or meta.get("page_number")
+                            filename = meta.get("filename") or "Document"
+                            chunk_text = (getattr(doc, "page_content", "") or "")[:500]
+                            relevance = meta.get("score")
+                            items.append({
+                                "document_id": meta.get("document_id"),
+                                "filename": filename,
+                                "relevance_score": relevance,
+                                "chunk_index": meta.get("chunk_index"),
+                                "page_number": page_number,
+                                "chunk_text": chunk_text,
+                                "rank": idx + 1
+                            })
+                        except Exception:
+                            continue
+                    return items
+
+                def _map_sources(docs):
+                    src = []
+                    for d in docs:
+                        try:
+                            title = f"{d.get('filename') or 'Document'}" + (f" (p. {d.get('page_number')})" if d.get('page_number') else "")
+                            src.append({
+                                "title": title,
+                                "url": "#",
+                                "snippet": d.get("chunk_text") or "",
+                                "relevance": d.get("relevance_score"),
+                                "type": "document"
+                            })
+                        except Exception:
+                            continue
+                    return src
+
+                documents_retrieved = _map_citations(source_docs)
+                sources = _map_sources(documents_retrieved)
+
+                # Persist assistant message with citations
                 saved = await chat_service.save_message(
                     db=db,
                     conversation_id=conversation_id,
@@ -795,15 +816,15 @@ async def websocket_chat(
                     }
                 )
                 message_id = str(saved.id)
-                break
+                await db.commit()  # Commit the agent message
 
-            # Unified completion event
-            await websocket.send_json({
-                "type": "done",
-                "message_id": message_id,
-                "citation_count": len(documents_retrieved),
-                "sources": sources
-            })
+                # Unified completion event
+                await websocket.send_json({
+                    "type": "done",
+                    "message_id": message_id,
+                    "citation_count": len(documents_retrieved),
+                    "sources": sources
+                })
 
     except WebSocketDisconnect:
         logger.info(f"Unified WebSocket disconnected for conversation {conversation_id}")
