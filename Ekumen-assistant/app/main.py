@@ -27,7 +27,7 @@ except ImportError:
 
 from app.core.config import settings
 from app.core.database import init_db, close_db
-from app.api.v1 import auth, chat, journal, products, chat_optimized, feedback
+from app.api.v1 import auth, chat, journal, products, chat_optimized, feedback, admin, knowledge_base, knowledge_base_workflow
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -79,6 +79,9 @@ app.include_router(chat_optimized.router, prefix="/api/v1/chat", tags=["chat-opt
 app.include_router(journal.router, prefix="/api/v1/journal", tags=["journal"])
 app.include_router(products.router, prefix="/api/v1/products", tags=["products"])
 app.include_router(feedback.router, prefix="/api/v1/feedback", tags=["feedback"])
+app.include_router(admin.router, prefix="/api/v1", tags=["super-admin"])
+app.include_router(knowledge_base.router, prefix="/api/v1", tags=["knowledge-base"])
+app.include_router(knowledge_base_workflow.router, prefix="/api/v1/knowledge-base", tags=["knowledge-base-workflow"])
 
 # Health check endpoint
 @app.get("/health")
@@ -112,12 +115,29 @@ async def startup_event():
     logger.info(f"Starting {settings.PROJECT_NAME} v{settings.VERSION}")
     await init_db()
     logger.info("Database initialized successfully")
+    
+    # Start knowledge base scheduler
+    try:
+        from app.services.scheduler_service import start_knowledge_base_scheduler
+        start_knowledge_base_scheduler()
+        logger.info("Knowledge base scheduler started")
+    except Exception as e:
+        logger.error(f"Failed to start knowledge base scheduler: {e}")
 
 # Shutdown event
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown"""
     logger.info("Shutting down application")
+    
+    # Stop knowledge base scheduler
+    try:
+        from app.services.scheduler_service import stop_knowledge_base_scheduler
+        stop_knowledge_base_scheduler()
+        logger.info("Knowledge base scheduler stopped")
+    except Exception as e:
+        logger.error(f"Failed to stop knowledge base scheduler: {e}")
+    
     await close_db()
     logger.info("Database connections closed")
 
