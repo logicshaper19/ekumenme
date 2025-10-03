@@ -1,5 +1,5 @@
 """
-Enhanced Tool Service for Agricultural AI
+Tool Service for Agricultural AI
 Advanced tool integration with validation and error handling
 """
 
@@ -36,8 +36,8 @@ class ToolValidationError(Exception):
     pass
 
 
-class EnhancedAgriculturalTool(BaseTool):
-    """Base class for enhanced agricultural tools"""
+class AgriculturalTool(BaseTool):
+    """Base class for agricultural tools"""
 
     # Define as class attributes to avoid Pydantic field validation issues
     regulatory_service: Optional[UnifiedRegulatoryService] = None
@@ -115,8 +115,8 @@ class EnhancedAgriculturalTool(BaseTool):
         raise NotImplementedError
 
 
-class WeatherAnalysisTool(EnhancedAgriculturalTool):
-    """Enhanced weather analysis tool"""
+class WeatherAnalysisTool(AgriculturalTool):
+    """Weather analysis tool"""
 
     name: str = "weather_analysis"
     description: str = "Analyse météorologique avancée pour l'agriculture avec recommandations d'intervention"
@@ -215,8 +215,8 @@ class WeatherAnalysisTool(EnhancedAgriculturalTool):
         return analysis
 
 
-class RegulatoryComplianceTool(EnhancedAgriculturalTool):
-    """Enhanced regulatory compliance tool"""
+class RegulatoryComplianceTool(AgriculturalTool):
+    """Regulatory compliance tool"""
 
     name: str = "regulatory_compliance"
     description: str = "Vérification de conformité réglementaire EPHY avec analyse détaillée"
@@ -291,8 +291,8 @@ class RegulatoryComplianceTool(EnhancedAgriculturalTool):
         return enhanced
 
 
-class FarmDataAnalysisTool(EnhancedAgriculturalTool):
-    """Enhanced farm data analysis tool"""
+class FarmDataAnalysisTool(AgriculturalTool):
+    """Farm data analysis tool"""
 
     name: str = "farm_data_analysis"
     description: str = "Analyse avancée des données d'exploitation avec insights opérationnels"
@@ -459,8 +459,8 @@ class FarmDataAnalysisTool(EnhancedAgriculturalTool):
         return insights
 
 
-class EnhancedToolService:
-    """Service for managing enhanced agricultural tools"""
+class ToolService:
+    """Service for managing agricultural tools"""
     
     def __init__(self):
         self.tools = {
@@ -470,11 +470,11 @@ class EnhancedToolService:
         }
         self.execution_stats = {}
     
-    def get_tool(self, tool_name: str) -> Optional[EnhancedAgriculturalTool]:
+    def get_tool(self, tool_name: str) -> Optional[AgriculturalTool]:
         """Get tool by name"""
         return self.tools.get(tool_name)
     
-    def get_all_tools(self) -> List[EnhancedAgriculturalTool]:
+    def get_all_tools(self) -> List[AgriculturalTool]:
         """Get all available tools"""
         return list(self.tools.values())
     

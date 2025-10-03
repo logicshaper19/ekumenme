@@ -19,7 +19,7 @@ from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langgraph.graph import StateGraph, END
 from langgraph.graph import add_messages
 
-from app.services.enhanced_tool_service import EnhancedToolService
+from app.services.tool_service import ToolService
 from app.services.memory_service import MemoryService
 from app.core.config import settings
 
@@ -59,7 +59,7 @@ class SpecializedAgent:
             temperature=0.1,
             openai_api_key=settings.OPENAI_API_KEY
         )
-        self.tool_service = EnhancedToolService()
+        self.tool_service = ToolService()
         self.execution_count = 0
         self.specialization_prompt = self._get_specialization_prompt()
     
