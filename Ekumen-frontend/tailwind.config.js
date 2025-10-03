@@ -3,6 +3,7 @@ export default {
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
+    "./src/styles/**/*.css",
   ],
   theme: {
     extend: {
@@ -184,6 +185,9 @@ export default {
         'overlay': '1080',
         'voiceInterface': '1090',
         'chatInterface': '1100',
+      },
+      transitionProperty: {
+        'theme': 'background-color, border-color, color',
       },
     },
   },

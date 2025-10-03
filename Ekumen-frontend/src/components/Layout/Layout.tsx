@@ -18,23 +18,36 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user } = useAuth()
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div
+      className="min-h-screen flex flex-col"
+      style={{
+        backgroundColor: 'var(--bg-app)',
+        color: 'var(--text-primary)',
+        transition: 'var(--transition-theme)'
+      }}
+    >
       {/* Header */}
-      <Header 
+      <Header
         onMenuClick={() => setSidebarOpen(!sidebarOpen)}
         user={user}
       />
-      
+
       <div className="flex flex-1">
         {/* Sidebar */}
-        <Sidebar 
+        <Sidebar
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           user={user}
         />
-        
+
         {/* Main content */}
-        <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? 'ml-10' : 'ml-0'}`}>
+        <main
+          className={`flex-1 transition-all duration-300 ${sidebarOpen ? 'ml-10' : 'ml-0'}`}
+          style={{
+            backgroundColor: 'var(--bg-app)',
+            color: 'var(--text-primary)'
+          }}
+        >
           <div className="px-6 py-1">
             {children || <Outlet />}
           </div>

@@ -52,19 +52,19 @@ const Login: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-app flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
           <Logo size="lg" showText={true} text="Assistant Agricole IA" />
         </div>
-        <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
+        <h2 className="mt-6 text-center text-3xl font-bold text-primary">
           Connectez-vous à votre compte
         </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
+        <p className="mt-2 text-center text-sm text-secondary">
           Ou{' '}
           <Link
             to="/register"
-            className="font-medium text-primary-600 hover:text-primary-500"
+            className="font-medium text-link hover:text-link-hover"
           >
             créez un nouveau compte
           </Link>
@@ -76,28 +76,28 @@ const Login: React.FC = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10"
+          className="card py-8 px-4 sm:px-10"
         >
           <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
             {/* Email field */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="email" className="block text-sm font-medium text-primary">
                 Adresse email
               </label>
               <div className="mt-1 relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
+                  <Mail className="h-5 w-5" style={{ color: 'var(--text-muted)' }} />
                 </div>
                 <input
                   {...register('email')}
                   type="email"
                   autoComplete="email"
-                  className="form-input pl-10"
+                  className="input pl-10"
                   placeholder="votre@email.com"
                 />
               </div>
               {errors.email && (
-                <p className="mt-1 text-sm text-error-600">{errors.email.message}</p>
+                <p className="mt-1 text-sm" style={{ color: 'var(--error-600)' }}>{errors.email.message}</p>
               )}
             </div>
 

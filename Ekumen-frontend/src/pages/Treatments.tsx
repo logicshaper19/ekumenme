@@ -169,47 +169,47 @@ const Treatments: React.FC = () => {
   return (
     <div className="space-y-6 p-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Traitements Phytosanitaires</h1>
-        <p className="mt-1 text-sm text-gray-600">
+        <h1 className="text-2xl font-bold text-primary">Traitements Phytosanitaires</h1>
+        <p className="mt-1 text-sm text-secondary">
           Historique des produits phytosanitaires utilisés sur vos parcelles
         </p>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-2xl font-bold text-gray-900">{filteredTreatments.length}</div>
-          <div className="text-sm text-gray-600">Traitements</div>
+        <div className="card p-4">
+          <div className="text-2xl font-bold text-primary">{filteredTreatments.length}</div>
+          <div className="text-sm text-secondary">Traitements</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-2xl font-bold text-green-600">{totalSurface.toFixed(1)} ha</div>
-          <div className="text-sm text-gray-600">Surface traitée</div>
+        <div className="card p-4">
+          <div className="text-2xl font-bold text-success">{totalSurface.toFixed(1)} ha</div>
+          <div className="text-sm text-secondary">Surface traitée</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="card p-4">
           <div className="text-2xl font-bold text-blue-600">{totalVolume.toFixed(2)} L</div>
-          <div className="text-sm text-gray-600">Volume total</div>
+          <div className="text-sm text-secondary">Volume total</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-2xl font-bold text-yellow-600">
+        <div className="card p-4">
+          <div className="text-2xl font-bold text-warning">
             {new Set(filteredTreatments.map(t => t.produit)).size}
           </div>
-          <div className="text-sm text-gray-600">Produits différents</div>
+          <div className="text-sm text-secondary">Produits différents</div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-4">
+      <div className="card p-4">
         <div className="flex flex-col md:flex-row gap-4">
           {/* Search */}
           <div className="flex-1">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted" />
               <input
                 type="text"
                 placeholder="Rechercher par produit, AMM, parcelle..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                className="input pl-10"
               />
             </div>
           </div>
@@ -219,7 +219,7 @@ const Treatments: React.FC = () => {
             <select
               value={filterParcelle}
               onChange={(e) => setFilterParcelle(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+              className="input"
             >
               <option value="all">Toutes les parcelles</option>
               {uniqueParcelles.map(parcelle => (
@@ -233,7 +233,7 @@ const Treatments: React.FC = () => {
             <select
               value={filterPeriod}
               onChange={(e) => setFilterPeriod(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+              className="input"
             >
               <option value="all">Toute la période</option>
               <option value="week">7 derniers jours</option>
@@ -242,7 +242,7 @@ const Treatments: React.FC = () => {
           </div>
 
           {/* Export Button */}
-          <button className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
+          <button className="btn-primary">
             <Download className="h-4 w-4" />
             Registre
           </button>
@@ -250,31 +250,31 @@ const Treatments: React.FC = () => {
       </div>
 
       {/* Treatments List */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Registre des Traitements</h2>
+      <div className="card">
+        <div className="px-6 py-4 border-b border-subtle">
+          <h2 className="text-lg font-semibold text-primary">Registre des Traitements</h2>
         </div>
 
-        <div className="divide-y divide-gray-200">
+        <div className="divide-y divide-subtle">
           {filteredTreatments.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              <Beaker className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+            <div className="p-8 text-center text-muted">
+              <Beaker className="h-12 w-12 mx-auto mb-4 text-muted" />
               <p>Aucun traitement trouvé</p>
               <p className="text-sm">Modifiez vos filtres pour voir plus de traitements</p>
             </div>
           ) : (
             filteredTreatments.map((treatment) => (
-              <div key={treatment.id} className="p-6 hover:bg-gray-50">
+              <div key={treatment.id} className="p-6 bg-card-hover transition-theme">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-4 mb-2">
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <div className="flex items-center gap-2 text-sm text-secondary">
                         <Calendar className="h-4 w-4" />
                         <span>{formatDate(treatment.date)}</span>
                       </div>
-                      
+
                       {treatment.znt && treatment.znt >= 10 && (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-warning text-warning text-xs rounded-full">
                           <AlertTriangle className="h-3 w-3" />
                           ZNT {treatment.znt}m
                         </span>
@@ -282,28 +282,28 @@ const Treatments: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-2 mb-2">
-                      <MapPin className="h-4 w-4 text-gray-400" />
-                      <span className="font-medium text-gray-900">{treatment.parcelle}</span>
-                      <span className="text-gray-400">•</span>
-                      <span className="text-gray-700">{treatment.culture}</span>
+                      <MapPin className="h-4 w-4 text-muted" />
+                      <span className="font-medium text-primary">{treatment.parcelle}</span>
+                      <span className="text-muted">•</span>
+                      <span className="text-secondary">{treatment.culture}</span>
                     </div>
 
                     <div className="mb-3">
                       <div className="flex items-center gap-2 mb-1">
                         <Beaker className="h-4 w-4 text-blue-600" />
-                        <span className="font-medium text-gray-900">{treatment.produit}</span>
-                        <span className="text-sm text-gray-600">AMM: {treatment.amm}</span>
+                        <span className="font-medium text-primary">{treatment.produit}</span>
+                        <span className="text-sm text-secondary">AMM: {treatment.amm}</span>
                         <button className="text-blue-600 hover:text-blue-800">
                           <ExternalLink className="h-3 w-3" />
                         </button>
                       </div>
-                      <div className="text-sm text-gray-700">
-                        Dose: {treatment.dose} {treatment.unite} • Surface: {treatment.surface} ha • 
+                      <div className="text-sm text-secondary">
+                        Dose: {treatment.dose} {treatment.unite} • Surface: {treatment.surface} ha •
                         Volume bouillie: {treatment.volume_bouillie} L/ha
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 mb-2">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-secondary mb-2">
                       <div>
                         <span className="font-medium">Opérateur:</span> {treatment.operateur}
                       </div>
@@ -312,7 +312,7 @@ const Treatments: React.FC = () => {
                       </div>
                       {treatment.znt && (
                         <div>
-                          <span className="font-medium">ZNT:</span> 
+                          <span className="font-medium">ZNT:</span>
                           <span className={`ml-1 ${getZntColor(treatment.znt)}`}>
                             {treatment.znt} mètres
                           </span>
@@ -323,7 +323,7 @@ const Treatments: React.FC = () => {
                     {(treatment.delai_reentree || treatment.delai_recolte) && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-2">
                         {treatment.delai_reentree && (
-                          <div className={`${isDelayRespected(treatment.date, treatment.delai_reentree) ? 'text-green-600' : 'text-red-600'}`}>
+                          <div className={`${isDelayRespected(treatment.date, treatment.delai_reentree) ? 'text-success' : 'text-error'}`}>
                             <span className="font-medium">Délai de rentrée:</span> {treatment.delai_reentree}h
                             {!isDelayRespected(treatment.date, treatment.delai_reentree / 24) && (
                               <span className="ml-1">(en cours)</span>
@@ -331,7 +331,7 @@ const Treatments: React.FC = () => {
                           </div>
                         )}
                         {treatment.delai_recolte && (
-                          <div className={`${isDelayRespected(treatment.date, treatment.delai_recolte) ? 'text-green-600' : 'text-orange-600'}`}>
+                          <div className={`${isDelayRespected(treatment.date, treatment.delai_recolte) ? 'text-success' : 'text-warning'}`}>
                             <span className="font-medium">Délai avant récolte:</span> {treatment.delai_recolte} jours
                             {!isDelayRespected(treatment.date, treatment.delai_recolte) && (
                               <span className="ml-1">(en cours)</span>
@@ -342,7 +342,7 @@ const Treatments: React.FC = () => {
                     )}
 
                     {treatment.notes && (
-                      <div className="text-sm text-gray-700">
+                      <div className="text-sm text-secondary">
                         <span className="font-medium">Notes:</span> {treatment.notes}
                       </div>
                     )}
@@ -350,7 +350,7 @@ const Treatments: React.FC = () => {
 
                   <div className="flex items-center gap-2 ml-4">
                     <button
-                      className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                      className="p-2 text-muted hover:text-primary transition-theme"
                       title="Voir détails"
                     >
                       <Eye className="h-4 w-4" />
