@@ -33,7 +33,9 @@ class TavilyService:
             self.client = None
             return
 
-        self.api_key = os.getenv("TAVILY_API_KEY")
+        # Use Pydantic settings instead of direct os.getenv
+        from app.core.config import settings
+        self.api_key = settings.TAVILY_API_KEY
         if not self.api_key:
             logger.warning("TAVILY_API_KEY not found in environment variables")
             self.client = None

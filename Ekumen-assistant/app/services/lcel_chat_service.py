@@ -243,7 +243,8 @@ Utilise l'historique de la conversation pour fournir des réponses cohérentes e
         message: str,
         use_rag: bool = False,
         organization_id: Optional[str] = None,
-        accessible_document_ids: Optional[List[str]] = None
+        accessible_document_ids: Optional[List[str]] = None,
+        mode: Optional[str] = None
     ) -> AsyncIterator[str]:
         """
         Stream message response with automatic history management
@@ -258,8 +259,92 @@ Utilise l'historique de la conversation pour fournir des réponses cohérentes e
             Response chunks
         """
         try:
-            # Create appropriate chain
-            if use_rag:
+            logger.info(f"🔍 LCEL stream_message called with mode: {mode}")
+            # Create appropriate chain based on mode
+            if mode == "internet" or mode == "supplier":
+                logger.info(f"🎯 Using Tavily chain for mode: {mode}")
+                # Use tool-based chain for Tavily integration
+                chain, tools = self.create_tavily_chain(db_session, mode=mode, organization_id=organization_id)
+                full_answer = ""
+                source_docs = []
+                
+                # Use ainvoke to get the final result directly, then stream it
+                try:
+                    # Get the final result from the agent executor
+                    final_result = await chain.ainvoke(
+                        {"input": message},
+                        config={"configurable": {"session_id": conversation_id}}
+                    )
+                    
+                    # Extract the final response
+                    final_response = ""
+                    if isinstance(final_result, dict):
+                        if "output" in final_result:
+                            content = final_result["output"]
+                            if hasattr(content, "content"):
+                                content = content.content
+                            if content and isinstance(content, str) and content.strip():
+                                final_response = content
+                    elif hasattr(final_result, "content"):
+                        final_response = final_result.content
+                    elif isinstance(final_result, str):
+                        final_response = final_result
+                    
+                    # Stream the final response in chunks for better UX
+                    if final_response:
+                        full_answer = final_response
+                        # Stream the response in larger chunks for better readability
+                        words = final_response.split()
+                        for i in range(0, len(words), 8):  # Stream 8 words at a time for better flow
+                            chunk = " ".join(words[i:i+8])
+                            if i + 8 < len(words):
+                                chunk += " "
+                            yield chunk
+                    else:
+                        # Fallback: return a generic message
+                        fallback_msg = "Je n'ai pas pu trouver d'informations spécifiques sur les fournisseurs demandés. Veuillez essayer avec des termes plus généraux."
+                        full_answer = fallback_msg
+                        yield fallback_msg
+                        
+                except Exception as e:
+                    logger.error(f"Error in agent execution: {e}")
+                    error_msg = "Une erreur s'est produite lors de la recherche. Veuillez réessayer."
+                    full_answer = error_msg
+                    yield error_msg
+                
+                # Extract sources from tools after execution
+                for tool in tools:
+                    # Handle both function-based tools and class-based tools
+                    if hasattr(tool, 'func') and hasattr(tool.func, '_last_sources'):
+                        # Function-based tool (internet search)
+                        sources = tool.func._last_sources
+                        if sources:
+                            for source in sources:
+                                source_docs.append({
+                                    "title": source.get("title", "Source web"),
+                                    "url": source.get("url", ""),
+                                    "snippet": source.get("snippet", "")[:500],
+                                    "relevance": source.get("relevance", 0.0),
+                                    "type": "web"
+                                })
+                    elif hasattr(tool, 'get_last_sources'):
+                        # Class-based tool with proper method (supplier tool)
+                        sources = tool.get_last_sources()
+                        if sources:
+                            for source in sources:
+                                source_docs.append({
+                                    "title": source.get("name", "Source web"),
+                                    "url": source.get("url", ""),
+                                    "snippet": source.get("description", "")[:500],
+                                    "relevance": source.get("relevance_score", 0.0),
+                                    "type": "web"
+                                })
+                
+                # Emit final event so callers can persist citations
+                yield {"final": {"answer": full_answer, "context": source_docs}}
+                
+            elif use_rag:
+                logger.info(f"🔍 Using RAG chain (mode was: {mode})")
                 chain = self.create_rag_chain(db_session, organization_id=organization_id, accessible_document_ids=accessible_document_ids)
                 full_answer = ""
                 source_docs = []
@@ -324,6 +409,83 @@ Utilise l'historique de la conversation pour fournir des réponses cohérentes e
         except Exception as e:
             logger.error(f"Error streaming message: {e}")
             raise
+    
+    def create_tavily_chain(self, db_session: AsyncSession, mode: str, organization_id: Optional[str] = None):
+        """
+        Create LCEL chain with Tavily tools for Internet/Supplier modes
+        
+        Args:
+            db_session: Database session
+            mode: Mode ('internet' or 'supplier')
+            organization_id: Organization ID for context
+            
+        Returns:
+            LCEL chain with Tavily tools
+        """
+        logger.info(f"🔧 create_tavily_chain called with mode: {mode}")
+        from langchain.tools import Tool
+        from app.services.tavily_service import get_tavily_service
+        
+        tavily_service = get_tavily_service()
+        
+        # Create Tavily tools based on mode
+        tools = []
+        
+        if mode == "internet":
+            # Internet search tool
+            def internet_search(query: str) -> str:
+                """Search the internet for real-time information"""
+                try:
+                    import asyncio
+                    # Run async function in sync context
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        result = loop.run_until_complete(tavily_service.search_internet(query, max_results=5))
+                    finally:
+                        loop.close()
+                    
+                    if result.get("success"):
+                        # Store sources globally for later retrieval
+                        sources = result.get("results", [])
+                        # Store sources in a way that can be accessed later
+                        internet_search._last_sources = sources
+                        
+                        # Format sources for the agent
+                        source_text = ""
+                        for i, source in enumerate(sources[:3], 1):
+                            source_text += f"\n{i}. {source.get('title', 'Source')} - {source.get('url', '')}"
+                        
+                        return f"Search results: {result.get('answer', 'No results found')}{source_text}"
+                    else:
+                        return f"Search error: {result.get('error', 'Unknown error')}"
+                except Exception as e:
+                    return f"Search failed: {str(e)}"
+            
+            tools.append(Tool(
+                name="internet_search",
+                description="Search the internet for real-time information, news, and current events",
+                func=internet_search
+            ))
+            
+        elif mode == "supplier":
+            # Import simplified supplier tool
+            logger.info("🔧 Creating supplier tools for mode: supplier")
+            try:
+                from app.tools.supplier_agent import SupplierSearchTool
+                logger.info("✅ Successfully imported SupplierSearchTool")
+                
+                # Create supplier search tool
+                supplier_tool = SupplierSearchTool()
+                tools.append(supplier_tool)
+                logger.info(f"✅ Added supplier tool to tools list. Total tools: {len(tools)}")
+            except Exception as e:
+                logger.error(f"❌ Error creating supplier tool: {str(e)}")
+                raise
+        
+        # Create tool-based chain
+        chain = self.create_multi_tool_chain(db_session, tools)
+        return chain, tools
     
     def create_multi_tool_chain(self, db_session: AsyncSession, tools: list):
         """

@@ -64,7 +64,7 @@ async def create_conversation(
         conversation = await chat_service.create_conversation(
             db=db,
             user_id=current_user.id,
-            agent_type=conversation_data.agent_type,
+            agent_type=getattr(conversation_data, 'agent_type', None),
             organization_id=org_id,
             farm_siret=conversation_data.farm_siret,
             title=conversation_data.title
@@ -703,6 +703,11 @@ async def websocket_chat(
 
             # Get thread_id from message data (frontend should provide this)
             thread_id = message_data.get("thread_id") or message_data.get("message_id") or f"thread-{int(time.time() * 1000)}"
+            
+            # Extract mode from message data (for Tavily routing)
+            mode = message_data.get("mode")
+            logger.info(f"🔍 Processing message with mode: {mode}")
+            logger.info(f"🔍 Full message data: {message_data}")
 
             # Create a new database session for this message processing
             async with AsyncSessionLocal() as db:
@@ -729,13 +734,14 @@ async def websocket_chat(
                 # Signal streaming start so frontend creates placeholder message
                 await websocket.send_json({"type": "llm_start", "message_id": assistant_message_id})
 
-                # Use org-scoped LCEL astream
+                # Use LCEL service with mode-aware tools
                 async for event in chat_service.lcel_service.stream_message(
                     db_session=db,
                     conversation_id=conversation_id,
                     message=message_content,
                     use_rag=True,
-                    organization_id=org_id
+                    organization_id=org_id,
+                    mode=mode  # Pass mode to LCEL service for tool selection
                 ):
                     # Final event carries full answer and context
                     if isinstance(event, dict) and "final" in event:
@@ -758,25 +764,54 @@ async def websocket_chat(
                 if tokens_emitted == 0 and isinstance(final_response, str) and final_response:
                     await websocket.send_json({"type": "token", "text": final_response, "message_id": assistant_message_id})
 
+                # Save assistant message to database
+                if final_response:
+                    assistant_message = await chat_service.save_message(
+                        db=db,
+                        conversation_id=conversation_id,
+                        content=final_response,
+                        sender="agent",
+                        agent_type=mode if mode in ["internet", "supplier"] else "farm_data",
+                        message_type="text",
+                        thread_id=thread_id
+                    )
+                    await db.commit()
+
                 # Map citations from source_docs (persisted + frontend-friendly)
                 def _map_citations(docs):
                     items = []
                     for idx, doc in enumerate(docs):
                         try:
-                            meta = getattr(doc, "metadata", {}) or {}
-                            page_number = meta.get("page") or meta.get("page_number")
-                            filename = meta.get("filename") or "Document"
-                            chunk_text = (getattr(doc, "page_content", "") or "")[:500]
-                            relevance = meta.get("score")
-                            items.append({
-                                "document_id": meta.get("document_id"),
-                                "filename": filename,
-                                "relevance_score": relevance,
-                                "chunk_index": meta.get("chunk_index"),
-                                "page_number": page_number,
-                                "chunk_text": chunk_text,
-                                "rank": idx + 1
-                            })
+                            # Handle both document chunks and Tavily sources
+                            if hasattr(doc, 'metadata'):
+                                # Document chunk format
+                                meta = getattr(doc, "metadata", {}) or {}
+                                page_number = meta.get("page") or meta.get("page_number")
+                                filename = meta.get("filename") or "Document"
+                                chunk_text = (getattr(doc, "page_content", "") or "")[:500]
+                                relevance = meta.get("score")
+                                items.append({
+                                    "document_id": meta.get("document_id"),
+                                    "filename": filename,
+                                    "relevance_score": relevance,
+                                    "chunk_index": meta.get("chunk_index"),
+                                    "page_number": page_number,
+                                    "chunk_text": chunk_text,
+                                    "rank": idx + 1
+                                })
+                            elif isinstance(doc, dict):
+                                # Tavily source format
+                                items.append({
+                                    "document_id": None,
+                                    "filename": doc.get("title", "Source web"),
+                                    "relevance_score": doc.get("relevance", 0.0),
+                                    "chunk_index": None,
+                                    "page_number": None,
+                                    "chunk_text": doc.get("snippet", "")[:500],
+                                    "rank": idx + 1,
+                                    "url": doc.get("url", ""),
+                                    "type": doc.get("type", "web")
+                                })
                         except Exception:
                             continue
                     return items
@@ -785,14 +820,25 @@ async def websocket_chat(
                     src = []
                     for d in docs:
                         try:
-                            title = f"{d.get('filename') or 'Document'}" + (f" (p. {d.get('page_number')})" if d.get('page_number') else "")
-                            src.append({
-                                "title": title,
-                                "url": "#",
-                                "snippet": d.get("chunk_text") or "",
-                                "relevance": d.get("relevance_score"),
-                                "type": "document"
-                            })
+                            if d.get("type") == "web":
+                                # Tavily web source
+                                src.append({
+                                    "title": d.get("filename", "Source web"),
+                                    "url": d.get("url", "#"),
+                                    "snippet": d.get("chunk_text", ""),
+                                    "relevance": d.get("relevance_score", 0.0),
+                                    "type": "web"
+                                })
+                            else:
+                                # Document source
+                                title = f"{d.get('filename') or 'Document'}" + (f" (p. {d.get('page_number')})" if d.get('page_number') else "")
+                                src.append({
+                                    "title": title,
+                                    "url": "#",
+                                    "snippet": d.get("chunk_text") or "",
+                                    "relevance": d.get("relevance_score"),
+                                    "type": "document"
+                                })
                         except Exception:
                             continue
                     return src
@@ -800,21 +846,32 @@ async def websocket_chat(
                 documents_retrieved = _map_citations(source_docs)
                 sources = _map_sources(documents_retrieved)
 
-                # Persist assistant message with citations
-                saved = await chat_service.save_message(
-                    db=db,
-                    conversation_id=conversation_id,
-                    content=final_response,
-                    sender="agent",
-                    agent_type=conversation.agent_type,
-                    message_type="text",
-                    metadata={
+                # Update the existing assistant message with citations (don't create a new one)
+                if assistant_message:
+                    assistant_message.message_metadata = {
                         "processing_method": "lcel_with_automatic_history",
                         "use_rag": True,
                         "knowledge_base_used": len(documents_retrieved) > 0,
                         "documents_retrieved": documents_retrieved
                     }
-                )
+                    await db.commit()
+                    saved = assistant_message
+                else:
+                    # Fallback: create new message if assistant_message doesn't exist
+                    saved = await chat_service.save_message(
+                        db=db,
+                        conversation_id=conversation_id,
+                        content=final_response,
+                        sender="agent",
+                        agent_type=mode if mode in ["internet", "supplier"] else "farm_data",
+                        message_type="text",
+                        metadata={
+                            "processing_method": "lcel_with_automatic_history",
+                            "use_rag": True,
+                            "knowledge_base_used": len(documents_retrieved) > 0,
+                            "documents_retrieved": documents_retrieved
+                        }
+                    )
                 message_id = str(saved.id)
                 await db.commit()  # Commit the agent message
 
