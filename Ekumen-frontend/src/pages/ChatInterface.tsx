@@ -523,23 +523,50 @@ const ChatInterface: React.FC = () => {
   // Show loading state while creating conversation or if no conversation ID yet
   if (isCreatingConversation || (!conversationId && isAuthenticated)) {
     return (
-      <div className="flex flex-col h-full bg-gray-50 items-center justify-center">
+      <div
+        className="flex flex-col h-full items-center justify-center"
+        style={{
+          backgroundColor: 'var(--bg-app)',
+          color: 'var(--text-primary)'
+        }}
+      >
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-green-600" />
-          <p className="text-gray-600">Initialisation de la conversation...</p>
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" style={{ color: 'var(--brand-600)' }} />
+          <p style={{ color: 'var(--text-secondary)' }}>Initialisation de la conversation...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <div
+      className="flex flex-col h-full"
+      style={{
+        backgroundColor: 'var(--bg-app)',
+        color: 'var(--text-primary)',
+        transition: 'var(--transition-theme)'
+      }}
+    >
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-8 py-4">
+      <div
+        className="px-8 py-4 border-b"
+        style={{
+          backgroundColor: 'var(--bg-card)',
+          borderColor: 'var(--border-subtle)'
+        }}
+      >
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Ekumen Assistant</h1>
-            <p className="text-sm text-gray-600">
+            <h1
+              className="text-xl font-semibold"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              Ekumen Assistant
+            </h1>
+            <p
+              className="text-sm"
+              style={{ color: 'var(--text-secondary)' }}
+            >
               {currentAgent ? (
                 <span className="flex items-center gap-2">
                   <span>{currentAgent.icon}</span>
@@ -551,7 +578,7 @@ const ChatInterface: React.FC = () => {
             </p>
           </div>
           {isStreaming && (
-            <div className="flex items-center gap-2 text-green-600">
+            <div className="flex items-center gap-2" style={{ color: 'var(--brand-600)' }}>
               <Loader2 className="h-4 w-4 animate-spin" />
               <span className="text-sm">En cours...</span>
             </div>
@@ -564,17 +591,17 @@ const ChatInterface: React.FC = () => {
         <div className="max-w-4xl mx-auto space-y-6">
           {messages.length === 0 ? (
             <div className="text-center py-12">
-              <Bot className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Bienvenue sur Ekumen Assistant</h3>
-              <p className="text-gray-600 mb-6">
+              <Bot className="h-12 w-12 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
+              <h3 className="text-lg font-medium text-primary mb-2">Bienvenue sur Ekumen Assistant</h3>
+              <p className="text-secondary mb-6">
                 Posez vos questions agricoles, je sélectionnerai automatiquement l'expert le plus approprié.
               </p>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-w-2xl mx-auto">
                 {Object.values(agents).map((agent) => (
-                  <div key={agent.type} className="bg-white rounded-lg p-3 border border-gray-200 text-center">
+                  <div key={agent.type} className="card text-center">
                     <div className="text-2xl mb-1">{agent.icon}</div>
-                    <div className="text-sm font-medium text-gray-900">{agent.name}</div>
-                    <div className="text-xs text-gray-600">{agent.description}</div>
+                    <div className="text-sm font-medium text-primary">{agent.name}</div>
+                    <div className="text-xs text-secondary">{agent.description}</div>
                   </div>
                 ))}
               </div>
@@ -584,11 +611,13 @@ const ChatInterface: React.FC = () => {
               <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`flex max-w-2xl ${message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'} gap-3`}>
                   {/* Avatar */}
-                  <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
-                    message.sender === 'user'
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-200 text-gray-600'
-                  }`}>
+                  <div
+                    className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center"
+                    style={{
+                      backgroundColor: message.sender === 'user' ? 'var(--brand-600)' : 'var(--bg-input)',
+                      color: message.sender === 'user' ? 'var(--text-inverse)' : 'var(--text-secondary)'
+                    }}
+                  >
                     {message.sender === 'user' ? (
                       <User className="h-5 w-5" />
                     ) : (
@@ -597,13 +626,18 @@ const ChatInterface: React.FC = () => {
                   </div>
 
                   {/* Message Content */}
-                  <div className={`rounded-lg px-4 py-3 ${
-                    message.sender === 'user'
-                      ? 'bg-green-600 text-white'
-                      : 'bg-white border border-gray-200 text-gray-900 shadow-sm'
-                  }`}>
+                  <div
+                    className="rounded-lg px-4 py-3"
+                    style={{
+                      backgroundColor: message.sender === 'user' ? 'var(--brand-600)' : 'var(--bg-card)',
+                      color: message.sender === 'user' ? 'var(--text-inverse)' : 'var(--text-primary)',
+                      borderColor: message.sender === 'user' ? 'transparent' : 'var(--border-subtle)',
+                      borderWidth: message.sender === 'user' ? '0' : '1px',
+                      boxShadow: message.sender === 'user' ? 'none' : 'var(--shadow-sm)'
+                    }}
+                  >
                     {message.sender === 'assistant' && message.agentName && (
-                      <div className="text-xs text-gray-500 mb-2 flex items-center gap-1">
+                      <div className="text-xs mb-2 flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
                         {agents[message.agent || '']?.icon}
                         <span>{message.agentName}</span>
                       </div>
@@ -633,7 +667,10 @@ const ChatInterface: React.FC = () => {
                         <div className="whitespace-pre-wrap">{message.content}</div>
                       )}
                       {message.isStreaming && (
-                        <span className="inline-block w-2 h-5 bg-gray-400 ml-1 animate-pulse" />
+                        <span
+                          className="inline-block w-2 h-5 ml-1 animate-pulse"
+                          style={{ backgroundColor: 'var(--text-muted)' }}
+                        />
                       )}
                     </div>
 
@@ -646,7 +683,14 @@ const ChatInterface: React.FC = () => {
                     {message.sender === 'user' && message.attachments && message.attachments.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-2">
                         {message.attachments.map(file => (
-                          <div key={file.id} className="flex items-center gap-1 bg-white bg-opacity-20 px-2 py-1 rounded text-xs">
+                          <div
+                            key={file.id}
+                            className="flex items-center gap-1 px-2 py-1 rounded text-xs"
+                            style={{
+                              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                              color: 'var(--text-inverse)'
+                            }}
+                          >
                             <FileText className="h-3 w-3" />
                             <span>{file.name}</span>
                           </div>
@@ -680,21 +724,32 @@ const ChatInterface: React.FC = () => {
       </div>
 
       {/* Input Area - At the bottom like normal chat */}
-      <div className="bg-white border-t border-gray-200 px-8 py-4">
+      <div
+        className="px-8 py-4 border-t"
+        style={{
+          backgroundColor: 'var(--bg-card)',
+          borderColor: 'var(--border-subtle)'
+        }}
+      >
         <div className="max-w-4xl mx-auto">
           {/* Attached Files Display */}
           {attachedFiles.length > 0 && (
             <div className="mb-3 flex flex-wrap gap-2">
               {attachedFiles.map(file => (
-                <div key={file.id} className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg text-sm">
-                  <FileText className="h-4 w-4 text-gray-600" />
-                  <span className="text-gray-700">{file.name}</span>
-                  <span className="text-gray-500">({formatFileSize(file.size)})</span>
+                <div
+                  key={file.id}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm"
+                  style={{ backgroundColor: 'var(--bg-input)' }}
+                >
+                  <FileText className="h-4 w-4" style={{ color: 'var(--text-secondary)' }} />
+                  <span className="text-primary">{file.name}</span>
+                  <span className="text-muted">({formatFileSize(file.size)})</span>
                   <button
                     onClick={() => handleRemoveFile(file.id)}
-                    className="ml-1 text-gray-500 hover:text-red-600"
+                    className="ml-1"
+                    style={{ color: 'var(--text-muted)' }}
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-4 w-4 hover:text-error" />
                   </button>
                 </div>
               ))}
@@ -702,7 +757,13 @@ const ChatInterface: React.FC = () => {
           )}
 
           {/* Main Input Container */}
-          <div className="bg-gray-50 rounded-2xl border border-gray-200 p-4">
+          <div
+            className="rounded-2xl border p-4"
+            style={{
+              backgroundColor: 'var(--bg-input)',
+              borderColor: 'var(--border-default)'
+            }}
+          >
             {/* Text Input */}
             <div className="mb-3">
               <textarea
@@ -710,7 +771,11 @@ const ChatInterface: React.FC = () => {
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Posez-moi vos questions sur votre exploitation ou vos fournisseurs"
-                className="w-full px-0 py-0 bg-transparent border-none resize-none focus:ring-0 focus:outline-none text-base text-gray-800 placeholder-gray-500"
+                className="w-full px-0 py-0 bg-transparent border-none resize-none focus:ring-0 focus:outline-none text-base text-primary"
+                style={{
+                  color: 'var(--text-primary)',
+                  '::placeholder': { color: 'var(--text-muted)' }
+                }}
                 rows={3}
                 disabled={isLoading}
               />
@@ -760,7 +825,13 @@ const ChatInterface: React.FC = () => {
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="p-2 text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
+                  className="p-2 rounded-lg transition-colors"
+                  style={{
+                    color: 'var(--text-secondary)',
+                    backgroundColor: 'transparent'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                   disabled={isLoading}
                   title="Attach files"
                 >
@@ -770,11 +841,21 @@ const ChatInterface: React.FC = () => {
                 {/* Voice Interface Toggle */}
                 <button
                   onClick={toggleVoiceInterface}
-                  className={`p-2 rounded-lg transition-colors ${
-                    showVoiceInterface
-                      ? 'bg-green-600 text-white'
-                      : 'text-gray-600 hover:bg-gray-200'
-                  }`}
+                  className="p-2 rounded-lg transition-colors"
+                  style={{
+                    backgroundColor: showVoiceInterface ? 'var(--brand-600)' : 'transparent',
+                    color: showVoiceInterface ? 'var(--text-inverse)' : 'var(--text-secondary)'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!showVoiceInterface) {
+                      e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!showVoiceInterface) {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                    }
+                  }}
                   disabled={isLoading}
                   title="Voice interface"
                 >
@@ -787,7 +868,21 @@ const ChatInterface: React.FC = () => {
                 <button
                   onClick={handleSendMessage}
                   disabled={!inputValue.trim() || isLoading}
-                  className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="p-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    backgroundColor: 'var(--brand-600)',
+                    color: 'var(--text-inverse)'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!e.currentTarget.disabled) {
+                      e.currentTarget.style.backgroundColor = 'var(--brand-700)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!e.currentTarget.disabled) {
+                      e.currentTarget.style.backgroundColor = 'var(--brand-600)'
+                    }
+                  }}
                   title="Send message"
                 >
                   {isLoading ? (
@@ -802,12 +897,21 @@ const ChatInterface: React.FC = () => {
 
           {/* Agent Selection Indicator */}
           {inputValue.trim() && !isLoading && (
-            <div className="mt-3 text-sm text-gray-600 flex items-center gap-2">
+            <div
+              className="mt-3 text-sm flex items-center gap-2"
+              style={{ color: 'var(--text-secondary)' }}
+            >
               <span>Agent suggéré:</span>
               {(() => {
                 const suggestedAgent = selectAgentForMessage(inputValue)
                 return (
-                  <span className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
+                  <span
+                    className="flex items-center gap-1 px-2 py-1 rounded"
+                    style={{
+                      backgroundColor: 'var(--bg-input)',
+                      color: 'var(--text-primary)'
+                    }}
+                  >
                     <span>{suggestedAgent.icon}</span>
                     <span>{suggestedAgent.name}</span>
                   </span>
@@ -820,13 +924,27 @@ const ChatInterface: React.FC = () => {
 
       {/* Voice Interface Modal */}
       {showVoiceInterface && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+          <div
+            className="rounded-lg p-6 max-w-md w-full mx-4"
+            style={{
+              backgroundColor: 'var(--bg-elevated)',
+              color: 'var(--text-primary)',
+              boxShadow: 'var(--shadow-lg)'
+            }}
+          >
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Interface Vocale</h3>
+              <h3
+                className="text-lg font-semibold"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                Interface Vocale
+              </h3>
               <button
                 onClick={toggleVoiceInterface}
-                className="text-gray-400 hover:text-gray-600"
+                style={{ color: 'var(--text-muted)' }}
+                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
               >
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
@@ -7,6 +7,7 @@ import { Toaster } from 'react-hot-toast'
 import LandingPage from '@pages/LandingPage'
 import Assistant from '@pages/Assistant'
 import ChatInterface from '@pages/ChatInterface'
+import NewChatInterface from '@pages/NewChatInterface'
 import VoiceJournal from '@pages/VoiceJournal'
 import Activities from '@pages/Activities'
 import Treatments from '@pages/Treatments'
@@ -17,10 +18,12 @@ import Register from '@pages/Register'
 
 // Components
 import Layout from '@components/Layout'
+import NewLayout from '@components/Layout/NewLayout'
 import ProtectedRoute from '@components/ProtectedRoute'
 
 // Hooks
 import { useAuth, AuthProvider } from '@hooks/useAuth'
+import { useTheme } from '@hooks/useTheme'
 
 // Styles
 import './index.css'
@@ -40,7 +43,11 @@ function AppContent() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen" style={{
+        backgroundColor: 'var(--bg-app)',
+        color: 'var(--text-primary)',
+        transition: 'var(--transition-theme)'
+      }}>
           <Routes>
             {/* Public routes */}
             <Route path="/" element={<LandingPage />} />
@@ -52,9 +59,9 @@ function AppContent() {
               path="/assistant"
               element={
                 <ProtectedRoute>
-                  <Layout>
-                    <ChatInterface />
-                  </Layout>
+                  <NewLayout>
+                    <NewChatInterface />
+                  </NewLayout>
                 </ProtectedRoute>
               }
             />
@@ -62,9 +69,9 @@ function AppContent() {
               path="/chat"
               element={
                 <ProtectedRoute>
-                  <Layout>
-                    <ChatInterface />
-                  </Layout>
+                  <NewLayout>
+                    <NewChatInterface />
+                  </NewLayout>
                 </ProtectedRoute>
               }
             />
@@ -72,9 +79,9 @@ function AppContent() {
               path="/journal"
               element={
                 <ProtectedRoute>
-                  <Layout>
+                  <NewLayout>
                     <VoiceJournal />
-                  </Layout>
+                  </NewLayout>
                 </ProtectedRoute>
               }
             />
@@ -82,9 +89,9 @@ function AppContent() {
               path="/activities"
               element={
                 <ProtectedRoute>
-                  <Layout>
+                  <NewLayout>
                     <Activities />
-                  </Layout>
+                  </NewLayout>
                 </ProtectedRoute>
               }
             />
@@ -92,9 +99,9 @@ function AppContent() {
               path="/treatments"
               element={
                 <ProtectedRoute>
-                  <Layout>
+                  <NewLayout>
                     <Treatments />
-                  </Layout>
+                  </NewLayout>
                 </ProtectedRoute>
               }
             />
@@ -102,9 +109,9 @@ function AppContent() {
               path="/parcelles"
               element={
                 <ProtectedRoute>
-                  <Layout>
+                  <NewLayout>
                     <Parcelles />
-                  </Layout>
+                  </NewLayout>
                 </ProtectedRoute>
               }
             />
@@ -112,9 +119,9 @@ function AppContent() {
               path="/farms"
               element={
                 <ProtectedRoute>
-                  <Layout>
+                  <NewLayout>
                     <FarmManagement />
-                  </Layout>
+                  </NewLayout>
                 </ProtectedRoute>
               }
             />
@@ -122,12 +129,17 @@ function AppContent() {
               path="/settings"
               element={
                 <ProtectedRoute>
-                  <Layout>
+                  <NewLayout>
                     <div className="p-6">
-                      <h1 className="text-2xl font-bold text-gray-900 mb-4">Paramètres</h1>
-                      <p className="text-gray-600">Configuration du système</p>
+                      <h1
+                        className="text-2xl font-bold mb-4"
+                        style={{ color: 'var(--text-primary)' }}
+                      >
+                        Paramètres
+                      </h1>
+                      <p style={{ color: 'var(--text-secondary)' }}>Configuration du système</p>
                     </div>
-                  </Layout>
+                  </NewLayout>
                 </ProtectedRoute>
               }
             />
@@ -165,11 +177,27 @@ function AppContent() {
   )
 }
 
+// Theme Provider Component
+function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const { theme } = useTheme()
+
+  // Apply theme to document root
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    document.body.style.backgroundColor = 'var(--bg-app)'
+    document.body.style.color = 'var(--text-primary)'
+  }, [theme])
+
+  return <>{children}</>
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <AppContent />
+        <ThemeProvider>
+          <AppContent />
+        </ThemeProvider>
       </AuthProvider>
     </QueryClientProvider>
   )

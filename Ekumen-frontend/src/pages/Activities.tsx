@@ -163,47 +163,47 @@ const Activities: React.FC = () => {
   return (
     <div className="space-y-6 p-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Activités Agricoles</h1>
-        <p className="mt-1 text-sm text-gray-600">
+        <h1 className="text-2xl font-bold text-primary">Activités Agricoles</h1>
+        <p className="mt-1 text-sm text-secondary">
           Historique des interventions et activités sur vos parcelles
         </p>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-2xl font-bold text-gray-900">{filteredActivities.length}</div>
-          <div className="text-sm text-gray-600">Activités</div>
+        <div className="card p-4">
+          <div className="text-2xl font-bold text-primary">{filteredActivities.length}</div>
+          <div className="text-sm text-secondary">Activités</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-2xl font-bold text-green-600">{totalSurface.toFixed(1)} ha</div>
-          <div className="text-sm text-gray-600">Surface totale</div>
+        <div className="card p-4">
+          <div className="text-2xl font-bold text-success">{totalSurface.toFixed(1)} ha</div>
+          <div className="text-sm text-secondary">Surface totale</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="card p-4">
           <div className="text-2xl font-bold text-blue-600">{formatCurrency(totalCost)}</div>
-          <div className="text-sm text-gray-600">Coût total</div>
+          <div className="text-sm text-secondary">Coût total</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-2xl font-bold text-yellow-600">
+        <div className="card p-4">
+          <div className="text-2xl font-bold text-warning">
             {filteredActivities.filter(a => a.statut === 'planifie').length}
           </div>
-          <div className="text-sm text-gray-600">Planifiées</div>
+          <div className="text-sm text-secondary">Planifiées</div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-4">
+      <div className="card p-4">
         <div className="flex flex-col md:flex-row gap-4">
           {/* Search */}
           <div className="flex-1">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted" />
               <input
                 type="text"
                 placeholder="Rechercher par parcelle, culture, intervention..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                className="input pl-10"
               />
             </div>
           </div>
@@ -213,7 +213,7 @@ const Activities: React.FC = () => {
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+              className="input"
             >
               <option value="all">Tous les statuts</option>
               <option value="termine">Terminé</option>
@@ -228,7 +228,7 @@ const Activities: React.FC = () => {
             <select
               value={filterPeriod}
               onChange={(e) => setFilterPeriod(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+              className="input"
             >
               <option value="all">Toute la période</option>
               <option value="week">7 derniers jours</option>
@@ -237,7 +237,7 @@ const Activities: React.FC = () => {
           </div>
 
           {/* Export Button */}
-          <button className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
+          <button className="btn-primary">
             <Download className="h-4 w-4" />
             Exporter
           </button>
@@ -245,51 +245,51 @@ const Activities: React.FC = () => {
       </div>
 
       {/* Activities List */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Liste des Activités</h2>
+      <div className="card">
+        <div className="px-6 py-4 border-b border-subtle">
+          <h2 className="text-lg font-semibold text-primary">Liste des Activités</h2>
         </div>
 
-        <div className="divide-y divide-gray-200">
+        <div className="divide-y divide-subtle">
           {filteredActivities.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+            <div className="p-8 text-center text-muted">
+              <Calendar className="h-12 w-12 mx-auto mb-4 text-muted" />
               <p>Aucune activité trouvée</p>
               <p className="text-sm">Modifiez vos filtres pour voir plus d'activités</p>
             </div>
           ) : (
             filteredActivities.map((activity) => (
-              <div key={activity.id} className="p-6 hover:bg-gray-50">
+              <div key={activity.id} className="p-6 bg-card-hover transition-theme">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-4 mb-2">
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <div className="flex items-center gap-2 text-sm text-secondary">
                         <Calendar className="h-4 w-4" />
                         <span>{formatDate(activity.date)}</span>
                       </div>
-                      
+
                       <span className={`inline-flex items-center px-2 py-1 text-xs rounded-full ${getStatusColor(activity.statut)}`}>
                         {getStatusText(activity.statut)}
                       </span>
                     </div>
 
                     <div className="flex items-center gap-2 mb-2">
-                      <MapPin className="h-4 w-4 text-gray-400" />
-                      <span className="font-medium text-gray-900">{activity.parcelle}</span>
-                      <span className="text-gray-400">•</span>
-                      <span className="text-gray-700">{activity.culture}</span>
-                      <span className="text-gray-400">•</span>
-                      <span className="text-gray-700">{activity.intervention}</span>
+                      <MapPin className="h-4 w-4 text-muted" />
+                      <span className="font-medium text-primary">{activity.parcelle}</span>
+                      <span className="text-muted">•</span>
+                      <span className="text-secondary">{activity.culture}</span>
+                      <span className="text-muted">•</span>
+                      <span className="text-secondary">{activity.intervention}</span>
                     </div>
 
                     {activity.produits && activity.produits.length > 0 && (
                       <div className="mb-2">
-                        <span className="text-sm text-gray-600">Produits: </span>
-                        <span className="text-sm text-gray-900">{activity.produits.join(', ')}</span>
+                        <span className="text-sm text-secondary">Produits: </span>
+                        <span className="text-sm text-primary">{activity.produits.join(', ')}</span>
                       </div>
                     )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm text-gray-600">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm text-secondary">
                       <div>
                         <span className="font-medium">Surface:</span> {activity.surface} ha
                       </div>
@@ -311,7 +311,7 @@ const Activities: React.FC = () => {
 
                   <div className="flex items-center gap-2 ml-4">
                     <button
-                      className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                      className="p-2 text-muted hover:text-primary transition-theme"
                       title="Voir détails"
                     >
                       <Eye className="h-4 w-4" />

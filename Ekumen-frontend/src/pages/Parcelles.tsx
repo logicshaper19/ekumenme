@@ -177,14 +177,14 @@ const Parcelles: React.FC = () => {
     <div className="space-y-6 p-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestion des Parcelles</h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <h1 className="text-2xl font-bold text-primary">Gestion des Parcelles</h1>
+          <p className="mt-1 text-sm text-secondary">
             Vue d'ensemble de vos parcelles et cultures
           </p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          className="btn-primary"
         >
           <Plus className="h-4 w-4" />
           Nouvelle parcelle
@@ -193,39 +193,39 @@ const Parcelles: React.FC = () => {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-2xl font-bold text-gray-900">{filteredParcelles.length}</div>
-          <div className="text-sm text-gray-600">Parcelles</div>
+        <div className="card p-4">
+          <div className="text-2xl font-bold text-primary">{filteredParcelles.length}</div>
+          <div className="text-sm text-secondary">Parcelles</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-2xl font-bold text-green-600">{totalSurface.toFixed(1)} ha</div>
-          <div className="text-sm text-gray-600">Surface totale</div>
+        <div className="card p-4">
+          <div className="text-2xl font-bold text-success">{totalSurface.toFixed(1)} ha</div>
+          <div className="text-sm text-secondary">Surface totale</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="card p-4">
           <div className="text-2xl font-bold text-blue-600">{rendementMoyen.toFixed(1)} q/ha</div>
-          <div className="text-sm text-gray-600">Rendement moyen prévu</div>
+          <div className="text-sm text-secondary">Rendement moyen prévu</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-2xl font-bold text-yellow-600">
+        <div className="card p-4">
+          <div className="text-2xl font-bold text-warning">
             {filteredParcelles.filter(p => p.irrigation).length}
           </div>
-          <div className="text-sm text-gray-600">Avec irrigation</div>
+          <div className="text-sm text-secondary">Avec irrigation</div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-4">
+      <div className="card p-4">
         <div className="flex flex-col md:flex-row gap-4">
           {/* Search */}
           <div className="flex-1">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted" />
               <input
                 type="text"
                 placeholder="Rechercher par nom, culture, variété..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                className="input pl-10"
               />
             </div>
           </div>
@@ -235,7 +235,7 @@ const Parcelles: React.FC = () => {
             <select
               value={filterCulture}
               onChange={(e) => setFilterCulture(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+              className="input"
             >
               <option value="all">Toutes les cultures</option>
               {uniqueCultures.map(culture => (
@@ -249,7 +249,7 @@ const Parcelles: React.FC = () => {
             <select
               value={filterStatut}
               onChange={(e) => setFilterStatut(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+              className="input"
             >
               <option value="all">Tous les statuts</option>
               <option value="seme">Semé</option>
@@ -262,45 +262,45 @@ const Parcelles: React.FC = () => {
       </div>
 
       {/* Parcelles Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="card overflow-hidden">
         {filteredParcelles.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
-            <MapPin className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+          <div className="p-8 text-center text-muted">
+            <MapPin className="h-12 w-12 mx-auto mb-4 text-muted" />
             <p>Aucune parcelle trouvée</p>
             <p className="text-sm">Modifiez vos filtres ou ajoutez une nouvelle parcelle</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-subtle">
+              <thead className="bg-card-hover">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                     Parcelle
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                     Culture
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                     Surface
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                     Statut
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                     Rendement prévu
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                     Sol / Irrigation
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">
                     Dates importantes
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-card divide-y divide-subtle">
                 {filteredParcelles.map((parcelle) => (
                   <tr key={parcelle.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">

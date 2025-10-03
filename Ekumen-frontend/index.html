@@ -14,6 +14,35 @@
     
     <!-- Inter font -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Theme initialization script - prevents FOUC (Flash of Unstyled Content) -->
+    <script>
+      (function() {
+        // Theme configuration
+        const STORAGE_KEY = 'ekumen-theme';
+        const DATA_ATTRIBUTE = 'data-theme';
+        const DEFAULT_THEME = 'dark';
+
+        // Try to get stored theme
+        try {
+          const stored = localStorage.getItem(STORAGE_KEY);
+          if (stored) {
+            const parsedState = JSON.parse(stored);
+            const theme = parsedState?.state?.theme;
+
+            if (theme === 'light' || theme === 'dark') {
+              document.documentElement.setAttribute(DATA_ATTRIBUTE, theme);
+              return;
+            }
+          }
+        } catch (error) {
+          console.error('Failed to parse stored theme:', error);
+        }
+
+        // Fall back to dark theme (our default)
+        document.documentElement.setAttribute(DATA_ATTRIBUTE, DEFAULT_THEME);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

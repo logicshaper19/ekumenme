@@ -1,0 +1,246 @@
+/**
+ * Ekumen Theme System - CSS Variables
+ * 
+ * Semantic tokens for light and dark themes.
+ * Maps to existing agricultural color palette from Tailwind config.
+ * 
+ * WCAG AA Compliance:
+ * - Body text: minimum 4.5:1 contrast ratio
+ * - Large text: minimum 3:1 contrast ratio
+ * - UI components: minimum 3:1 contrast ratio
+ */
+
+/* ============================================
+   TRANSITION TOKENS
+   ============================================ */
+:root {
+  /* Smooth theme switching transitions */
+  --transition-theme: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  --transition-theme-fast: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  --transition-theme-slow: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+/* Apply smooth transitions to specific themed elements only */
+[data-theme] .card,
+[data-theme] .btn-primary,
+[data-theme] .btn-secondary,
+[data-theme] .btn-ghost,
+[data-theme] .input,
+[data-theme] .transition-theme {
+  transition: var(--transition-theme);
+}
+
+/* Ensure body and html use theme variables */
+html[data-theme] {
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+}
+
+body {
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+}
+
+/* Initialize theme immediately to prevent FOUC */
+html:not([data-theme]) {
+  /* Default to dark theme if no theme is set */
+  background-color: #000000;
+  color: #ffffff;
+}
+
+/* ============================================
+   LIGHT THEME (DEFAULT)
+   ============================================ */
+:root[data-theme="light"] {
+  /* ===== TEXT COLORS ===== */
+  --text-primary: #111827;        /* gray-900 - Primary text */
+  --text-secondary: #4b5563;      /* gray-600 - Secondary text */
+  --text-muted: #6b7280;          /* gray-500 - Muted/disabled text */
+  --text-inverse: #ffffff;        /* White text on dark backgrounds */
+  --text-link: #16a34a;           /* primary-600 - Links */
+  --text-link-hover: #15803d;     /* primary-700 - Link hover */
+  
+  /* ===== SURFACE/BACKGROUND COLORS ===== */
+  --bg-app: #f9fafb;              /* gray-50 - App background */
+  --bg-card: #ffffff;             /* White - Card backgrounds */
+  --bg-card-hover: #f9fafb;       /* gray-50 - Card hover state */
+  --bg-elevated: #ffffff;         /* White - Elevated surfaces (modals, dropdowns) */
+  --bg-input: #ffffff;            /* White - Input backgrounds */
+  --bg-input-disabled: #f3f4f6;   /* gray-100 - Disabled inputs */
+  
+  /* ===== BORDER COLORS ===== */
+  --border-subtle: #e5e7eb;       /* gray-200 - Subtle borders */
+  --border-default: #d1d5db;      /* gray-300 - Default borders */
+  --border-strong: #9ca3af;       /* gray-400 - Strong borders */
+  --border-focus: #22c55e;        /* primary-500 - Focus rings */
+  
+  /* ===== BRAND/PRIMARY COLORS ===== */
+  --brand-50: #f0fdf4;
+  --brand-100: #dcfce7;
+  --brand-200: #bbf7d0;
+  --brand-300: #86efac;
+  --brand-400: #4ade80;
+  --brand-500: #22c55e;           /* Primary brand color */
+  --brand-600: #16a34a;
+  --brand-700: #15803d;
+  --brand-800: #166534;
+  --brand-900: #14532d;
+  
+  /* ===== FEEDBACK COLORS ===== */
+  /* Success */
+  --success-50: #f0fdf4;
+  --success-100: #dcfce7;
+  --success-200: #bbf7d0;
+  --success-500: #22c55e;
+  --success-600: #16a34a;
+  --success-700: #15803d;
+  --success-text: #15803d;        /* Success text color */
+  --success-bg: #f0fdf4;          /* Success background */
+  --success-border: #bbf7d0;      /* Success border */
+  
+  /* Warning */
+  --warning-50: #fffbeb;
+  --warning-100: #fef3c7;
+  --warning-200: #fde68a;
+  --warning-500: #f59e0b;
+  --warning-600: #d97706;
+  --warning-700: #b45309;
+  --warning-text: #b45309;        /* Warning text color */
+  --warning-bg: #fffbeb;          /* Warning background */
+  --warning-border: #fde68a;      /* Warning border */
+  
+  /* Error */
+  --error-50: #fef2f2;
+  --error-100: #fee2e2;
+  --error-200: #fecaca;
+  --error-500: #ef4444;
+  --error-600: #dc2626;
+  --error-700: #b91c1c;
+  --error-text: #b91c1c;          /* Error text color */
+  --error-bg: #fef2f2;            /* Error background */
+  --error-border: #fecaca;        /* Error border */
+  
+  /* Info */
+  --info-50: #f9fafb;
+  --info-100: #f3f4f6;
+  --info-200: #e5e7eb;
+  --info-500: #6b7280;
+  --info-600: #4b5563;
+  --info-700: #374151;
+  --info-text: #374151;           /* Info text color */
+  --info-bg: #f9fafb;             /* Info background */
+  --info-border: #e5e7eb;         /* Info border */
+  
+  /* ===== EARTH TONES (Agricultural) ===== */
+  --earth-50: #fafaf9;
+  --earth-100: #f5f5f4;
+  --earth-200: #e7e5e4;
+  --earth-500: #78716c;
+  --earth-600: #57534e;
+  --earth-700: #44403c;
+  
+  /* ===== SHADOWS ===== */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  --shadow-card-hover: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* ============================================
+   DARK THEME - TRUE BLACK & WHITE
+   ============================================ */
+:root[data-theme="dark"] {
+  /* ===== TEXT COLORS ===== */
+  --text-primary: #ffffff;        /* Pure white - Primary text */
+  --text-secondary: #e5e5e5;      /* Light gray - Secondary text */
+  --text-muted: #a3a3a3;          /* Medium gray - Muted/disabled text */
+  --text-inverse: #000000;        /* Pure black on light backgrounds */
+  --text-link: #22c55e;           /* Green - Links */
+  --text-link-hover: #16a34a;     /* Darker green - Link hover */
+
+  /* ===== SURFACE/BACKGROUND COLORS ===== */
+  --bg-app: #000000;              /* Pure black - App background */
+  --bg-card: #1a1a1a;             /* Very dark gray - Card backgrounds */
+  --bg-card-hover: #2a2a2a;       /* Slightly lighter - Card hover state */
+  --bg-elevated: #1a1a1a;         /* Very dark gray - Elevated surfaces */
+  --bg-input: #2a2a2a;            /* Dark gray - Input backgrounds */
+  --bg-input-disabled: #404040;   /* Medium gray - Disabled inputs */
+  
+  /* ===== BORDER COLORS ===== */
+  --border-subtle: #404040;       /* Dark gray - Subtle borders */
+  --border-default: #525252;      /* Medium gray - Default borders */
+  --border-strong: #737373;       /* Light gray - Strong borders */
+  --border-focus: #22c55e;        /* Green - Focus rings */
+  
+  /* ===== BRAND/PRIMARY COLORS ===== */
+  --brand-50: #14532d;            /* Inverted for dark mode */
+  --brand-100: #166534;
+  --brand-200: #15803d;
+  --brand-300: #16a34a;
+  --brand-400: #22c55e;
+  --brand-500: #4ade80;           /* Primary brand color (brighter) */
+  --brand-600: #86efac;
+  --brand-700: #bbf7d0;
+  --brand-800: #dcfce7;
+  --brand-900: #f0fdf4;
+  
+  /* ===== FEEDBACK COLORS ===== */
+  /* Success */
+  --success-50: #14532d;
+  --success-100: #166534;
+  --success-200: #15803d;
+  --success-500: #4ade80;
+  --success-600: #86efac;
+  --success-700: #bbf7d0;
+  --success-text: #86efac;        /* Success text color */
+  --success-bg: #14532d;          /* Success background */
+  --success-border: #15803d;      /* Success border */
+  
+  /* Warning */
+  --warning-50: #78350f;
+  --warning-100: #92400e;
+  --warning-200: #b45309;
+  --warning-500: #fbbf24;
+  --warning-600: #fcd34d;
+  --warning-700: #fde68a;
+  --warning-text: #fcd34d;        /* Warning text color */
+  --warning-bg: #78350f;          /* Warning background */
+  --warning-border: #b45309;      /* Warning border */
+  
+  /* Error */
+  --error-50: #7f1d1d;
+  --error-100: #991b1b;
+  --error-200: #b91c1c;
+  --error-500: #f87171;
+  --error-600: #fca5a5;
+  --error-700: #fecaca;
+  --error-text: #fca5a5;          /* Error text color */
+  --error-bg: #7f1d1d;            /* Error background */
+  --error-border: #b91c1c;        /* Error border */
+  
+  /* Info */
+  --info-50: #111827;
+  --info-100: #1f2937;
+  --info-200: #374151;
+  --info-500: #9ca3af;
+  --info-600: #d1d5db;
+  --info-700: #e5e7eb;
+  --info-text: #d1d5db;           /* Info text color */
+  --info-bg: #1f2937;             /* Info background */
+  --info-border: #374151;         /* Info border */
+  
+  /* ===== EARTH TONES (Agricultural) ===== */
+  --earth-50: #0c0a09;
+  --earth-100: #1c1917;
+  --earth-200: #292524;
+  --earth-500: #a8a29e;
+  --earth-600: #d6d3d1;
+  --earth-700: #e7e5e4;
+  
+  /* ===== SHADOWS ===== */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-card-hover: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.4);
+}
+
