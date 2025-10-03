@@ -1,11 +1,10 @@
 """
-Supplier Agent - Powered by Tavily
-Handles supplier search queries when user activates "Mode Fournisseurs"
+Simplified Supplier Agent - Phase 1: Discovery Only
+Focused on supplier discovery and research using Tavily
 """
 
 import logging
-import re
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from app.services.tavily_service import get_tavily_service
 
 logger = logging.getLogger(__name__)
@@ -13,206 +12,170 @@ logger = logging.getLogger(__name__)
 
 class SupplierAgent:
     """
-    Agent for handling Supplier mode queries
-    Uses Tavily to find agricultural suppliers, products, and services
+    Simplified Agent for supplier discovery (Phase 1)
+    Focus: Find suppliers using Tavily search
+    Future: Will integrate with database in Phase 2
+    
+    Phase 2 Integration Points:
+    - self.db: Database session for supplier data
+    - self._get_verified_suppliers(): Query verified suppliers from database
+    - self._get_pricing_data(): Get real-time pricing from supplier APIs
+    - self._get_inventory_levels(): Check product availability
     """
     
-    def __init__(self):
+    def __init__(self, db_session=None):
         self.tavily = get_tavily_service()
+        self.db = db_session  # Phase 2: Database integration
         self.agent_type = "supplier"
         self.name = "Agent Fournisseurs"
-        logger.info("Supplier Agent initialized")
+        logger.info("Simplified Supplier Agent initialized")
     
-    async def process(
-        self,
-        query: str,
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+    # Phase 2 Integration Hooks
+    async def _get_verified_suppliers(self, product_category: str, region: str = None) -> list:
         """
-        Process a supplier search query
+        Phase 2: Get verified suppliers from database
+        This method will be implemented when suppliers onboard
+        """
+        # TODO: Implement database query for verified suppliers
+        # Example: SELECT * FROM suppliers WHERE category = ? AND region = ?
+        return []
+    
+    async def _get_pricing_data(self, supplier_id: str, product_id: str) -> dict:
+        """
+        Phase 2: Get real-time pricing from supplier APIs
+        This method will integrate with supplier pricing APIs
+        """
+        # TODO: Implement API calls to supplier pricing systems
+        return {"price": None, "currency": "EUR", "available": False}
+    
+    async def _get_inventory_levels(self, supplier_id: str, product_id: str) -> dict:
+        """
+        Phase 2: Check product availability and lead times
+        This method will integrate with supplier inventory systems
+        """
+        # TODO: Implement API calls to supplier inventory systems
+        return {"available": False, "quantity": 0, "lead_time_days": None}
+    
+    async def find_suppliers(self, query: str, context: dict = None) -> Dict[str, Any]:
+        """
+        Find suppliers using Tavily search
         
         Args:
             query: User's supplier search query
-            context: Additional context (user location, farm info, etc.)
+            context: Additional context (not used in Phase 1)
             
         Returns:
-            Dict with supplier results formatted for chat response
+            Dict with supplier results or error information
         """
         logger.info(f"Supplier Agent processing: {query}")
 
         if not self.tavily.is_available():
             return {
                 "success": False,
-                "response": "Le service de recherche de fournisseurs n'est pas disponible actuellement. Veuillez réessayer plus tard.",
-                "agent": self.agent_type
+                "response": "Le service de recherche de fournisseurs n'est pas disponible actuellement.",
+                "agent": self.agent_type,
+                "sources": []
             }
         
         try:
-            # Extract location from query or context
-            location = self._extract_location(query)
-            if not location and context:
-                # Try to get location from user context
-                location = context.get("user_region") or context.get("user_department")
+            # Enhance query for agricultural context
+            enhanced_query = self._enhance_query(query)
             
-            # Enhance query for supplier search
-            enhanced_query = self._enhance_supplier_query(query)
+            # Search suppliers
+            result = await self.tavily.search_suppliers(enhanced_query, max_results=6)
             
-            # Search for suppliers
-            result = await self.tavily.search_suppliers(
-                query=enhanced_query,
-                location=location,
-                max_results=8  # More results for suppliers
-            )
-            
-            return self._format_supplier_response(result, query)
-            
+            if result.get("success"):
+                suppliers = result.get("suppliers", [])
+                return {
+                    "success": True,
+                    "response": self._format_response(suppliers, query),
+                    "agent": self.agent_type,
+                    "sources": self._format_sources(suppliers),
+                    "metadata": {
+                        "query": query,
+                        "supplier_count": len(suppliers),
+                        "enhanced_query": enhanced_query
+                    }
+                }
+            else:
+                return {
+                    "success": False,
+                    "response": f"Erreur de recherche: {result.get('error', 'Erreur inconnue')}",
+                    "agent": self.agent_type,
+                    "sources": []
+                }
+                
         except Exception as e:
             logger.error(f"Supplier Agent error: {str(e)}")
             return {
                 "success": False,
-                "response": f"Erreur lors de la recherche de fournisseurs: {str(e)}",
-                "agent": self.agent_type
+                "response": f"Erreur lors de la recherche: {str(e)}",
+                "agent": self.agent_type,
+                "sources": []
             }
     
-    def _extract_location(self, query: str) -> Optional[str]:
-        """Extract location from query"""
-        # Common French location patterns
-        location_patterns = [
-            r"(?:à|a|près de|proche de|autour de)\s+([A-Z][a-zéèêàâôûù\-]+(?:\s+[A-Z][a-zéèêàâôûù\-]+)?)",
-            r"([A-Z][a-zéèêàâôûù\-]+(?:\s+[A-Z][a-zéèêàâôûù\-]+)?)\s+\d{5}",  # City with postal code
-        ]
+    def _enhance_query(self, query: str) -> str:
+        """Add agricultural context to improve search results"""
+        enhanced = query.lower()
         
-        for pattern in location_patterns:
-            match = re.search(pattern, query)
-            if match:
-                return match.group(1)
+        # Add product-specific context
+        if any(word in enhanced for word in ['fertilizer', 'engrais', 'azote', 'potasse']):
+            enhanced += " distributeur agricole"
+        elif any(word in enhanced for word in ['seed', 'semence', 'graine']):
+            enhanced += " semencier agréé"
+        elif any(word in enhanced for word in ['tracteur', 'equipment', 'matériel']):
+            enhanced += " concessionnaire agricole"
+        elif any(word in enhanced for word in ['pesticide', 'herbicide', 'phyto']):
+            enhanced += " distributeur agréé"
         
-        # Check for department numbers
-        dept_match = re.search(r"\b(\d{2})\b", query)
-        if dept_match:
-            return f"département {dept_match.group(1)}"
+        # Add regional context
+        enhanced += " France professionnel"
         
-        return None
+        return enhanced
     
-    def _enhance_supplier_query(self, query: str) -> str:
-        """Enhance query for better supplier search results"""
-        query_lower = query.lower()
+    def _format_response(self, suppliers: list, original_query: str) -> str:
+        """Format supplier response for chat"""
+        if not suppliers:
+            return f"Aucun fournisseur trouvé pour '{original_query}'. Essayez des termes plus généraux ou ajoutez une localisation."
         
-        # Add "fournisseur" if not present
-        if "fournisseur" not in query_lower and "vendeur" not in query_lower:
-            # Check if it's a product query
-            products = [
-                "semence", "engrais", "phyto", "pesticide", "herbicide",
-                "tracteur", "matériel", "équipement", "pièce",
-                "glyphosate", "roundup", "azote", "potasse"
-            ]
-            
-            for product in products:
-                if product in query_lower:
-                    return f"fournisseur {query}"
+        response = f"**🔍 Fournisseurs trouvés pour: {original_query}**\n\n"
         
-        return query
+        for i, supplier in enumerate(suppliers[:5], 1):
+            response += f"**{i}. {supplier.get('name', 'N/A')}**\n"
+            response += f"   📝 {supplier.get('description', '')[:150]}...\n"
+            response += f"   🔗 {supplier.get('url', 'N/A')}\n\n"
+        
+        response += "**💡 Conseil:** Contactez plusieurs fournisseurs pour comparer les prix et conditions."
+        return response
     
-    def _format_supplier_response(
-        self,
-        result: Dict[str, Any],
-        original_query: str
-    ) -> Dict[str, Any]:
-        """Format supplier search results for chat"""
-        if not result.get("success"):
-            return {
-                "success": False,
-                "response": f"Erreur: {result.get('error', 'Erreur inconnue')}",
-                "agent": self.agent_type
-            }
-
-        response = "**Recherche de fournisseurs**\n\n"
-
-        # Add AI summary if available
-        if result.get("summary"):
-            response += f"{result['summary']}\n\n"
-
-        # Format sources as structured data
-        suppliers = result.get("suppliers", [])
+    def _format_sources(self, suppliers: list) -> list:
+        """Format sources for frontend display"""
         sources = []
-
-        if suppliers:
-            response += f"**{len(suppliers)} fournisseur(s) trouvé(s)**\n"
-
-            for supplier in suppliers:
-                sources.append({
-                    "title": supplier.get("name", ""),
-                    "url": supplier.get("url", ""),
-                    "snippet": supplier.get("description", "")[:200] if supplier.get("description") else None,
-                    "relevance": supplier.get("relevance_score", 0.0),
-                    "type": "web"
-                })
-        else:
-            response += "Aucun fournisseur trouvé pour cette recherche.\n\n"
-            response += "**Suggestions:**\n"
-            response += "- Essayez d'élargir votre recherche\n"
-            response += "- Vérifiez l'orthographe du produit\n"
-            response += "- Ajoutez une localisation (ville, département)\n"
-
-        # Add helpful tips
-        if suppliers:
-            response += "\n**Conseils:**\n"
-            response += "- Contactez plusieurs fournisseurs pour comparer les prix\n"
-            response += "- Vérifiez les certifications et autorisations\n"
-            response += "- Demandez les délais de livraison\n"
-
-        return {
-            "success": True,
-            "response": response,
-            "agent": self.agent_type,
-            "sources": sources,  # Structured sources for frontend
-            "metadata": {
-                "query": result.get("query"),
-                "supplier_count": len(suppliers),
-                "timestamp": result.get("timestamp"),
-                "original_query": original_query
-            }
-        }
+        for supplier in suppliers:
+            sources.append({
+                "title": supplier.get("name", "Source web"),
+                "url": supplier.get("url", ""),
+                "snippet": supplier.get("description", "")[:200] if supplier.get("description") else "",
+                "relevance": supplier.get("relevance_score", 0.0),
+                "type": "web"
+            })
+        return sources
     
-    async def search_product_availability(
-        self,
-        product_name: str,
-        location: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """
-        Search for product availability at suppliers
-        
-        Args:
-            product_name: Name of the product
-            location: Location to search near
-            
-        Returns:
-            Dict with availability information
-        """
+    # Legacy methods for backward compatibility
+    async def process(self, query: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Legacy method - redirects to find_suppliers"""
+        return await self.find_suppliers(query, context)
+    
+    async def search_product_availability(self, product_name: str, location: Optional[str] = None) -> Dict[str, Any]:
+        """Search for product availability at suppliers"""
         query = f"disponibilité {product_name} agricole"
         if location:
             query += f" {location}"
-        
-        return await self.process(query)
+        return await self.find_suppliers(query)
     
-    async def compare_suppliers(
-        self,
-        product_name: str,
-        location: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """
-        Compare suppliers for a specific product
-        
-        Args:
-            product_name: Name of the product
-            location: Location to search near
-            
-        Returns:
-            Dict with comparison information
-        """
+    async def compare_suppliers(self, product_name: str, location: Optional[str] = None) -> Dict[str, Any]:
+        """Compare suppliers for a specific product"""
         query = f"comparaison prix {product_name} fournisseurs agricoles"
         if location:
             query += f" {location}"
-        
-        return await self.process(query)
-
+        return await self.find_suppliers(query)
