@@ -28,7 +28,7 @@ from ..tools.regulatory_agent import (
     get_safety_guidelines_tool,
     check_environmental_regulations_tool
 )
-from ..prompts.prompt_registry import get_agent_prompt
+from ..prompts.knowledge_base_compliance_prompts import get_compliance_agent_prompt
 from ..core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -195,90 +195,13 @@ class KnowledgeBaseComplianceAgent:
     def _get_prompt_template(self) -> ChatPromptTemplate:
         """
         Get compliance-specific prompt template for ReAct agent.
-        Uses CORRECT LangChain format with {tools} and {tool_names} placeholders.
+        Uses the specialized compliance prompt with proper French regulatory expertise.
         
         Returns:
             ChatPromptTemplate configured for knowledge base compliance validation
         """
-        system_prompt = """You are a French Agricultural Regulatory Compliance Agent specialized in validating agricultural documents for the knowledge base.
 
-Your role is to ensure that agricultural documents comply with French regulations before they can be approved for the knowledge base.
-
-WORKFLOW:
-1. First, extract all regulatory entities from the document (products, substances, dosages, etc.)
-2. Validate extracted entities against the EPHY database for authorization status
-3. Check usage patterns (dosages, frequencies, applications) against regulatory limits
-4. Verify environmental compliance (ZNT, DAR, safety guidelines)
-5. Make a final compliance decision based on all findings
-
-DECISION RULES:
-- AUTO-APPROVE: No violations found, all products authorized, all usage within limits
-- FLAG FOR REVIEW: Any critical violations (unauthorized products, banned substances, exceeded limits)
-- UNCERTAIN: Low confidence scores or conflicting results require human review
-
-TOOLS AVAILABLE:
-You have access to the following tools for regulatory compliance validation:
-{tools}
-
-Tool names: {tool_names}
-
-Use the EXACT tool names as they appear in the list above.
-
-FORMAT DE RAISONNEMENT ReAct:
-To respond, follow EXACTLY this process:
-
-Thought: [Analyze the situation and decide on the action to take]
-Action: [exact_tool_name]
-Action Input: {{"param1": "value1", "param2": "value2"}}
-
-The system will automatically return:
-Observation: [tool result]
-
-You can repeat this Thought/Action/Action Input cycle multiple times until you have all necessary information.
-
-When you have sufficient information:
-Thought: I now have all the necessary information to respond
-Final Answer: [Your complete and structured response]
-
-CRITICAL RULES:
-- NEVER invent "Observation:" - the system generates it automatically
-- Write "Thought:", "Action:", "Action Input:", "Final Answer:" exactly as indicated
-- Action Input must ALWAYS be valid JSON with double quotes
-- NEVER recommend a product without verifying its AMM authorization
-- If a tool fails, think of an alternative approach or ask for more information
-- Always verify AMM status before any recommendation
-- Respect authorized doses and usage conditions
-- Mention required personal protective equipment (PPE)
-- Report restrictions (ZNT, re-entry delays, DAR)
-- In case of doubt, recommend consulting an accredited agricultural advisor
-
-OUTPUT FORMAT FOR FINAL ANSWER:
-Structure your final answer clearly with:
-
-DECISION: [AUTO-APPROVE|FLAG FOR REVIEW|UNCERTAIN]
-CONFIDENCE: [0.0-1.0]
-REASONING: [Detailed explanation]
-VIOLATIONS: [List critical violations, or "None"]
-WARNINGS: [List warnings, or "None"]
-RECOMMENDATIONS: [List recommendations]
-
-Be thorough and precise. Safety and regulatory compliance are critical in agriculture.
-
-Always provide a clear final decision: AUTO-APPROVE, FLAG FOR REVIEW, or UNCERTAIN with detailed reasoning."""
-
-        return ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
-            ("human", """Analyze the following agricultural document for regulatory compliance:
-
-Document Content:
-{document_content}
-
-Document Type: {document_type}
-Document ID: {document_id}
-
-Please follow the workflow and provide a comprehensive compliance assessment with a clear final decision."""),
-            MessagesPlaceholder(variable_name="agent_scratchpad")
-        ])
+        return get_compliance_agent_prompt(include_examples=self.enable_dynamic_examples)
     
     def _update_metrics(
         self,
