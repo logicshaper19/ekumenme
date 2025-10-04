@@ -115,3 +115,115 @@ class ProductValidationOutput(BaseModel):
     violations: List[ComplianceViolation] = Field(default_factory=list, description="Product-specific violations")
     warnings: List[ComplianceWarning] = Field(default_factory=list, description="Product-specific warnings")
     ephy_data: Optional[Dict[str, Any]] = Field(default=None, description="EPHY database information")
+
+
+class WebVerificationResult(BaseModel):
+    """Result of web verification for a single item"""
+    item_name: str = Field(description="Name of the verified item")
+    item_type: str = Field(description="Type of item (product or substance)")
+    verification_status: str = Field(description="Verification status (verified, not_found, error)")
+    confidence_score: float = Field(ge=0.0, le=1.0, description="Confidence in verification result")
+    website_results: Dict[str, Any] = Field(default_factory=dict, description="Results from each website")
+    violations: List[ComplianceViolation] = Field(default_factory=list, description="Found violations")
+    warnings: List[ComplianceWarning] = Field(default_factory=list, description="Found warnings")
+    recommendations: List[str] = Field(default_factory=list, description="Recommendations")
+
+
+class WebComplianceVerifierInput(BaseModel):
+    """Input for web compliance verification"""
+    uncertain_products: List[str] = Field(
+        default_factory=list,
+        description="Products that need web verification"
+    )
+    uncertain_substances: List[str] = Field(
+        default_factory=list,
+        description="Substances that need web verification"
+    )
+    validation_results: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Previous validation results"
+    )
+    document_id: str = Field(description="Document identifier for tracking")
+    
+    @field_validator('uncertain_products', 'uncertain_substances')
+    @classmethod
+    def validate_lists(cls, v):
+        if not isinstance(v, list):
+            return []
+        return [item for item in v if item and isinstance(item, str)]
+
+
+class WebComplianceVerifierOutput(BaseModel):
+    """Output for web compliance verification"""
+    status: str = Field(description="Overall verification status")
+    verification_status: str = Field(description="Verification status (success, partial, failed)")
+    verification_results: Dict[str, Any] = Field(description="Detailed verification results")
+    total_products_verified: int = Field(description="Number of products verified")
+    total_substances_verified: int = Field(description="Number of substances verified")
+    total_violations: int = Field(description="Total violations found")
+    total_warnings: int = Field(description="Total warnings found")
+    document_id: str = Field(description="Document identifier")
+    timestamp: datetime = Field(default_factory=datetime.now, description="Verification timestamp")
+
+
+class UsageLimitValidationResult(BaseModel):
+    """Result of usage limit validation for a single product"""
+    product_name: str = Field(description="Name of the validated product")
+    dosage_compliance: str = Field(description="Dosage compliance status")
+    frequency_compliance: str = Field(description="Application frequency compliance status")
+    seasonal_compliance: str = Field(description="Seasonal application compliance status")
+    znt_compliance: str = Field(description="Buffer zone compliance status")
+    dar_compliance: str = Field(description="Pre-harvest interval compliance status")
+    violations: List[ComplianceViolation] = Field(default_factory=list, description="Found violations")
+    warnings: List[ComplianceWarning] = Field(default_factory=list, description="Found warnings")
+    recommendations: List[str] = Field(default_factory=list, description="Recommendations")
+
+
+class UsageLimitValidatorInput(BaseModel):
+    """Input for usage limit validation"""
+    extracted_entities: Dict[str, Any] = Field(description="Extracted regulatory entities from previous tool")
+    document_id: str = Field(description="Document identifier for tracking")
+    
+    @field_validator('extracted_entities')
+    @classmethod
+    def validate_dicts(cls, v):
+        if not isinstance(v, dict):
+            raise ValueError("Input must be a dictionary")
+        return v
+
+
+class UsageLimitValidatorOutput(BaseModel):
+    """Output for usage limit validation"""
+    status: str = Field(description="Overall validation status")
+    validation_results: Dict[str, Any] = Field(description="Detailed validation results")
+    total_products_validated: int = Field(description="Number of products validated")
+    total_violations: int = Field(description="Total violations found")
+    total_warnings: int = Field(description="Total warnings found")
+    document_id: str = Field(description="Document identifier")
+    timestamp: datetime = Field(default_factory=datetime.now, description="Validation timestamp")
+
+
+
+
+class RegulatoryEntityExtractorInput(BaseModel):
+    """Input for regulatory entity extraction"""
+    document_content: str = Field(description="Full text content of the agricultural document")
+    document_type: str = Field(description="Type of document (manual, product_spec, technical_sheet, etc.)")
+    max_content_length: Optional[int] = Field(default=8000, description="Maximum content length to process")
+    
+    @field_validator('document_content')
+    @classmethod
+    def validate_content(cls, v):
+        if not v or len(v.strip()) < 50:
+            raise ValueError("Document content too short (minimum 50 characters)")
+        return v
+
+
+class RegulatoryEntityExtractorOutput(BaseModel):
+    """Output for regulatory entity extraction"""
+    status: str = Field(description="Overall extraction status")
+    extraction_results: Dict[str, Any] = Field(description="Detailed extraction results")
+    total_entities_extracted: int = Field(description="Total number of entities extracted")
+    extraction_confidence: float = Field(ge=0.0, le=1.0, description="Overall extraction confidence")
+    document_type: str = Field(description="Type of document processed")
+    timestamp: datetime = Field(default_factory=datetime.now, description="Extraction timestamp")

@@ -74,7 +74,7 @@ To switch → Log out and log back in (or use different browser tab)
 - Example: Cooperative shares best practices with members
 
 #### PUBLIC (Ekumen-provided)
-- Available to ALL Ekumen users
+- Available to ALL authenticated Ekumen users
 - Example: Regulations, general agricultural guides
 - Curated by Ekumen team
 

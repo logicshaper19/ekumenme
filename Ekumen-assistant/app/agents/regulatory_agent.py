@@ -18,7 +18,7 @@ from langchain.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
 from ..tools.regulatory_agent import (
-    database_integrated_amm_tool,
+    lookup_amm_tool,
     check_regulatory_compliance_tool,
     get_safety_guidelines_tool,
     check_environmental_regulations_tool
@@ -74,7 +74,7 @@ class RegulatoryIntelligenceAgent:
 
         # Use provided tools or default production tools
         self.tools = tools or [
-            database_integrated_amm_tool,
+            lookup_amm_tool,
             check_regulatory_compliance_tool,
             get_safety_guidelines_tool,
             check_environmental_regulations_tool

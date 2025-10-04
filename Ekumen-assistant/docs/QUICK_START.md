@@ -144,7 +144,7 @@ No mid-session switching (like ChatGPT Teams)
 Documents have 3 visibility levels:
   - INTERNAL: Only org members
   - SHARED: Specific orgs/users
-  - PUBLIC: All Ekumen users
+  - PUBLIC: All authenticated Ekumen users
 
 LangChain retriever filters by permissions automatically
 ```

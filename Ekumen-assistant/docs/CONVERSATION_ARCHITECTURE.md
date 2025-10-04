@@ -290,7 +290,7 @@ Each document has **visibility level**:
 - Example: Phyto company shares product specs with customers
 
 #### 3. **PUBLIC** (Ekumen-provided)
-- Available to ALL Ekumen users
+- Available to ALL authenticated Ekumen users
 - Example: Regulations, general guides
 
 ### Document Schema

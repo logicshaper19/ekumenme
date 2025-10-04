@@ -15,6 +15,11 @@ from .ephy import (
     ProductType, CommercialType, GammeUsage, EtatAutorisation
 )
 from .mesparcelles import Exploitation, Parcelle, Intervention, Intrant
+from .analytics import (
+    AnalyticsEvent, DocumentAnalytics, QueryAnalytics, ContentGap,
+    UserSegmentAnalytics, AnalyticsAlert, AnalyticsEventType,
+    DocumentAudience, UserRole
+)
 
 __all__ = [
     "User", "UserSession", "UserActivity",
@@ -28,5 +33,8 @@ __all__ = [
     "PhraseRisque", "ProduitPhraseRisque", "ProduitClassification",
     "ConditionEmploi", "PermisImportation",
     "ProductType", "CommercialType", "GammeUsage", "EtatAutorisation",
-    "Exploitation", "Parcelle", "Intervention", "Intrant"
+    "Exploitation", "Parcelle", "Intervention", "Intrant",
+    "AnalyticsEvent", "DocumentAnalytics", "QueryAnalytics", "ContentGap",
+    "UserSegmentAnalytics", "AnalyticsAlert", "AnalyticsEventType",
+    "DocumentAudience", "UserRole"
 ]

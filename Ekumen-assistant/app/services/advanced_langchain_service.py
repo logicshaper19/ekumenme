@@ -272,8 +272,8 @@ class AdvancedLangChainService:
         def lookup_amm_database(product_name: str, crop_type: str = None) -> str:
             """Look up AMM information using real EPHY database"""
             try:
-                from app.tools.regulatory_agent.database_integrated_amm_tool import DatabaseIntegratedAMMLookupTool
-                amm_tool = DatabaseIntegratedAMMLookupTool()
+                from app.tools.regulatory_agent.lookup_amm_tool import lookup_amm_tool
+                amm_tool = lookup_amm_tool
                 return amm_tool._run(product_name=product_name, crop_type=crop_type)
             except Exception as e:
                 return f"Error looking up AMM data: {str(e)}"

@@ -79,15 +79,19 @@ class ChatService:
         self,
         db: AsyncSession,
         user_id: str,
-        agent_type: str,
+        agent_type: Optional[str] = None,
         farm_siret: Optional[str] = None,
         title: Optional[str] = None,
         organization_id: str = None
     ) -> Conversation:
         """Create a new conversation"""
+        # Use default agent type if not provided
+        if not agent_type:
+            agent_type = "farm_data"
+            
         # Generate title if not provided
         if not title:
-            title = f"Conversation avec {agent_type.replace('_', ' ').title()}"
+            title = "Nouvelle conversation"
 
         conversation = Conversation(
             user_id=user_id,
@@ -199,15 +203,56 @@ class ChatService:
 
         db.add(message)
 
-        # Update conversation's last message timestamp
+        # Update conversation's last message timestamp and title
         conversation = await db.get(Conversation, conversation_id)
         if conversation:
             conversation.last_message_at = message.created_at
+            
+            # Generate title from first user message if conversation still has generic title
+            if (sender == "user" and 
+                conversation.title in ["Nouvelle conversation", "Conversation avec Farm Data", "Conversation avec farm_data"] and
+                len(content.strip()) > 0):
+                
+                # Generate a better title from the first user message
+                title = self._generate_conversation_title(content)
+                conversation.title = title
+                logger.info(f"Updated conversation {conversation_id} title to: {title}")
 
         await db.commit()
         await db.refresh(message)
 
         return message
+
+    def _generate_conversation_title(self, first_message: str) -> str:
+        """Generate a conversation title from the first user message"""
+        # Clean and truncate the message
+        clean_message = first_message.strip()
+        
+        # Remove common question words and make it more concise
+        question_words = ["quel", "quelle", "comment", "pourquoi", "quand", "où", "qui", "que", "qu'est-ce que", "peux-tu", "peux", "peut", "est-ce que"]
+        words = clean_message.lower().split()
+        
+        # Remove question words from the beginning
+        while words and words[0] in question_words:
+            words.pop(0)
+        
+        # Take first 6-8 words to make it more descriptive
+        title_words = words[:8]
+        if not title_words:
+            return "Nouvelle conversation"
+        
+        # Join words and capitalize first letter
+        title = " ".join(title_words).capitalize()
+        
+        # Ensure it ends with proper punctuation if it's a question
+        if not title.endswith(('?', '.', '!')):
+            title += "..."
+        
+        # Truncate if too long (but keep it descriptive)
+        if len(title) > 60:
+            title = title[:57] + "..."
+        
+        return title
     async def _update_latest_agent_message_metadata(self, db: AsyncSession, conversation_id: str, metadata_update: Dict[str, Any]) -> Optional[Message]:
         """Attach/merge metadata to the latest assistant message in a conversation.
         Keeps existing metadata and overwrites keys provided in metadata_update.
@@ -778,3 +823,76 @@ class ChatService:
         except Exception as e:
             logger.error(f"Error getting available agents: {e}")
             return []
+
+    def map_citations_for_storage(self, docs: List) -> List[Dict]:
+        """
+        Map source docs to internal citation format for database storage
+        Handles both document chunks and Tavily web sources
+        """
+        items = []
+        for idx, doc in enumerate(docs):
+            try:
+                # Handle both document chunks and Tavily sources
+                if hasattr(doc, 'metadata'):
+                    # Document chunk format
+                    meta = getattr(doc, "metadata", {}) or {}
+                    page_number = meta.get("page") or meta.get("page_number")
+                    filename = meta.get("filename") or "Document"
+                    chunk_text = (getattr(doc, "page_content", "") or "")[:500]
+                    relevance = meta.get("score")
+                    items.append({
+                        "document_id": meta.get("document_id"),
+                        "filename": filename,
+                        "relevance_score": relevance,
+                        "chunk_index": meta.get("chunk_index"),
+                        "page_number": page_number,
+                        "chunk_text": chunk_text,
+                        "rank": idx + 1
+                    })
+                elif isinstance(doc, dict):
+                    # Tavily source format
+                    items.append({
+                        "document_id": None,
+                        "filename": doc.get("title", "Source web"),
+                        "relevance_score": doc.get("relevance", 0.0),
+                        "chunk_index": None,
+                        "page_number": None,
+                        "chunk_text": doc.get("snippet", "")[:500],
+                        "rank": idx + 1,
+                        "url": doc.get("url", ""),
+                        "type": doc.get("type", "web")
+                    })
+            except Exception:
+                continue
+        return items
+
+    def map_citations_for_frontend(self, citations: List[Dict]) -> List[Dict]:
+        """
+        Map internal citations to frontend-friendly format
+        Converts stored citation data to display format
+        """
+        sources = []
+        for d in citations:
+            try:
+                if d.get("type") == "web":
+                    # Tavily web source
+                    sources.append({
+                        "title": d.get("filename", "Source web"),
+                        "url": d.get("url", "#"),
+                        "snippet": d.get("chunk_text", ""),
+                        "relevance": d.get("relevance_score", 0.0),
+                        "type": "web"
+                    })
+                else:
+                    # Document source
+                    title = f"{d.get('filename') or 'Document'}" + (f" (p. {d.get('page_number')})" if d.get('page_number') else "")
+                    sources.append({
+                        "title": title,
+                        "url": "#",
+                        "snippet": d.get("chunk_text") or "",
+                        "relevance": d.get("relevance_score"),
+                        "type": "document"
+                    })
+            except Exception:
+                continue
+        return sources
