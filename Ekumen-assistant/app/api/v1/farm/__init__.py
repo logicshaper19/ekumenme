@@ -9,6 +9,7 @@ from .parcelles import router as parcelles_router
 from .interventions import router as interventions_router
 from .exploitation import router as exploitation_router
 from .dashboard import router as dashboard_router
+from .websocket import router as websocket_router
 
 # Main router for farm API
 router = APIRouter(prefix="/farm", tags=["Farm Data"])
@@ -18,3 +19,4 @@ router.include_router(parcelles_router)
 router.include_router(interventions_router)
 router.include_router(exploitation_router)
 router.include_router(dashboard_router)
+router.include_router(websocket_router)

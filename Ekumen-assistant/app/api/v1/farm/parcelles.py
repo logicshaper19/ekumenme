@@ -13,6 +13,12 @@ from app.models.user import User
 from app.models.mesparcelles import Parcelle, Exploitation
 from app.models.organization import OrganizationFarmAccess, OrganizationMembership
 from app.services.shared import AuthService
+from app.services.validation import (
+    farm_data_validator,
+    create_validation_error_response,
+    ParcelCreateRequest,
+    ValidationError
+)
 from app.api.v1.knowledge_base.schemas import PaginatedResponse, create_paginated_response_from_skip
 from pydantic import BaseModel
 from decimal import Decimal
@@ -294,3 +300,62 @@ async def get_parcelles_by_farm(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve parcelles for farm: {str(e)}"
         )
+
+@router.post(
+    "/",
+    response_model=ParcelleResponse,
+    summary="Create a new parcelle",
+    description="Create a new parcelle with validation and authorization checks.",
+    tags=["Farm - Parcelles"]
+)
+async def create_parcelle(
+    parcelle_data: ParcelCreateRequest,
+    current_user: User = Depends(auth_service.get_current_active_user),
+    db: AsyncSession = Depends(get_async_db)
+) -> ParcelleResponse:
+    """
+    Create a new parcelle.
+    """
+    try:
+        # Validate the input data
+        validated_data = farm_data_validator.validate_parcel_data(parcelle_data.dict())
+        
+        # Check if user has access to the farm
+        access_query = select(OrganizationFarmAccess).where(
+            and_(
+                OrganizationFarmAccess.organization_id.in_(
+                    select(OrganizationMembership.organization_id)
+                    .where(OrganizationMembership.user_id == current_user.id)
+                ),
+                OrganizationFarmAccess.farm_siret == validated_data['siret']
+            )
+        )
+        access_result = await db.execute(access_query)
+        access = access_result.scalar_one_or_none()
+        
+        if not access:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to create parcelles for this farm")
+
+        # Create new parcelle
+        new_parcelle = Parcelle(
+            id=uuid.uuid4(),
+            **validated_data
+        )
+        
+        db.add(new_parcelle)
+        await db.commit()
+        await db.refresh(new_parcelle)
+        
+        logger.info(f"Created new parcelle {new_parcelle.id} for farm {validated_data['siret']}")
+        
+        return ParcelleResponse.from_orm(new_parcelle)
+        
+    except ValidationError as e:
+        logger.warning(f"Validation error creating parcelle: {e.message}")
+        raise create_validation_error_response(e)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating parcelle: {e}")
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
