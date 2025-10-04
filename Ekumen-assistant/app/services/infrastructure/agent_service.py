@@ -70,10 +70,65 @@ class AgentService:
         user: User
     ) -> ChatResponse:
         """Process message with Farm Data Manager agent"""
-        # TODO: Implement actual farm data agent logic
-        # This is a placeholder implementation
-        
-        response_content = f"""
+        try:
+            from app.agents.farm_data_agent import FarmDataIntelligenceAgent
+            
+            # Initialize farm data agent
+            farm_agent = FarmDataIntelligenceAgent()
+            
+            # Prepare context with farm SIRET if available
+            context = {}
+            if conversation.farm_siret:
+                context["farm_siret"] = conversation.farm_siret
+                context["user_id"] = str(user.id)
+            
+            # Process message with farm data agent
+            result = await farm_agent.aprocess(message, context)
+            
+            if result.get("success", True):
+                response_content = result.get("response", "Désolé, je n'ai pas pu traiter votre demande.")
+                
+                return ChatResponse(
+                    content=response_content,
+                    agent_type=AgentType.FARM_DATA,
+                    timestamp=datetime.utcnow(),
+                    metadata={
+                        "agent_name": "Gestionnaire de Données d'Exploitation",
+                        "capabilities": ["parcels", "interventions", "farm_profile", "regional_context"],
+                        "iterations": result.get("iterations", 0),
+                        "tools_used": result.get("tools_used", [])
+                    }
+                )
+            else:
+                # Handle error case
+                error_message = result.get("error", "Erreur inconnue")
+                response_content = f"""
+Désolé, je n'ai pas pu traiter votre demande concernant les données d'exploitation.
+
+**Erreur** : {error_message}
+
+Veuillez vérifier que :
+- Votre exploitation est bien configurée
+- Vous avez accès aux données de votre ferme
+- Votre question est claire et spécifique
+
+Vous pouvez essayer de reformuler votre question ou me demander de l'aide pour accéder à vos données d'exploitation.
+                """.strip()
+                
+                return ChatResponse(
+                    content=response_content,
+                    agent_type=AgentType.FARM_DATA,
+                    timestamp=datetime.utcnow(),
+                    metadata={
+                        "agent_name": "Gestionnaire de Données d'Exploitation",
+                        "error": error_message,
+                        "error_type": result.get("error_type", "unknown")
+                    }
+                )
+                
+        except Exception as e:
+            # Fallback to placeholder if farm agent fails
+            response_content = f"""
 Bonjour {user.full_name or user.email.split('@')[0]},
 
 Je suis votre Gestionnaire de Données d'Exploitation. Je peux vous aider avec :
@@ -86,24 +141,26 @@ Je suis votre Gestionnaire de Données d'Exploitation. Je peux vous aider avec :
 
 🔍 **Votre demande** : {message}
 
-Pour le moment, je suis en cours de développement. Bientôt, je pourrai :
-- Analyser vos données d'exploitation
-- Fournir des insights sur vos parcelles
-- Suivre l'évolution de vos cultures
-- Générer des rapports personnalisés
+Actuellement, je rencontre un problème technique. Veuillez réessayer dans quelques instants.
+
+En attendant, vous pouvez :
+- Consulter vos données directement via l'interface web
+- Me poser des questions générales sur l'agriculture
+- Demander de l'aide pour configurer votre exploitation
 
 Avez-vous des questions spécifiques sur vos données d'exploitation ?
-        """.strip()
-        
-        return ChatResponse(
-            content=response_content,
-            agent_type=AgentType.FARM_DATA,
-            timestamp=datetime.utcnow(),
-            metadata={
-                "agent_name": "Gestionnaire de Données d'Exploitation",
-                "capabilities": ["parcels", "interventions", "farm_profile", "regional_context"]
-            }
-        )
+            """.strip()
+            
+            return ChatResponse(
+                content=response_content,
+                agent_type=AgentType.FARM_DATA,
+                timestamp=datetime.utcnow(),
+                metadata={
+                    "agent_name": "Gestionnaire de Données d'Exploitation",
+                    "capabilities": ["parcels", "interventions", "farm_profile", "regional_context"],
+                    "error": str(e)
+                }
+            )
     
     async def _process_regulatory_message(
         self,
