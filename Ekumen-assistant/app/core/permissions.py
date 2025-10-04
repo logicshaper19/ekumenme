@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_async_db
 from app.models.user import User
-from app.services.auth_service import AuthService
+from app.services.shared.auth_service import AuthService
 
 auth_service = AuthService()
 

@@ -15,7 +15,7 @@ sys.path.insert(0, str(project_root))
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import AsyncSessionLocal
 from app.models.user import User, UserRole, UserStatus
-from app.services.auth_service import AuthService
+from app.services.shared.auth_service import AuthService
 import bcrypt
 
 

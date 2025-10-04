@@ -11,9 +11,9 @@ import logging
 from app.core.database import get_async_db
 from app.models.user import User
 from app.schemas.journal import JournalEntryCreate, JournalEntryResponse, ValidationResult
-from app.services.auth_service import AuthService
-from app.services.journal_service import JournalService
-from app.services.voice_service import VoiceService
+from app.services.shared.auth_service import AuthService
+from app.services.infrastructure.journal_service import JournalService
+from app.services.infrastructure.voice_service import VoiceService
 
 logger = logging.getLogger(__name__)
 

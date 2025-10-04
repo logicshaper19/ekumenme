@@ -11,9 +11,9 @@ import logging
 from app.core.database import get_async_db
 from app.models.user import User
 from app.schemas.chat import ConversationCreate, ConversationResponse, ConversationUpdate
-from app.services.auth_service import AuthService
-from app.services.chat_service import ChatService
-from app.services.agent_service import AgentService
+from app.services.shared.auth_service import AuthService
+from app.services.shared.chat_service import ChatService
+from app.services.infrastructure.agent_service import AgentService
 
 from .dependencies import get_org_id_from_token
 

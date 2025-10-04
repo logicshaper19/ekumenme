@@ -14,7 +14,7 @@ from app.main import app
 from app.core.database import Base, get_async_db
 from app.core.config import settings
 from app.models.user import User, UserRole, UserStatus
-from app.services.auth_service import AuthService
+from app.services.shared.auth_service import AuthService
 
 
 # Test database URL (in-memory SQLite for testing)

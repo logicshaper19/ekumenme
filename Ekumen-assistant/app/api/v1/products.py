@@ -16,8 +16,8 @@ from app.schemas.product import (
     CropStatisticsResponse, SubstanceStatisticsResponse,
     ProductValidationRequest, ProductCompatibilityRequest
 )
-from app.services.auth_service import AuthService
-from app.services.product_service import ProductService
+from app.services.shared.auth_service import AuthService
+from app.services.infrastructure.product_service import ProductService
 
 logger = logging.getLogger(__name__)
 

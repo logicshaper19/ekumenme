@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_async_db
 from app.core.rate_limiting import is_development_mode
 from app.api.v1.knowledge_base.schemas import StandardErrorResponse
-from app.services.analytics_service import AnalyticsService
+from app.services.farm_data.analytics_service import AnalyticsService
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ async def get_source_attribution_dev(
         mock_organization_id = "48359c04-d103-4cdd-b165-502ceefda04a"
         
         # Get relevant documents using RAG service
-        from app.services.rag_service import RAGService
+        from app.services.knowledge_base.rag_service import RAGService
         rag_service = RAGService()
         
         # Search for relevant documents

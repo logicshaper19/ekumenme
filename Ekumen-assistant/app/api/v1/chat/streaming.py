@@ -13,8 +13,8 @@ import json
 from app.core.database import get_async_db
 from app.models.user import User
 from app.schemas.chat import ChatMessage
-from app.services.auth_service import AuthService
-from app.services.chat_service import ChatService
+from app.services.shared.auth_service import AuthService
+from app.services.shared.chat_service import ChatService
 
 from .dependencies import get_org_id_from_token
 

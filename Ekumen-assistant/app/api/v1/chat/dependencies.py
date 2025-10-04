@@ -5,7 +5,7 @@ Shared dependency functions for chat endpoints
 
 from typing import Optional
 from fastapi import Depends
-from app.services.auth_service import AuthService, oauth2_scheme
+from app.services.shared.auth_service import AuthService, oauth2_scheme
 import logging
 
 logger = logging.getLogger(__name__)

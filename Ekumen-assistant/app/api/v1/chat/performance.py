@@ -5,8 +5,8 @@ Handles performance statistics and cache management
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.models.user import User
-from app.services.auth_service import AuthService
-from app.services.optimized_streaming_service import OptimizedStreamingService
+from app.services.shared.auth_service import AuthService
+from app.services.infrastructure.optimized_streaming_service import OptimizedStreamingService
 from app.services.shared.tool_registry_service import get_tool_registry
 from app.api.v1.knowledge_base.schemas import StandardErrorResponse
 import logging

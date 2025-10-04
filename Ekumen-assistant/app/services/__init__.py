@@ -67,7 +67,8 @@ from .infrastructure import (
     JournalService,
     LangGraphWorkflowService,
     LCELChatService,
-    MemoryPersistenceService,
+    get_lcel_chat_service,
+    # MemoryPersistenceService removed to avoid circular import
     MultiAgentConversationService,
     # MultiAgentService removed to avoid circular import
     MultiLayerCacheService,
@@ -76,9 +77,12 @@ from .infrastructure import (
     OptimizedStreamingService,
     ParallelExecutorService,
     PerformanceOptimizationService,
-    PostgresChatHistory,
+    performance_monitor,
+    PostgresChatMessageHistory,
+    AsyncPostgresChatMessageHistory,
     ProductService,
-    QueryClassifier,
+    QueryComplexityClassifier,
+    get_classifier,
     SmartToolSelectorService,
     StreamingService,
     VoiceService
@@ -126,7 +130,8 @@ __all__ = [
     "JournalService",
     "LangGraphWorkflowService",
     "LCELChatService",
-    "MemoryPersistenceService",
+    "get_lcel_chat_service",
+    # "MemoryPersistenceService",  # Removed to avoid circular import
     "MultiAgentConversationService",
     # "MultiAgentService",  # Removed to avoid circular import
     "MultiLayerCacheService",
@@ -135,9 +140,12 @@ __all__ = [
     "OptimizedStreamingService",
     "ParallelExecutorService",
     "PerformanceOptimizationService",
-    "PostgresChatHistory",
+    "performance_monitor",
+    "PostgresChatMessageHistory",
+    "AsyncPostgresChatMessageHistory",
     "ProductService",
-    "QueryClassifier",
+    "QueryComplexityClassifier",
+    "get_classifier",
     "SmartToolSelectorService",
     "StreamingService",
     "VoiceService"

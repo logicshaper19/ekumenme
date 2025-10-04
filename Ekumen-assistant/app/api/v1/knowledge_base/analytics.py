@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_async_db
 from app.models.user import User
-from app.services.auth_service import AuthService
-from app.services.analytics_service import AnalyticsService
+from app.services.shared.auth_service import AuthService
+from app.services.farm_data.analytics_service import AnalyticsService
 from app.api.v1.knowledge_base.dependencies import require_user_organization
 from app.api.v1.knowledge_base.schemas import StandardErrorResponse
 
@@ -78,7 +78,7 @@ async def get_source_attribution(
         organization_id = await require_user_organization(current_user, db)
         
         # Get relevant documents using RAG service
-        from app.services.rag_service import RAGService
+        from app.services.knowledge_base.rag_service import RAGService
         rag_service = RAGService()
         
         # Search for relevant documents
@@ -164,7 +164,7 @@ async def get_document_chunk_analytics(
     Shows which chunks are most frequently accessed and their performance
     """
     try:
-        from app.services.rag_service import RAGService
+        from app.services.knowledge_base.rag_service import RAGService
         
         rag_service = RAGService()
         

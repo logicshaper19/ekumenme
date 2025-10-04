@@ -15,7 +15,7 @@ from app.core.config import settings
 from app.models.user import User, UserRole
 from app.models.organization import Organization, OrganizationMembership, OrganizationStatus
 from app.schemas.auth import UserCreate, UserLogin, UserResponse, Token
-from app.services.auth_service import AuthService
+from app.services.shared.auth_service import AuthService
 
 logger = logging.getLogger(__name__)
 
