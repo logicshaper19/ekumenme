@@ -544,12 +544,11 @@ Utilise l'historique de la conversation pour fournir des réponses cohérentes e
             # Import simplified supplier tool
             logger.info("🔧 Creating supplier tools for mode: supplier")
             try:
-                from app.tools.supplier_agent import SupplierSearchTool
-                logger.info("✅ Successfully imported SupplierSearchTool")
+                from app.tools.supplier_agent import supplier_search_tool
+                logger.info("✅ Successfully imported supplier_search_tool")
                 
-                # Create supplier search tool
-                supplier_tool = SupplierSearchTool()
-                tools.append(supplier_tool)
+                # Add supplier search tool
+                tools.append(supplier_search_tool)
                 logger.info(f"✅ Added supplier tool to tools list. Total tools: {len(tools)}")
             except Exception as e:
                 logger.error(f"❌ Error creating supplier tool: {str(e)}")
