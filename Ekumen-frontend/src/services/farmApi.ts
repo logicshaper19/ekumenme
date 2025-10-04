@@ -3,7 +3,7 @@
  * Connects frontend to backend farm data APIs
  */
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1'
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1'
 
 // Types matching our backend API responses
 export interface ParcelleResponse {

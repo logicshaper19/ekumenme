@@ -33,7 +33,7 @@ class WebSocketService {
         throw new Error('No authentication token found. Please log in.')
       }
 
-      const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000'
+      const wsUrl = import.meta.env.VITE_WS_URL || `ws://${window.location.host}`
       const url = `${wsUrl}/api/v1/chat/ws/${conversationId}?token=${authToken}`
 
       console.log('Connecting to WebSocket:', url)
@@ -60,7 +60,7 @@ class WebSocketService {
         throw new Error('No authentication token found. Please log in.')
       }
 
-      const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000'
+      const wsUrl = import.meta.env.VITE_WS_URL || `ws://${window.location.host}`
       const url = `${wsUrl}/api/v1/farm/ws?token=${authToken}`
 
       console.log('Connecting to Farm WebSocket:', url)
