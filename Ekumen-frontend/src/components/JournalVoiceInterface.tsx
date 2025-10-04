@@ -509,4 +509,4 @@ export const JournalVoiceInterface: React.FC<VoiceInterfaceProps> = ({
   )
 }
 
-export default EnhancedVoiceInterface
+export default JournalVoiceInterface
