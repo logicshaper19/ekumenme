@@ -33,9 +33,17 @@ class JournalService:
         self.voice_service = VoiceService()
         self.journal_agent = JournalAgent()
         self.validation_queue = asyncio.Queue()
-        
-        # Start validation worker
-        asyncio.create_task(self._validation_worker())
+        self._worker_started = False
+    
+    def _ensure_worker_started(self):
+        """Start the validation worker if not already started"""
+        if not self._worker_started:
+            try:
+                asyncio.create_task(self._validation_worker())
+                self._worker_started = True
+            except RuntimeError:
+                # No event loop running yet, will start later
+                pass
     
     @monitor_voice_function('process_voice_input')
     async def process_voice_input(
@@ -58,6 +66,9 @@ class JournalService:
             Processing result with entry ID
         """
         try:
+            # Ensure validation worker is started
+            self._ensure_worker_started()
+            
             # Step 1: Transcribe audio
             logger.info("Transcribing audio...")
             transcription_tracking_id = voice_monitor.record_transcription_start(
