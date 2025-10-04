@@ -17,7 +17,7 @@ from langgraph.prebuilt import ToolNode
 from langchain.tools import tool
 
 from app.core.config import settings
-from app.services.unified_regulatory_service import UnifiedRegulatoryService
+from app.services.regulatory import UnifiedRegulatoryService
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,7 @@
 # Model imports for proper relationship resolution
 from .user import User, UserSession, UserActivity
 from .organization import Organization, OrganizationMembership, OrganizationFarmAccess, KnowledgeBaseEntry
+from .knowledge_base import KnowledgeBaseDocument
 from .conversation import Conversation, Message
 from .feedback import ResponseFeedback, FeedbackType, FeedbackCategory
 from .intervention import VoiceJournalEntry, ProductUsage, InterventionHistory
@@ -24,6 +25,7 @@ from .analytics import (
 __all__ = [
     "User", "UserSession", "UserActivity",
     "Organization", "OrganizationMembership", "OrganizationFarmAccess", "KnowledgeBaseEntry",
+    "KnowledgeBaseDocument",
     "Conversation", "Message",
     "ResponseFeedback", "FeedbackType", "FeedbackCategory",
     "VoiceJournalEntry", "ProductUsage", "InterventionHistory",

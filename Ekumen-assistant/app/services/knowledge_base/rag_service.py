@@ -18,7 +18,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from app.core.config import settings
 from app.models.knowledge_base import KnowledgeBaseDocument, DocumentStatus
-from app.services.knowledge_base_workflow_service import KnowledgeBaseWorkflowService
+from .knowledge_base_workflow_service import KnowledgeBaseWorkflowService
 
 logger = logging.getLogger(__name__)
 
@@ -451,7 +451,7 @@ class RAGService:
         try:
             from datetime import datetime
             from sqlalchemy import update
-            from app.services.analytics_service import AnalyticsService
+            from app.services.farm_data import AnalyticsService
             from app.models.analytics import AnalyticsEvent
             
             analytics_service = AnalyticsService()
@@ -516,7 +516,7 @@ class RAGService:
         Track when a document is cited in a response with enhanced confidence scoring
         """
         try:
-            from app.services.analytics_service import AnalyticsService
+            from app.services.farm_data import AnalyticsService
             
             analytics_service = AnalyticsService()
             

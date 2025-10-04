@@ -11,8 +11,8 @@ from sqlalchemy import select, func, and_
 from app.core.database import get_async_db
 from app.models.user import User
 from app.models.knowledge_base import DocumentType
-from app.services.knowledge_base_workflow_service import KnowledgeBaseWorkflowService
-from app.services.auth_service import AuthService
+from app.services.knowledge_base import KnowledgeBaseWorkflowService
+from app.services.shared import AuthService
 from app.core.validation import validate_file_upload
 from app.core.rate_limiting import check_rate_limit
 from app.api.v1.knowledge_base.dependencies import require_user_organization
@@ -43,7 +43,7 @@ async def search_knowledge_base(
     Returns public, shared, and organization-specific content
     """
     try:
-        from app.services.rag_service import RAGService
+        from app.services.knowledge_base import RAGService
         
         rag_service = RAGService()
         

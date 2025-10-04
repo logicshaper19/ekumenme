@@ -12,13 +12,13 @@ import uuid
 
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
 from langchain_openai import ChatOpenAI
-from langgraph import StateGraph, END
+from langgraph.graph import StateGraph, END
 from langgraph.graph import add_messages
-from langgraph.prebuilt import ToolExecutor
+from langgraph.prebuilt import ToolNode
 from langchain.tools import tool
 
 from app.core.config import settings
-from app.services.unified_regulatory_service import UnifiedRegulatoryService
+from app.services.regulatory import UnifiedRegulatoryService
 
 logger = logging.getLogger(__name__)
 

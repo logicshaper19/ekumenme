@@ -21,8 +21,8 @@ from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain.callbacks.base import AsyncCallbackHandler
 
 from app.agents.orchestrator import OrchestratorAgent
-from app.services.multi_layer_cache_service import MultiLayerCacheService
-from app.services.parallel_executor_service import ParallelExecutorService
+from .multi_layer_cache_service import MultiLayerCacheService
+from .parallel_executor_service import ParallelExecutorService
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)

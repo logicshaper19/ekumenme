@@ -48,8 +48,8 @@ from ...core.database import AsyncSessionLocal
 from ...core.cache import redis_cache
 from ...models.disease import Disease
 from ...models.bbch_stage import BBCHStage
-from ...services.knowledge_base_service import KnowledgeBaseService
-from ...services.bbch_service import BBCHService
+from ...services.crop_health import KnowledgeBaseService
+from ...services.regulatory.bbch_service import BBCHService
 
 logger = logging.getLogger(__name__)
 

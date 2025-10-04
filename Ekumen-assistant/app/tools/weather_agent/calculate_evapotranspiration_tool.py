@@ -37,7 +37,7 @@ from app.tools.exceptions import (
     WeatherDataError
 )
 from app.core.cache import redis_cache
-from app.services.evapotranspiration_service import (
+from app.services.weather import (
     SolarRadiationEstimator,
     PenmanMonteithET0
 )

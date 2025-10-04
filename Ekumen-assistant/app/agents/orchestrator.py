@@ -11,7 +11,7 @@ from langchain_openai import ChatOpenAI
 from langchain.callbacks.base import BaseCallbackHandler
 
 from app.prompts.prompt_registry import get_agent_prompt
-from app.services.tool_registry_service import get_tool_registry
+from app.services.shared.tool_registry_service import get_tool_registry
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)

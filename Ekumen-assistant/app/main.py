@@ -118,7 +118,7 @@ async def startup_event():
     
     # Start knowledge base scheduler
     try:
-        from app.services.scheduler_service import start_knowledge_base_scheduler
+        from app.services.shared import start_knowledge_base_scheduler
         start_knowledge_base_scheduler()
         logger.info("Knowledge base scheduler started")
     except Exception as e:
@@ -132,7 +132,7 @@ async def shutdown_event():
     
     # Stop knowledge base scheduler
     try:
-        from app.services.scheduler_service import stop_knowledge_base_scheduler
+        from app.services.shared import stop_knowledge_base_scheduler
         stop_knowledge_base_scheduler()
         logger.info("Knowledge base scheduler stopped")
     except Exception as e:

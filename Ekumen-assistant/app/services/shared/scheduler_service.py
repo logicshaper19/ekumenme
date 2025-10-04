@@ -12,8 +12,10 @@ import time
 from threading import Thread
 
 from app.core.database import AsyncSessionLocal
-from app.services.knowledge_base_workflow_service import KnowledgeBaseWorkflowService
-from app.services.rag_service import RAGService
+from app.services.knowledge_base import (
+    KnowledgeBaseWorkflowService,
+    RAGService
+)
 
 logger = logging.getLogger(__name__)
 

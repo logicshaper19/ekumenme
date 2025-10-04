@@ -9,7 +9,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 from langchain_core.tools import StructuredTool
 
-from app.services.tavily_service import get_tavily_service
+from app.services.external import get_tavily_service
 from app.tools.schemas.supplier_schemas import (
     SupplierSearchInput, SupplierSearchOutput, SupplierInfo
 )

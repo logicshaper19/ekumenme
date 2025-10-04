@@ -36,9 +36,9 @@ from app.tools.schemas.compliance_schemas import (
 # Exceptions are handled via Pydantic ValidationError and generic Exception
 from app.core.cache import redis_cache
 from app.core.database import AsyncSessionLocal
-from app.services.configuration_service import ConfigurationService
-from app.services.unified_regulatory_service import UnifiedRegulatoryService
-from app.services.bbch_service import BBCHService
+from app.services.regulatory import ConfigurationService
+from app.services.regulatory import UnifiedRegulatoryService
+from app.services.regulatory.bbch_service import BBCHService
 from app.models.ephy import EtatAutorisation
 
 logger = logging.getLogger(__name__)

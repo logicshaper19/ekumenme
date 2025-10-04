@@ -17,8 +17,8 @@ from app.models.organization import Organization, OrganizationMembership, Organi
 from app.models.conversation import Conversation
 from app.models.conversation import Message
 from app.core.permissions import get_superuser, SuperAdminPermissions
-from app.services.auth_service import AuthService
-from app.services.admin_service import AdminService
+from app.services.shared import AuthService
+from app.services.admin import AdminService
 from app.api.v1.knowledge_base.schemas import StandardErrorResponse, PaginatedResponse, create_paginated_response_from_skip
 
 logger = logging.getLogger(__name__)

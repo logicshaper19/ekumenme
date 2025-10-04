@@ -11,8 +11,8 @@ from pydantic import ValidationError
 
 from app.core.database import AsyncSessionLocal
 from app.core.cache import redis_cache
-from app.services.unified_regulatory_service import UnifiedRegulatoryService
-from app.services.configuration_service import get_configuration_service
+from app.services.regulatory import UnifiedRegulatoryService
+from app.services.regulatory import get_configuration_service
 from app.tools.schemas.amm_schemas import (
     AMMInput, AMMOutput, ProductInfo, SubstanceInfo,
     SearchSummary, RegulatoryContext, ComplianceStatus

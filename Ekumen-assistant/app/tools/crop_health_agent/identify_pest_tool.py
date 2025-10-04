@@ -33,7 +33,7 @@ from app.tools.schemas.pest_schemas import (
     CropCategoryRiskProfile
 )
 from app.core.cache import redis_cache
-from app.services.knowledge_base_service import KnowledgeBaseService
+from app.services.crop_health import KnowledgeBaseService
 
 logger = logging.getLogger(__name__)
 

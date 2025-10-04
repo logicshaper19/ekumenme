@@ -4,8 +4,8 @@ Handles real-time WebSocket communication for chat
 """
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, status
-from app.services.auth_service import AuthService
-from app.services.chat_service import ChatService
+from app.services.shared import AuthService
+from app.services.shared import ChatService
 import logging
 import json
 import time

@@ -179,7 +179,7 @@ class ToolRegistryService:
         from app.agents.internet_agent import InternetAgent
         from app.agents.supplier_agent import SupplierAgent
         from app.agents.weather_agent import WeatherIntelligenceAgent
-        from app.agents.regulatory_agent import IntegratedRegulatoryAgent
+        from app.agents.regulatory_agent import RegulatoryIntelligenceAgent
 
         # Category to primary tool mapping (for LangChain tools)
         category_to_tool = {
@@ -195,7 +195,7 @@ class ToolRegistryService:
             "supplier": SupplierAgent,
             "market_prices": InternetAgent,  # Market prices uses internet agent
             "weather": WeatherIntelligenceAgent,
-            "regulatory": IntegratedRegulatoryAgent
+            "regulatory": RegulatoryIntelligenceAgent
         }
 
         results = {}

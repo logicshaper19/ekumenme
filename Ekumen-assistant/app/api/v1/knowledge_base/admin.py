@@ -11,7 +11,7 @@ from sqlalchemy import select, and_
 from app.core.database import get_async_db
 from app.models.user import User
 from app.core.permissions import get_superuser
-from app.services.knowledge_base_workflow_service import KnowledgeBaseWorkflowService
+from app.services.knowledge_base import KnowledgeBaseWorkflowService
 from app.api.v1.knowledge_base.schemas import StandardErrorResponse
 
 logger = logging.getLogger(__name__)

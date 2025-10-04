@@ -13,8 +13,8 @@ from sqlalchemy import select
 
 from app.core.cache import redis_cache
 from app.core.database import AsyncSessionLocal
-from app.services.configuration_service import ConfigurationService
-from app.services.unified_regulatory_service import UnifiedRegulatoryService
+from .configuration_service import ConfigurationService
+from .unified_regulatory_service import UnifiedRegulatoryService
 from app.models.ephy import Produit, UsageProduit, SubstanceActive, ProduitSubstance, PhraseRisque, ProduitPhraseRisque
 from app.tools.schemas.environmental_schemas import (
     EnvironmentalRegulationsInput,

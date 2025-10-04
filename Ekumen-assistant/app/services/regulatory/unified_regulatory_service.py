@@ -14,8 +14,8 @@ from app.models.ephy import (
     Produit as Product, SubstanceActive, ProduitSubstance as ProductSubstance,
     UsageProduit as Usage, ProductType, EtatAutorisation as AuthorizationStatus
 )
-from app.services.configuration_service import get_configuration_service
-from app.services.product_service import ProductService
+from .configuration_service import get_configuration_service
+# ProductService removed to avoid circular import - not used in this service
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ class UnifiedRegulatoryService:
     
     def __init__(self):
         self.config_service = get_configuration_service()
-        self.product_service = ProductService()
+        # ProductService removed - not used in this service
         logger.info("Initialized UnifiedRegulatoryService")
     
     async def search_compliant_products(

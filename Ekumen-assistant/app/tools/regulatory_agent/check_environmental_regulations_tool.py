@@ -8,7 +8,7 @@ from typing import Optional, List, Dict, Any
 from datetime import date
 from langchain.tools import StructuredTool
 
-from app.services.environmental_regulations_service import EnvironmentalRegulationsService
+from app.services.regulatory.environmental_regulations_service import EnvironmentalRegulationsService
 
 logger = logging.getLogger(__name__)
 

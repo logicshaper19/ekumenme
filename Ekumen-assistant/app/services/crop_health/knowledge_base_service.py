@@ -11,9 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func, text
 from sqlalchemy.orm import selectinload
 
-from ..core.database import AsyncSessionLocal
-from ..models.disease import Disease
-from ..models.pest import Pest
+from app.core.database import AsyncSessionLocal
+from app.models.disease import Disease
+from app.models.pest import Pest
 
 logger = logging.getLogger(__name__)
 

@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
 from app.core.config import settings
-from app.services.error_recovery_service import ErrorRecoveryService, ErrorContext, ErrorSeverity
+from .error_recovery_service import ErrorRecoveryService, ErrorContext, ErrorSeverity
 
 logger = logging.getLogger(__name__)
 

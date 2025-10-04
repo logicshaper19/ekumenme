@@ -20,7 +20,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.graph import add_messages
 
 from app.services.tool_service import ToolService
-from app.services.memory_service import MemoryService
+from app.services.shared import MemoryService
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)

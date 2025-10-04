@@ -5,7 +5,7 @@ Focused on supplier discovery and research using Tavily
 
 import logging
 from typing import Dict, Any, Optional
-from app.services.tavily_service import get_tavily_service
+from app.services.external import get_tavily_service
 
 logger = logging.getLogger(__name__)
 

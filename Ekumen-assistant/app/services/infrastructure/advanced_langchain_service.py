@@ -21,10 +21,10 @@ from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
-from app.services.unified_regulatory_service import UnifiedRegulatoryService
+from app.services.regulatory import UnifiedRegulatoryService
 # SemanticRoutingService deleted - routing now handled by orchestrator agent
-from app.services.memory_persistence_service import MemoryPersistenceService
-from app.services.langgraph_workflow_service import LangGraphWorkflowService
+from .memory_persistence_service import MemoryPersistenceService
+from .langgraph_workflow_service import LangGraphWorkflowService
 
 logger = logging.getLogger(__name__)
 

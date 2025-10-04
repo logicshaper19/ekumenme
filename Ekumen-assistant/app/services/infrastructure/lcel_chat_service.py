@@ -18,7 +18,7 @@ from langchain_community.vectorstores import Chroma
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.services.postgres_chat_history import get_session_history, AsyncPostgresChatMessageHistory
+from .postgres_chat_history import get_session_history, AsyncPostgresChatMessageHistory
 from app.prompts.base_prompts import BASE_AGRICULTURAL_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)

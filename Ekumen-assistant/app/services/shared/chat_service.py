@@ -11,12 +11,14 @@ from sqlalchemy.orm import selectinload
 from app.models.conversation import Conversation, Message, ConversationStatus
 from app.models.user import User
 from app.schemas.chat import ConversationCreate, ChatMessage
-from app.services.advanced_langchain_service import AdvancedLangChainService
-from app.services.langgraph_workflow_service import LangGraphWorkflowService
-from app.services.memory_service import MemoryService
-from app.services.multi_agent_service import MultiAgentService
-from app.services.performance_optimization_service import PerformanceOptimizationService, performance_monitor
-from app.services.lcel_chat_service import get_lcel_chat_service
+from app.services.infrastructure import AdvancedLangChainService
+from app.services.infrastructure import (
+    LangGraphWorkflowService,
+    PerformanceOptimizationService,
+    performance_monitor,
+    get_lcel_chat_service
+)
+from .memory_service import MemoryService
 import logging
 from datetime import datetime
 
@@ -61,7 +63,7 @@ class ChatService:
             logger.info("LangGraph workflow service initialized")
 
             # Initialize multi-agent service
-            self.multi_agent_service = MultiAgentService()
+            # MultiAgentService removed to avoid circular import
             logger.info("Multi-agent service initialized")
 
             logger.info("🚀 ALL ADVANCED AI SERVICES INITIALIZED SUCCESSFULLY!")

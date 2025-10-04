@@ -14,7 +14,7 @@ from langchain.tools import BaseTool, tool
 from langchain.callbacks.manager import CallbackManagerForToolRun
 from pydantic import BaseModel, Field, validator
 
-from app.services.unified_regulatory_service import UnifiedRegulatoryService
+from app.services.regulatory import UnifiedRegulatoryService
 from app.core.database import AsyncSessionLocal
 from sqlalchemy import text
 
