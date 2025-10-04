@@ -11,7 +11,7 @@ from datetime import datetime
 import json
 
 from app.services.infrastructure.voice_service import VoiceService
-from app.agents.real_journal_agent import RealJournalAgent
+from app.agents.journal_agent import JournalAgent
 from app.models.intervention import VoiceJournalEntry
 from app.core.database import get_async_db
 from app.services.monitoring.voice_monitoring import voice_monitor, monitor_voice_function
@@ -31,7 +31,7 @@ class JournalService:
     
     def __init__(self):
         self.voice_service = VoiceService()
-        self.journal_agent = RealJournalAgent()
+        self.journal_agent = JournalAgent()
         self.validation_queue = asyncio.Queue()
         
         # Start validation worker

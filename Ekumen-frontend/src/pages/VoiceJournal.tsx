@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { Calendar, MapPin, Clock, Mic, Save, Edit, Trash2, Plus, BarChart3, TrendingUp, Activity } from 'lucide-react'
+import { Calendar, MapPin, Clock, Mic, Edit, Trash2, Plus, TrendingUp, Activity } from 'lucide-react'
 import VoiceInterface from '../components/VoiceInterface'
-import StreamingVoiceAssistant from '../components/StreamingVoiceAssistant'
-import EnhancedVoiceInterface from '../components/EnhancedVoiceInterface'
+import { JournalVoiceInterface } from '../components/JournalVoiceInterface'
 
 interface JournalEntry {
   id: string
@@ -19,16 +18,7 @@ interface JournalEntry {
 const VoiceJournal: React.FC = () => {
   const [entries, setEntries] = useState<JournalEntry[]>([])
   const [showVoiceInterface, setShowVoiceInterface] = useState(false)
-  const [showStreamingVoice, setShowStreamingVoice] = useState(false)
-  const [showEnhancedVoice, setShowEnhancedVoice] = useState(false)
-  const [editingEntry, setEditingEntry] = useState<string | null>(null)
-  const [newEntry, setNewEntry] = useState<Partial<JournalEntry>>({
-    date: new Date(),
-    parcelle: '',
-    intervention: '',
-    description: '',
-    isVoiceRecorded: false
-  })
+  const [showJournalVoice, setShowJournalVoice] = useState(false)
 
   // Mock data for demonstration
   useEffect(() => {
@@ -74,28 +64,8 @@ const VoiceJournal: React.FC = () => {
     setShowVoiceInterface(false)
   }
 
-  const handleStreamingJournalEntry = (journalData: any) => {
-    // Handle structured journal data from streaming voice assistant
-    console.log('Received journal data:', journalData)
-    
-    // Create journal entry from structured data
-    const entry: JournalEntry = {
-      id: Date.now().toString(),
-      date: new Date(),
-      parcelle: journalData.data?.parcelle || 'Parcelle (à préciser)',
-      intervention: journalData.data?.intervention_type || 'Intervention (à préciser)',
-      description: journalData.data?.content || 'Description générée par IA',
-      duration: journalData.data?.duration_minutes,
-      weather: journalData.data?.weather_conditions,
-      notes: journalData.data?.notes,
-      isVoiceRecorded: true
-    }
 
-    setEntries(prev => [entry, ...prev])
-    setShowStreamingVoice(false)
-  }
-
-  const handleEnhancedJournalEntry = (entry: any) => {
+  const handleJournalEntry = (entry: any) => {
     console.log('Received enhanced journal entry:', entry)
     const journalEntry: JournalEntry = {
       id: entry.id,
@@ -107,33 +77,9 @@ const VoiceJournal: React.FC = () => {
       isVoiceRecorded: true
     }
     setEntries(prev => [journalEntry, ...prev])
-    setShowEnhancedVoice(false)
+    setShowJournalVoice(false)
   }
 
-  const saveEntry = () => {
-    if (newEntry.parcelle && newEntry.intervention && newEntry.description) {
-      const entry: JournalEntry = {
-        id: Date.now().toString(),
-        date: newEntry.date || new Date(),
-        parcelle: newEntry.parcelle,
-        intervention: newEntry.intervention,
-        description: newEntry.description,
-        duration: newEntry.duration,
-        weather: newEntry.weather,
-        notes: newEntry.notes,
-        isVoiceRecorded: newEntry.isVoiceRecorded || false
-      }
-
-      setEntries(prev => [entry, ...prev])
-      setNewEntry({
-        date: new Date(),
-        parcelle: '',
-        intervention: '',
-        description: '',
-        isVoiceRecorded: false
-      })
-    }
-  }
 
   const deleteEntry = (id: string) => {
     setEntries(prev => prev.filter(entry => entry.id !== id))
@@ -227,25 +173,18 @@ const VoiceJournal: React.FC = () => {
           <h2 className="text-lg font-semibold text-primary">Historique des Interventions</h2>
           <div className="flex items-center gap-2">
         <button
-          onClick={() => setShowEnhancedVoice(true)}
+          onClick={() => setShowJournalVoice(true)}
           className="btn-primary flex items-center gap-2"
         >
           <Mic className="h-4 w-4" />
-          Assistant Vocal (Nouveau)
-        </button>
-        <button
-          onClick={() => setShowStreamingVoice(true)}
-          className="btn-secondary flex items-center gap-2"
-        >
-          <Mic className="h-4 w-4" />
-          Assistant Vocal IA
+          Enregistrer Intervention Vocale
         </button>
         <button
           onClick={() => setShowVoiceInterface(true)}
           className="btn-secondary flex items-center gap-2"
         >
           <Plus className="h-4 w-4" />
-          Ajouter Manuel
+          Ajouter Manuellement
         </button>
           </div>
         </div>
@@ -347,7 +286,7 @@ const VoiceJournal: React.FC = () => {
                     <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-1">
                         <button
-                          onClick={() => setEditingEntry(entry.id)}
+                          onClick={() => console.log('Edit entry:', entry.id)}
                           className="text-gray-400 hover:text-gray-600 p-1"
                           title="Modifier"
                         >
@@ -403,14 +342,14 @@ const VoiceJournal: React.FC = () => {
         </div>
       )}
 
-      {/* Enhanced Voice Interface Modal */}
-      {showEnhancedVoice && (
+      {/* Journal Voice Interface Modal */}
+      {showJournalVoice && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Assistant Vocal (Nouveau)</h3>
+              <h3 className="text-lg font-semibold text-gray-900">Enregistrement d'Intervention Vocale</h3>
               <button
-                onClick={() => setShowEnhancedVoice(false)}
+                onClick={() => setShowJournalVoice(false)}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
               >
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -421,58 +360,23 @@ const VoiceJournal: React.FC = () => {
 
             <div className="mb-4">
               <p className="text-sm text-gray-600">
-                Nouvelle interface vocale avec validation asynchrone. Enregistrez votre intervention 
-                et recevez une validation en temps réel avec vérification EPHY et météo.
+                Enregistrez votre intervention agricole par la voix. Le système extrait automatiquement 
+                les informations structurées et valide la conformité avec les réglementations.
               </p>
               <p className="text-xs text-gray-500 mt-2">
                 Exemple: "J'ai appliqué Saracen Delta sur la parcelle Nord ce matin"
               </p>
             </div>
 
-            <EnhancedVoiceInterface
-              onJournalEntry={handleEnhancedJournalEntry}
-              mode="journal"
-              className="py-4"
-            />
+              <JournalVoiceInterface
+                onJournalEntry={handleJournalEntry}
+                mode="journal"
+                className="py-4"
+              />
           </div>
         </div>
       )}
 
-      {/* Streaming Voice Assistant Modal */}
-      {showStreamingVoice && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Assistant Vocal Intelligent</h3>
-              <button
-                onClick={() => setShowStreamingVoice(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="mb-4">
-              <p className="text-sm text-gray-600">
-                Décrivez votre intervention agricole en détail. L'IA va extraire automatiquement les informations structurées 
-                (parcelle, type d'intervention, produits utilisés, conditions météo, etc.) et valider la conformité.
-              </p>
-              <p className="text-xs text-gray-500 mt-2">
-                Exemple: "J'ai appliqué du fongicide sur la parcelle Nord de 12 hectares ce matin. 
-                Conditions ensoleillées, 18 degrés, vent faible. Utilisé 2 litres par hectare."
-              </p>
-            </div>
-
-            <StreamingVoiceAssistant
-              onJournalEntry={handleStreamingJournalEntry}
-              mode="journal"
-              className="py-4"
-            />
-          </div>
-        </div>
-      )}
     </div>
   )
 }

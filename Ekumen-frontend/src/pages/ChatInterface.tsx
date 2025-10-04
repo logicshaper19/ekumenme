@@ -625,6 +625,7 @@ const ChatInterface: React.FC = () => {
                       )}
                     </div>
 
+
                     {/* Sources for Assistant Messages */}
                     {message.sender === 'assistant' && message.sources && message.sources.length > 0 && (
                       <Sources sources={message.sources} />

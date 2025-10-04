@@ -76,6 +76,47 @@ class LCELChatService:
             logger.error(f"Failed to initialize LCEL components: {e}")
             raise
     
+    def create_query_reformulation_chain(self, db_session: AsyncSession):
+        """
+        Create a shared query reformulation chain that can be used by both RAG and basic chat
+        
+        Args:
+            db_session: Database session for history persistence
+            
+        Returns:
+            Chain that reformulates queries based on conversation history
+        """
+        # Create the contextualize prompt (same as in RAG chain)
+        contextualize_q_prompt = ChatPromptTemplate.from_messages([
+            ("system", """Étant donné l'historique de la conversation et la dernière question de l'utilisateur,
+reformule la question pour qu'elle soit compréhensible sans l'historique.
+
+Si la question fait référence à quelque chose mentionné précédemment (comme "cette parcelle", "ce traitement", etc.),
+inclus ce contexte dans la reformulation.
+
+NE réponds PAS à la question, reformule-la seulement pour qu'elle soit autonome.
+
+Exemples:
+- "Et pour le maïs?" → "Quelles sont les réglementations pour le maïs?"
+- "Quel traitement pour cette parcelle?" → "Quel traitement recommandes-tu pour la parcelle de blé de 10 hectares?"
+"""),
+            MessagesPlaceholder("chat_history"),
+            ("human", "{input}"),
+        ])
+        
+        # Create reformulation chain
+        reformulation_chain = contextualize_q_prompt | self.llm | StrOutputParser()
+        
+        # Wrap with automatic history management
+        reformulation_chain_with_history = RunnableWithMessageHistory(
+            reformulation_chain,
+            lambda session_id: get_session_history(session_id, db_session),
+            input_messages_key="input",
+            history_messages_key="chat_history",
+        )
+        
+        return reformulation_chain_with_history
+
     def create_basic_chat_chain(self, db_session: AsyncSession):
         """
         Create basic chat chain with automatic history management
@@ -121,25 +162,7 @@ Si l'utilisateur fait référence à quelque chose mentionné précédemment, ut
         Returns:
             RAG chain with automatic history
         """
-        # Step 1: Create history-aware retriever
-        # This reformulates queries based on chat history
-        contextualize_q_prompt = ChatPromptTemplate.from_messages([
-            ("system", """Étant donné l'historique de la conversation et la dernière question de l'utilisateur,
-reformule la question pour qu'elle soit compréhensible sans l'historique.
-
-Si la question fait référence à quelque chose mentionné précédemment (comme "cette parcelle", "ce traitement", etc.),
-inclus ce contexte dans la reformulation.
-
-NE réponds PAS à la question, reformule-la seulement pour qu'elle soit autonome.
-
-Exemples:
-- "Et pour le maïs?" → "Quelles sont les réglementations pour le maïs?"
-- "Quel traitement pour cette parcelle?" → "Quel traitement recommandes-tu pour la parcelle de blé de 10 hectares?"
-"""),
-            MessagesPlaceholder("chat_history"),
-            ("human", "{input}"),
-        ])
-        
+        # Step 1: Create history-aware retriever using shared reformulation chain
         # Build Chroma search kwargs with org/document filter
         # Note: For Chroma, we use 'k' for number of results
         # Filtering is NOT supported in as_retriever for the deprecated Chroma version
@@ -150,13 +173,16 @@ Exemples:
         # For now, we'll retrieve without filtering and filter post-retrieval
         # This is a temporary workaround until langchain-chroma is installed
 
+        # Use the shared reformulation chain for consistency
+        reformulation_chain = self.create_query_reformulation_chain(db_session)
+        
         history_aware_retriever = create_history_aware_retriever(
             llm=self.llm,
             retriever=self.vectorstore.as_retriever(
                 search_type="similarity",
                 search_kwargs=search_kwargs
             ),
-            prompt=contextualize_q_prompt
+            prompt=reformulation_chain
         )
         
         # Step 2: Create QA chain
@@ -354,6 +380,7 @@ Utilise l'historique de la conversation pour fournir des réponses cohérentes e
                 #
                 # IMPORTANT: Only listen to ONE event type to avoid duplicate tokens!
                 # We use on_chat_model_stream which is the most reliable for OpenAI models
+                reformulated_query = None
                 async for event in chain.astream_events(
                     {"input": message},
                     config={"configurable": {"session_id": conversation_id}},
@@ -363,23 +390,28 @@ Utilise l'historique de la conversation pour fournir des réponses cohérentes e
 
                     # 1) Stream raw LLM tokens ONLY from chat_model_stream
                     # DO NOT also listen to on_llm_stream or on_chain_stream to avoid duplicates!
-                    # FILTER: Only stream from the final answer generation (seq:step:3),
-                    # NOT the query reformulation (seq:step:2)
+                    # Handle both query reformulation (seq:step:2) and final answer generation (seq:step:3)
                     if kind == "on_chat_model_stream":
                         event_tags = event.get("tags", [])
-
-                        # Skip the question reformulation step (seq:step:2)
-                        # Only stream the final answer generation (seq:step:3)
-                        if "seq:step:2" in event_tags:
-                            continue
-
                         chunk = event.get("data", {}).get("chunk")
+                        
                         # chunk may be a BaseMessageChunk or str depending on backend
                         if chunk is not None:
                             content = getattr(chunk, "content", None) or (chunk if isinstance(chunk, str) else None)
                             if content:
-                                full_answer += content
-                                yield content
+                                # Handle query reformulation step (seq:step:2)
+                                if "seq:step:2" in event_tags:
+                                    if not reformulated_query:
+                                        reformulated_query = ""
+                                    reformulated_query += content
+                                    logger.info(f"🔄 Query reformulation: '{content}'")
+                                    # Don't yield reformulation content to user, just collect it
+                                    continue
+                                
+                                # Handle final answer generation (seq:step:3)
+                                elif "seq:step:3" in event_tags or not any("seq:step:" in tag for tag in event_tags):
+                                    full_answer += content
+                                    yield content
 
                     # 2) Capture the final answer and context from the retrieval chain
                     elif kind == "on_chain_end":
@@ -392,19 +424,59 @@ Utilise l'historique de la conversation pour fournir des réponses cohérentes e
                             if "context" in output:
                                 source_docs = output.get("context", [])
 
-                # Emit final event so callers can persist citations
-                yield {"final": {"answer": full_answer, "context": source_docs}}
+                # Log reformulation results
+                if reformulated_query:
+                    logger.info(f"✅ Query reformulated: '{message}' → '{reformulated_query}'")
+                else:
+                    logger.info(f"ℹ️ No reformulation needed for: '{message}'")
+                
+                # Emit final event so callers can persist citations and reformulated query
+                yield {"final": {"answer": full_answer, "context": source_docs, "reformulated_query": reformulated_query}}
             else:
+                # For basic chat, we still want to reformulate queries for better context
+                # but we don't need RAG retrieval
+                reformulated_query = None
+                full_answer = ""
+                
+                # Step 1: Reformulate the query using shared reformulation chain
+                reformulation_chain = self.create_query_reformulation_chain(db_session)
+                
+                try:
+                    # Get reformulated query
+                    reformulated_result = await reformulation_chain.ainvoke(
+                        {"input": message},
+                        config={"configurable": {"session_id": conversation_id}}
+                    )
+                    reformulated_query = reformulated_result if reformulated_result else message
+                    
+                    # Log reformulation results
+                    if reformulated_query and reformulated_query != message:
+                        logger.info(f"✅ Query reformulated: '{message}' → '{reformulated_query}'")
+                    else:
+                        logger.info(f"ℹ️ No reformulation needed for: '{message}'")
+                        
+                except Exception as e:
+                    logger.warning(f"Query reformulation failed, using original: {e}")
+                    reformulated_query = message
+                
+                # Step 2: Use the reformulated query for the actual chat response
                 chain = self.create_basic_chat_chain(db_session)
                 async for chunk in chain.astream(
-                    {"input": message},
+                    {"input": reformulated_query},  # Use reformulated query instead of original
                     config={"configurable": {"session_id": conversation_id}}
                 ):
                     # Normalize chunks to strings for WebSocket/SSE layer
                     if hasattr(chunk, "content"):
-                        yield chunk.content
+                        content = chunk.content
+                        full_answer += content
+                        yield content
                     else:
-                        yield str(chunk)
+                        content = str(chunk)
+                        full_answer += content
+                        yield content
+                
+                # Emit final event with reformulated query info
+                yield {"final": {"answer": full_answer, "context": [], "reformulated_query": reformulated_query}}
 
         except Exception as e:
             logger.error(f"Error streaming message: {e}")

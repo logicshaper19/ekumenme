@@ -118,6 +118,7 @@ async def websocket_chat(
                 await websocket.send_json({"type": "llm_start", "message_id": assistant_message_id})
 
                 # Use LCEL service with mode-aware tools
+                reformulated_query = None
                 async for event in chat_service.lcel_service.stream_message(
                     db_session=db,
                     conversation_id=conversation_id,
@@ -135,6 +136,8 @@ async def websocket_chat(
                         ctx = final_payload.get("context")
                         if isinstance(ctx, list):
                             source_docs = ctx
+                        # Capture reformulated query
+                        reformulated_query = final_payload.get("reformulated_query")
                         continue
 
                     # Token streaming (string chunks) - INCLUDE message_id!
@@ -170,7 +173,9 @@ async def websocket_chat(
                         "processing_method": "lcel_with_automatic_history",
                         "use_rag": True,
                         "knowledge_base_used": len(documents_retrieved) > 0,
-                        "documents_retrieved": documents_retrieved
+                        "documents_retrieved": documents_retrieved,
+                        "reformulated_query": reformulated_query,
+                        "original_query": message_content
                     }
                     await db.commit()
                     saved = assistant_message
@@ -187,7 +192,9 @@ async def websocket_chat(
                             "processing_method": "lcel_with_automatic_history",
                             "use_rag": True,
                             "knowledge_base_used": len(documents_retrieved) > 0,
-                            "documents_retrieved": documents_retrieved
+                            "documents_retrieved": documents_retrieved,
+                            "reformulated_query": reformulated_query,
+                            "original_query": message_content
                         }
                     )
                 message_id = str(saved.id)
@@ -198,7 +205,9 @@ async def websocket_chat(
                     "type": "done",
                     "message_id": message_id,
                     "citation_count": len(documents_retrieved),
-                    "sources": sources
+                    "sources": sources,
+                    "reformulated_query": reformulated_query,
+                    "original_query": message_content
                 })
 
     except WebSocketDisconnect:
