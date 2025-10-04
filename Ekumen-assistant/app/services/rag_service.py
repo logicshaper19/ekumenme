@@ -1,20 +1,24 @@
 """
 RAG Service with Knowledge Base Workflow Integration
 Integrates with the vetted, time-bound knowledge contribution system
+Enhanced with detailed source tracking and attribution
 """
 
 import logging
-from typing import Dict, Any, Optional, List, AsyncIterator
+from typing import Dict, Any, Optional, List, AsyncIterator, Tuple
 from datetime import datetime, timedelta
+import json
+import re
 
 from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func
+from sqlalchemy.dialects.postgresql import JSONB
 
 from app.core.config import settings
 from app.models.knowledge_base import KnowledgeBaseDocument, DocumentStatus
-from app.services.knowledge_base_workflow import KnowledgeBaseWorkflowService
+from app.services.knowledge_base_workflow_service import KnowledgeBaseWorkflowService
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +128,9 @@ class RAGService:
                     search_results, accessible_docs, db
                 )
                 
+                # Track document analytics - update query count and last accessed
+                await self._track_document_analytics(enhanced_docs, db, query)
+                
                 return enhanced_docs
                 
             except Exception as e:
@@ -181,14 +188,14 @@ class RAGService:
                         func.jsonb_array_length(
                             func.coalesce(
                                 KnowledgeBaseDocument.shared_with_organizations, 
-                                '[]'::jsonb
+                                func.cast('[]', JSONB)
                             )
                         ) == 0,  # Empty array means shared with all
                         # Shared with specific organizations including user's org
                         func.jsonb_array_length(
                             func.coalesce(
                                 KnowledgeBaseDocument.shared_with_organizations, 
-                                '[]'::jsonb
+                                func.cast('[]', JSONB)
                             )
                         ) > 0
                     )
@@ -275,9 +282,9 @@ class RAGService:
             
             # Create documents with metadata
             documents = []
-            for i, chunk in enumerate(chunks):
+            for i, chunk_data in enumerate(chunks):
                 doc = Document(
-                    page_content=chunk,
+                    page_content=chunk_data["content"],
                     metadata={
                         "document_id": str(document.id),
                         "chunk_index": i,
@@ -286,7 +293,11 @@ class RAGService:
                         "organization_id": str(document.organization_id),
                         "uploaded_by": str(document.uploaded_by),
                         "created_at": document.created_at.isoformat(),
-                        "version": document.version
+                        "version": document.version,
+                        "page_number": chunk_data.get("page_number"),
+                        "section": chunk_data.get("section"),
+                        "chunk_start": chunk_data.get("chunk_start", 0),
+                        "chunk_end": chunk_data.get("chunk_end", 0)
                     }
                 )
                 documents.append(doc)
@@ -305,12 +316,19 @@ class RAGService:
             logger.error(f"Error adding document to vector store: {e}")
             return False
     
-    def _split_text_into_chunks(self, text: str, chunk_size: int = 1000, overlap: int = 200) -> List[str]:
+    def _split_text_into_chunks(self, text: str, chunk_size: int = 1000, overlap: int = 200) -> List[Dict[str, Any]]:
         """
-        Split text into overlapping chunks for better retrieval
+        Split text into overlapping chunks with page/section mapping for better retrieval
+        Returns list of dictionaries with chunk content and metadata
         """
         if len(text) <= chunk_size:
-            return [text]
+            return [{
+                "content": text,
+                "page_number": self._extract_page_from_text(text),
+                "section": self._extract_section_from_text(text),
+                "chunk_start": 0,
+                "chunk_end": len(text)
+            }]
         
         chunks = []
         start = 0
@@ -326,9 +344,15 @@ class RAGService:
                         end = i + 1
                         break
             
-            chunk = text[start:end].strip()
-            if chunk:
-                chunks.append(chunk)
+            chunk_text = text[start:end].strip()
+            if chunk_text:
+                chunks.append({
+                    "content": chunk_text,
+                    "page_number": self._extract_page_from_text(chunk_text),
+                    "section": self._extract_section_from_text(chunk_text),
+                    "chunk_start": start,
+                    "chunk_end": end
+                })
             
             start = end - overlap
             
@@ -413,3 +437,507 @@ class RAGService:
         except Exception as e:
             logger.error(f"Error getting document statistics: {e}")
             return {}
+    
+    async def _track_document_analytics(
+        self,
+        documents: List[Document],
+        db: AsyncSession,
+        query: str = None
+    ) -> None:
+        """
+        Track document analytics when documents are retrieved
+        Updates query_count, last_accessed_at, and creates analytics records with chunk-level tracking
+        """
+        try:
+            from datetime import datetime
+            from sqlalchemy import update
+            from app.services.analytics_service import AnalyticsService
+            from app.models.analytics import AnalyticsEvent
+            
+            analytics_service = AnalyticsService()
+            
+            for doc in documents:
+                document_id = doc.metadata.get("document_id")
+                chunk_index = doc.metadata.get("chunk_index", 0)
+                if not document_id:
+                    continue
+                
+                # Update query count and last accessed timestamp
+                await db.execute(
+                    update(KnowledgeBaseDocument)
+                    .where(KnowledgeBaseDocument.id == document_id)
+                    .values(
+                        query_count=KnowledgeBaseDocument.query_count + 1,
+                        last_accessed_at=datetime.utcnow()
+                    )
+                )
+                
+                # Create analytics record for this retrieval
+                await analytics_service.create_document_analytics_record(
+                    document_id=document_id,
+                    document_name=doc.metadata.get("filename", "Unknown Document"),
+                    retrievals=1,  # This document was retrieved once
+                    citations=0,   # Will be updated if document is cited
+                    interactions=0,  # Will be updated if user interacts with document
+                    db=db
+                )
+                
+                # Create chunk-level analytics event
+                chunk_event = AnalyticsEvent(
+                    event_type="document_retrieved",
+                    event_data={
+                        "document_id": document_id,
+                        "chunk_index": chunk_index,
+                        "chunk_content_preview": doc.page_content[:200] + "..." if len(doc.page_content) > 200 else doc.page_content,
+                        "query": query,
+                        "relevance_score": doc.metadata.get("score", 0.0),
+                        "timestamp": datetime.utcnow().isoformat()
+                    }
+                )
+                db.add(chunk_event)
+            
+            await db.commit()
+            logger.info(f"Updated analytics for {len(documents)} documents with chunk-level tracking")
+            
+        except Exception as e:
+            logger.error(f"Error tracking document analytics: {e}")
+            await db.rollback()
+
+    async def track_document_citation(
+        self,
+        document_id: str,
+        query: str,
+        citation_context: str,
+        confidence_score: float = None,
+        chunk_index: int = None,
+        db: AsyncSession = None
+    ) -> None:
+        """
+        Track when a document is cited in a response with enhanced confidence scoring
+        """
+        try:
+            from app.services.analytics_service import AnalyticsService
+            
+            analytics_service = AnalyticsService()
+            
+            # Get document name for analytics
+            result = await db.execute(
+                select(KnowledgeBaseDocument).where(KnowledgeBaseDocument.id == document_id)
+            )
+            document = result.scalar_one_or_none()
+            document_name = document.filename if document else "Unknown Document"
+            
+            # Calculate confidence score if not provided
+            if confidence_score is None:
+                confidence_score = self._calculate_citation_confidence(query, citation_context)
+            
+            # Update analytics record with citation
+            await analytics_service.create_document_analytics_record(
+                document_id=document_id,
+                document_name=document_name,
+                retrievals=0,  # No new retrieval
+                citations=1,   # This document was cited once
+                interactions=0,  # No user interaction yet
+                satisfaction_score=confidence_score,  # Use confidence as satisfaction proxy
+                db=db
+            )
+            
+            # Create analytics event for citation tracking
+            from app.models.analytics import AnalyticsEvent
+            citation_event = AnalyticsEvent(
+                event_type="document_cited",
+                event_data={
+                    "document_id": document_id,
+                    "query": query,
+                    "citation_context": citation_context,
+                    "confidence_score": confidence_score,
+                    "chunk_index": chunk_index,
+                    "citation_type": "direct" if confidence_score > 0.7 else "indirect",
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            )
+            db.add(citation_event)
+            
+            await db.commit()
+            logger.info(f"Tracked citation for document {document_id} with confidence {confidence_score}")
+            
+        except Exception as e:
+            logger.error(f"Error tracking document citation: {e}")
+            await db.rollback()
+
+    def _calculate_citation_confidence(self, query: str, citation_context: str) -> float:
+        """
+        Calculate confidence score for a citation based on query-citation alignment
+        """
+        try:
+            # Convert to lowercase for comparison
+            query_words = set(query.lower().split())
+            context_words = set(citation_context.lower().split())
+            
+            # Calculate word overlap
+            overlap = len(query_words.intersection(context_words))
+            total_query_words = len(query_words)
+            
+            if total_query_words == 0:
+                return 0.0
+            
+            # Base confidence from word overlap
+            word_overlap_score = overlap / total_query_words
+            
+            # Boost for exact phrase matches
+            phrase_boost = 0.0
+            if len(query) > 10:  # Only for longer queries
+                if query.lower() in citation_context.lower():
+                    phrase_boost = 0.3
+            
+            # Boost for high-frequency query words
+            frequency_boost = 0.0
+            common_words = {"the", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by"}
+            meaningful_query_words = query_words - common_words
+            if meaningful_query_words:
+                meaningful_overlap = len(meaningful_query_words.intersection(context_words))
+                frequency_boost = (meaningful_overlap / len(meaningful_query_words)) * 0.2
+            
+            # Combine scores
+            final_score = word_overlap_score + phrase_boost + frequency_boost
+            
+            # Normalize to 0-1 range
+            return min(max(final_score, 0.0), 1.0)
+            
+        except Exception as e:
+            logger.error(f"Error calculating citation confidence: {e}")
+            return 0.5  # Default moderate confidence
+
+    async def get_detailed_source_attribution(
+        self,
+        query: str,
+        documents: List[Document],
+        db: AsyncSession
+    ) -> Dict[str, Any]:
+        """
+        Enhanced source attribution with detailed text extraction and mapping
+        Returns which exact text/pages/sections were used to answer the query
+        """
+        try:
+            attribution_data = {
+                "query": query,
+                "timestamp": datetime.utcnow().isoformat(),
+                "sources": [],
+                "total_sources": len(documents),
+                "confidence_scores": [],
+                "text_extracts": []
+            }
+            
+            for i, doc in enumerate(documents):
+                source_info = await self._extract_source_details(doc, db)
+                if source_info:
+                    attribution_data["sources"].append(source_info)
+                    
+                    # Calculate confidence score based on relevance
+                    confidence = self._calculate_confidence_score(doc, query)
+                    attribution_data["confidence_scores"].append(confidence)
+                    
+                    # Extract relevant text snippets
+                    text_extract = self._extract_relevant_text(doc, query)
+                    attribution_data["text_extracts"].append(text_extract)
+            
+            # Calculate overall confidence
+            if attribution_data["confidence_scores"]:
+                attribution_data["overall_confidence"] = sum(attribution_data["confidence_scores"]) / len(attribution_data["confidence_scores"])
+            else:
+                attribution_data["overall_confidence"] = 0.0
+            
+            # Track citations for each document used with confidence scoring
+            for doc in documents:
+                document_id = doc.metadata.get("document_id")
+                chunk_index = doc.metadata.get("chunk_index", 0)
+                if document_id:
+                    # Calculate confidence based on document relevance
+                    confidence = self._calculate_confidence_score(doc, query)
+                    
+                    await self.track_document_citation(
+                        document_id=document_id,
+                        query=query,
+                        citation_context=doc.page_content[:200] + "..." if len(doc.page_content) > 200 else doc.page_content,
+                        confidence_score=confidence,
+                        chunk_index=chunk_index,
+                        db=db
+                    )
+            
+            return attribution_data
+            
+        except Exception as e:
+            logger.error(f"Error generating source attribution: {e}")
+            return {"error": str(e)}
+
+    async def _extract_source_details(
+        self,
+        document: Document,
+        db: AsyncSession
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Extract detailed information about a source document
+        """
+        try:
+            doc_id = document.metadata.get("document_id")
+            if not doc_id:
+                return None
+            
+            # Get document from database
+            result = await db.execute(
+                select(KnowledgeBaseDocument).where(KnowledgeBaseDocument.id == doc_id)
+            )
+            kb_doc = result.scalar_one_or_none()
+            
+            if not kb_doc:
+                return None
+            
+            # Extract page/section information from metadata
+            page_info = self._extract_page_section_info(document)
+            
+            return {
+                "document_id": str(kb_doc.id),
+                "filename": kb_doc.filename,
+                "document_type": kb_doc.document_type.value if kb_doc.document_type else "unknown",
+                "visibility": kb_doc.visibility,
+                "created_at": kb_doc.created_at.isoformat() if kb_doc.created_at else None,
+                "page_info": page_info,
+                "chunk_index": document.metadata.get("chunk_index", 0),
+                "chunk_count": document.metadata.get("chunk_count", 1),
+                "relevance_score": document.metadata.get("score", 0.0),
+                "text_preview": document.page_content[:200] + "..." if len(document.page_content) > 200 else document.page_content
+            }
+            
+        except Exception as e:
+            logger.error(f"Error extracting source details: {e}")
+            return None
+
+    def _extract_page_section_info(self, document: Document) -> Dict[str, Any]:
+        """
+        Extract page and section information from document metadata with enhanced mapping
+        """
+        metadata = document.metadata
+        
+        # Try to extract page number from various metadata fields
+        page_number = (
+            metadata.get("page_number") or 
+            metadata.get("page") or 
+            self._extract_page_from_text(document.page_content)
+        )
+        
+        # Try to extract section information
+        section = (
+            metadata.get("section") or 
+            metadata.get("heading") or 
+            self._extract_section_from_text(document.page_content)
+        )
+        
+        # Calculate position within document
+        chunk_start = metadata.get("chunk_start", 0)
+        chunk_end = metadata.get("chunk_end", 0)
+        chunk_size = chunk_end - chunk_start if chunk_end > chunk_start else len(document.page_content)
+        
+        return {
+            "page_number": page_number,
+            "section": section,
+            "chunk_position": metadata.get("chunk_index", 0),
+            "total_chunks": metadata.get("chunk_count", 1),
+            "chunk_start_position": chunk_start,
+            "chunk_end_position": chunk_end,
+            "chunk_size": chunk_size,
+            "relative_position": f"Chunk {metadata.get('chunk_index', 0) + 1} of {metadata.get('chunk_count', 1)}"
+        }
+
+    def _extract_page_from_text(self, text: str) -> Optional[int]:
+        """
+        Try to extract page number from text content
+        """
+        # Look for common page indicators
+        page_patterns = [
+            r'page\s+(\d+)',
+            r'p\.\s*(\d+)',
+            r'^(\d+)\s*$',  # Line with just a number
+            r'^\s*(\d+)\s*$'  # Line with just a number and whitespace
+        ]
+        
+        lines = text.split('\n')
+        for line in lines[:5]:  # Check first 5 lines
+            for pattern in page_patterns:
+                match = re.search(pattern, line, re.IGNORECASE)
+                if match:
+                    try:
+                        return int(match.group(1))
+                    except ValueError:
+                        continue
+        
+        return None
+
+    def _extract_section_from_text(self, text: str) -> Optional[str]:
+        """
+        Try to extract section/heading information from text content
+        """
+        lines = text.split('\n')
+        
+        # Look for common heading patterns
+        for line in lines[:10]:  # Check first 10 lines
+            line = line.strip()
+            if not line:
+                continue
+                
+            # Check for numbered sections
+            if re.match(r'^\d+\.?\s+[A-Z]', line):
+                return line[:50] + "..." if len(line) > 50 else line
+            
+            # Check for all caps headings
+            if line.isupper() and len(line) > 3 and len(line) < 100:
+                return line
+            
+            # Check for bold/emphasized text (common in PDFs)
+            if re.match(r'^[A-Z][A-Za-z\s]{5,50}$', line):
+                return line
+        
+        return None
+
+    def _calculate_confidence_score(self, document: Document, query: str) -> float:
+        """
+        Calculate confidence score for how relevant this document is to the query
+        """
+        try:
+            # Base score from vector similarity
+            base_score = document.metadata.get("score", 0.0)
+            
+            # Boost score based on text length (longer chunks often more informative)
+            length_boost = min(len(document.page_content) / 1000, 0.2)
+            
+            # Boost score based on keyword matching
+            query_words = set(query.lower().split())
+            text_words = set(document.page_content.lower().split())
+            keyword_overlap = len(query_words.intersection(text_words)) / len(query_words)
+            keyword_boost = min(keyword_overlap * 0.3, 0.3)
+            
+            # Combine scores
+            final_score = base_score + length_boost + keyword_boost
+            
+            # Normalize to 0-1 range
+            return min(max(final_score, 0.0), 1.0)
+            
+        except Exception as e:
+            logger.error(f"Error calculating confidence score: {e}")
+            return 0.0
+
+    def _extract_relevant_text(self, document: Document, query: str) -> Dict[str, Any]:
+        """
+        Extract the most relevant text snippets from the document
+        """
+        try:
+            text = document.page_content
+            query_words = set(query.lower().split())
+            
+            # Split text into sentences
+            sentences = re.split(r'[.!?]+', text)
+            
+            # Score sentences based on query word overlap
+            scored_sentences = []
+            for sentence in sentences:
+                sentence_words = set(sentence.lower().split())
+                overlap = len(query_words.intersection(sentence_words))
+                if overlap > 0:
+                    scored_sentences.append((sentence.strip(), overlap))
+            
+            # Sort by relevance and take top 3
+            scored_sentences.sort(key=lambda x: x[1], reverse=True)
+            top_sentences = [s[0] for s in scored_sentences[:3]]
+            
+            return {
+                "relevant_snippets": top_sentences,
+                "total_sentences": len(sentences),
+                "relevant_sentences": len(scored_sentences),
+                "full_text_length": len(text)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error extracting relevant text: {e}")
+            return {"error": str(e)}
+
+    async def get_chunk_analytics(
+        self,
+        document_id: str,
+        db: AsyncSession,
+        period_days: int = 30
+    ) -> Dict[str, Any]:
+        """
+        Get chunk-level analytics for a specific document
+        Shows which chunks are most frequently accessed and their performance
+        """
+        try:
+            from datetime import datetime, timedelta
+            from sqlalchemy import select, func, and_
+            from app.models.analytics import AnalyticsEvent
+            
+            # Calculate period
+            end_date = datetime.utcnow()
+            start_date = end_date - timedelta(days=period_days)
+            
+            # Get chunk-level events for this document
+            result = await db.execute(
+                select(AnalyticsEvent)
+                .where(
+                    and_(
+                        AnalyticsEvent.event_type == "document_retrieved",
+                        AnalyticsEvent.event_data['document_id'].astext == document_id,
+                        AnalyticsEvent.created_at >= start_date,
+                        AnalyticsEvent.created_at <= end_date
+                    )
+                )
+                .order_by(AnalyticsEvent.created_at.desc())
+            )
+            chunk_events = result.scalars().all()
+            
+            # Aggregate chunk statistics
+            chunk_stats = {}
+            total_retrievals = 0
+            
+            for event in chunk_events:
+                event_data = event.event_data
+                chunk_index = event_data.get("chunk_index", 0)
+                
+                if chunk_index not in chunk_stats:
+                    chunk_stats[chunk_index] = {
+                        "chunk_index": chunk_index,
+                        "retrieval_count": 0,
+                        "avg_relevance_score": 0.0,
+                        "relevance_scores": [],
+                        "queries": [],
+                        "last_accessed": None,
+                        "content_preview": event_data.get("chunk_content_preview", "")
+                    }
+                
+                chunk_stats[chunk_index]["retrieval_count"] += 1
+                chunk_stats[chunk_index]["relevance_scores"].append(event_data.get("relevance_score", 0.0))
+                chunk_stats[chunk_index]["queries"].append(event_data.get("query", ""))
+                chunk_stats[chunk_index]["last_accessed"] = event.created_at.isoformat()
+                total_retrievals += 1
+            
+            # Calculate average relevance scores
+            for chunk_index, stats in chunk_stats.items():
+                if stats["relevance_scores"]:
+                    stats["avg_relevance_score"] = sum(stats["relevance_scores"]) / len(stats["relevance_scores"])
+                # Remove the raw scores array to keep response clean
+                del stats["relevance_scores"]
+            
+            # Sort chunks by retrieval count
+            sorted_chunks = sorted(chunk_stats.values(), key=lambda x: x["retrieval_count"], reverse=True)
+            
+            return {
+                "document_id": document_id,
+                "period_days": period_days,
+                "total_retrievals": total_retrievals,
+                "total_chunks_accessed": len(chunk_stats),
+                "chunk_statistics": sorted_chunks,
+                "most_accessed_chunk": sorted_chunks[0] if sorted_chunks else None,
+                "least_accessed_chunk": sorted_chunks[-1] if sorted_chunks else None
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting chunk analytics: {e}")
+            return {"error": str(e)}

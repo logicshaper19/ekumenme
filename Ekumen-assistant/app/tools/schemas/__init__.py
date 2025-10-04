@@ -137,6 +137,12 @@ from app.tools.schemas.nutrient_schemas import (
     ConfidenceLevel as NutrientConfidenceLevel
 )
 
+from app.tools.schemas.supplier_schemas import (
+    SupplierSearchInput,
+    SupplierSearchOutput,
+    SupplierInfo
+)
+
 __all__ = [
     # Weather schemas
     "WeatherInput",
@@ -247,5 +253,9 @@ __all__ = [
     "DeficiencyLevel",
     "NutrientType",
     "NutrientConfidenceLevel",
+    # Supplier schemas
+    "SupplierSearchInput",
+    "SupplierSearchOutput",
+    "SupplierInfo",
 ]
 

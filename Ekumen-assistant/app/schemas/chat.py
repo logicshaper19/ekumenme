@@ -11,7 +11,7 @@ from app.models.conversation import AgentType
 
 class ConversationCreate(BaseModel):
     """Schema for creating a new conversation"""
-    agent_type: AgentType
+    agent_type: Optional[AgentType] = None
     farm_siret: Optional[str] = Field(None, max_length=14)
     title: Optional[str] = Field(None, max_length=255)
     

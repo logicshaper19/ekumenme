@@ -40,11 +40,13 @@ from .crop_health_agent import (
     generate_treatment_plan_tool
 )
 from .regulatory_agent import (
-    database_integrated_amm_tool,
-    LookupAMMTool,  # Legacy tool (keep for backward compatibility)
+    lookup_amm_tool,
     check_regulatory_compliance_tool,
     get_safety_guidelines_tool,
     check_environmental_regulations_tool
+)
+from .supplier_agent import (
+    supplier_search_tool
 )
 from .sustainability_agent import (
     calculate_carbon_footprint_tool,
@@ -80,11 +82,13 @@ __all__ = [
     "generate_treatment_plan_tool",
 
     # Regulatory Agent Tools (Production-Ready with Real EPHY Database)
-    "database_integrated_amm_tool",  # Primary tool with real EPHY data
-    "LookupAMMTool",  # Legacy tool (keep for backward compatibility)
+    "lookup_amm_tool",  # Primary AMM lookup tool with real EPHY data
     "check_regulatory_compliance_tool",
     "get_safety_guidelines_tool",
     "check_environmental_regulations_tool",
+
+    # Supplier Agent Tools (Production-Ready with Tavily Integration)
+    "supplier_search_tool",  # Find agricultural suppliers with structured output
 
     # Sustainability Agent Tools (Production-Ready with Uncertainty Quantification & Economic ROI)
     "calculate_carbon_footprint_tool",

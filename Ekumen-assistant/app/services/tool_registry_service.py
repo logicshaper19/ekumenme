@@ -36,7 +36,7 @@ from app.tools import (
     generate_treatment_plan_tool,
 
     # Regulatory tools
-    database_integrated_amm_tool,
+    lookup_amm_tool,
     check_regulatory_compliance_tool,
     get_safety_guidelines_tool,
     check_environmental_regulations_tool,
@@ -97,7 +97,7 @@ class ToolRegistryService:
         self._register_tool("generate_treatment_plan", generate_treatment_plan_tool)
 
         # Regulatory tools
-        self._register_tool("lookup_amm", database_integrated_amm_tool)
+        self._register_tool("lookup_amm", lookup_amm_tool)
         self._register_tool("check_regulatory_compliance", check_regulatory_compliance_tool)
         self._register_tool("get_safety_guidelines", get_safety_guidelines_tool)
         self._register_tool("check_environmental_regulations", check_environmental_regulations_tool)

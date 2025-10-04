@@ -92,6 +92,7 @@ class Organization(Base):
     # Relationships
     memberships = relationship("OrganizationMembership", back_populates="organization", cascade="all, delete-orphan", lazy="select")
     farm_access = relationship("OrganizationFarmAccess", back_populates="organization", cascade="all, delete-orphan", lazy="select")
+    knowledge_documents = relationship("KnowledgeBaseDocument", back_populates="organization", cascade="all, delete-orphan", lazy="select")
     
     def __repr__(self):
         return f"<Organization(id={self.id}, name={self.name}, type={self.organization_type})>"

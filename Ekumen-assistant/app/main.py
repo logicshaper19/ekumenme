@@ -27,7 +27,9 @@ except ImportError:
 
 from app.core.config import settings
 from app.core.database import init_db, close_db
-from app.api.v1 import auth, chat, journal, products, chat_optimized, feedback, admin, knowledge_base, knowledge_base_workflow
+from app.api.v1 import auth, journal, products, feedback, admin
+from app.api.v1.chat import router as chat_router
+from app.api.v1.knowledge_base import router as knowledge_base_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -74,14 +76,12 @@ async def add_process_time_header(request: Request, call_next):
 
 # Include API routers
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["authentication"])
-app.include_router(chat.router, prefix="/api/v1/chat", tags=["chat"])
-app.include_router(chat_optimized.router, prefix="/api/v1/chat", tags=["chat-optimized"])
+app.include_router(chat_router, prefix="/api/v1")
 app.include_router(journal.router, prefix="/api/v1/journal", tags=["journal"])
 app.include_router(products.router, prefix="/api/v1/products", tags=["products"])
 app.include_router(feedback.router, prefix="/api/v1/feedback", tags=["feedback"])
 app.include_router(admin.router, prefix="/api/v1", tags=["super-admin"])
-app.include_router(knowledge_base.router, prefix="/api/v1", tags=["knowledge-base"])
-app.include_router(knowledge_base_workflow.router, prefix="/api/v1/knowledge-base", tags=["knowledge-base-workflow"])
+app.include_router(knowledge_base_router, prefix="/api/v1")
 
 # Health check endpoint
 @app.get("/health")
