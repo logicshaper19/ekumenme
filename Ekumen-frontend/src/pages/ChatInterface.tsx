@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Send, Bot, User, Loader2, Paperclip, X, FileText, Globe, Package } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import { useWebSocket } from '../services/websocket'
 import { useAuth } from '../hooks/useAuth'
 import VoiceInterface from '../components/VoiceInterface'
@@ -45,22 +46,17 @@ interface Message {
   }
 }
 
-interface AgentInfo {
-  type: string
-  name: string
-  icon: string
-  description: string
-}
 
 const ChatInterface: React.FC = () => {
   const { isAuthenticated } = useAuth()
+  const [searchParams] = useSearchParams()
   const [messages, setMessages] = useState<Message[]>([])
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [currentAgent, setCurrentAgent] = useState<AgentInfo | null>(null)
   const [isStreaming, setIsStreaming] = useState(false)
   const [showVoiceInterface, setShowVoiceInterface] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
+  const [isLoadingConversation, setIsLoadingConversation] = useState(false)
   const [isCreatingConversation, setIsCreatingConversation] = useState(false)
   const [chatMode, setChatMode] = useState<ChatMode>(null)
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
@@ -69,17 +65,6 @@ const ChatInterface: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const webSocket = useWebSocket()
 
-  const agents: Record<string, AgentInfo> = {
-    farm_data: { type: 'farm_data', name: 'Données d\'Exploitation', icon: '🌾', description: 'Analyse de parcelles et interventions' },
-    weather: { type: 'weather', name: 'Météorologie', icon: '🌤️', description: 'Prévisions et fenêtres d\'intervention' },
-    crop_health: { type: 'crop_health', name: 'Santé des Cultures', icon: '🌱', description: 'Diagnostic et protection' },
-    planning: { type: 'planning', name: 'Planification', icon: '📋', description: 'Organisation des activités' },
-    regulatory: { type: 'regulatory', name: 'Conformité', icon: '⚖️', description: 'Réglementation et AMM' },
-    sustainability: { type: 'sustainability', name: 'Durabilité', icon: '🌍', description: 'Impact environnemental' },
-    internet: { type: 'internet', name: 'Internet', icon: '🌐', description: 'Recherche web en temps réel' },
-    supplier: { type: 'supplier', name: 'Fournisseurs', icon: '🎁', description: 'Trouver des fournisseurs agricoles' },
-    market_prices: { type: 'market_prices', name: 'Prix du Marché', icon: '💰', description: 'Prix des matières premières' }
-  }
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -88,6 +73,77 @@ const ChatInterface: React.FC = () => {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // Load conversation from URL parameter
+  useEffect(() => {
+    const conversationParam = searchParams.get('conversation')
+    if (conversationParam) {
+      loadConversation(conversationParam)
+    }
+  }, [searchParams])
+
+  // Function to load an existing conversation
+  const loadConversation = async (conversationId: string) => {
+    try {
+      setIsLoadingConversation(true)
+      const token = localStorage.getItem('auth_token')
+
+      if (!token) {
+        console.error('No auth token found')
+        return
+      }
+
+      // Get conversation details
+      const conversationResponse = await fetch(`/api/v1/chat/conversations/${conversationId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (!conversationResponse.ok) {
+        throw new Error(`Failed to load conversation: ${conversationResponse.statusText}`)
+      }
+
+      const conversation = await conversationResponse.json()
+      
+      // Set the conversation ID
+      setConversationId(conversationId)
+
+      // Load conversation messages
+      const messagesResponse = await fetch(`/api/v1/chat/conversations/${conversationId}/messages`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (messagesResponse.ok) {
+        const messagesData = await messagesResponse.json()
+        // Convert backend messages to frontend format
+        const formattedMessages: Message[] = messagesData.map((msg: any) => ({
+          id: msg.id,
+          content: msg.content,
+          sender: msg.sender === 'user' ? 'user' : 'agent',
+          timestamp: new Date(msg.created_at),
+          agentType: msg.agent_type,
+          sources: msg.sources || [],
+          metadata: msg.metadata || {}
+        }))
+        setMessages(formattedMessages)
+      }
+
+    } catch (error) {
+      console.error('Error loading conversation:', error)
+      // If conversation doesn't exist, create a new one
+      const newConversationId = await createConversation()
+      if (newConversationId) {
+        setConversationId(newConversationId)
+      }
+    } finally {
+      setIsLoadingConversation(false)
+    }
+  }
 
   // Function to create a new conversation
   const createConversation = async (): Promise<string | null> => {
@@ -107,7 +163,6 @@ const ChatInterface: React.FC = () => {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          agent_type: 'farm_data',
           title: 'Nouvelle conversation'
         })
       })
@@ -185,8 +240,6 @@ const ChatInterface: React.FC = () => {
         content: data.message.content,
         sender: 'assistant',
         timestamp: new Date(data.message.timestamp),
-        agent: data.agent,
-        agentName: agents[data.agent]?.name,
         queryText: lastUserQueryRef.current
       }
 
@@ -339,14 +392,6 @@ const ChatInterface: React.FC = () => {
       ))
     }
 
-    const handleAgentSelected = (data: any) => {
-      setCurrentAgent({
-        type: data.agent_type,
-        name: data.agent_name,
-        icon: agents[data.agent_type]?.icon || '🤖',
-        description: agents[data.agent_type]?.description || ''
-      })
-    }
 
     const handleError = (data: any) => {
       console.error('WebSocket error:', data)
@@ -370,7 +415,6 @@ const ChatInterface: React.FC = () => {
     webSocket.onWorkflowStart(handleWorkflowStart)
     webSocket.onWorkflowInit(handleWorkflowInit)
     webSocket.onWorkflowStep(handleWorkflowStep)
-    webSocket.onAgentSelected(handleAgentSelected)
     webSocket.onError(handleError)
 
     return () => {
@@ -382,48 +426,10 @@ const ChatInterface: React.FC = () => {
       webSocket.off('chat:workflow_start', handleWorkflowStart)
       webSocket.off('chat:workflow_init', handleWorkflowInit)
       webSocket.off('chat:workflow_step', handleWorkflowStep)
-      webSocket.off('chat:agent_selected', handleAgentSelected)
       webSocket.off('error', handleError)
     }
   }, [isAuthenticated]) // Re-run only when authentication status changes
 
-  // Smart agent selection based on message content
-  const selectAgentForMessage = (message: string): AgentInfo => {
-    const messageLower = message.toLowerCase()
-
-    // Weather keywords
-    if (messageLower.includes('météo') || messageLower.includes('pluie') || messageLower.includes('vent') ||
-        messageLower.includes('température') || messageLower.includes('prévision')) {
-      return agents.weather
-    }
-
-    // Crop health keywords
-    if (messageLower.includes('maladie') || messageLower.includes('ravageur') || messageLower.includes('tache') ||
-        messageLower.includes('symptôme') || messageLower.includes('diagnostic') || messageLower.includes('traitement')) {
-      return agents.crop_health
-    }
-
-    // Regulatory keywords
-    if (messageLower.includes('amm') || messageLower.includes('réglementation') || messageLower.includes('conformité') ||
-        messageLower.includes('autorisation') || messageLower.includes('znt')) {
-      return agents.regulatory
-    }
-
-    // Planning keywords
-    if (messageLower.includes('planification') || messageLower.includes('calendrier') || messageLower.includes('programme') ||
-        messageLower.includes('organisation') || messageLower.includes('planning')) {
-      return agents.planning
-    }
-
-    // Sustainability keywords
-    if (messageLower.includes('durabilité') || messageLower.includes('environnement') || messageLower.includes('carbone') ||
-        messageLower.includes('biodiversité') || messageLower.includes('bio')) {
-      return agents.sustainability
-    }
-
-    // Farm data keywords (default)
-    return agents.farm_data
-  }
 
   // File handling functions
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -470,9 +476,6 @@ const ChatInterface: React.FC = () => {
     // Store the query for feedback tracking
     lastUserQueryRef.current = queryText
 
-    // Select appropriate agent
-    const selectedAgent = selectAgentForMessage(inputValue)
-
     setMessages(prev => [...prev, userMessage])
     setInputValue('')
     setAttachedFiles([])  // Clear attachments after sending
@@ -480,8 +483,10 @@ const ChatInterface: React.FC = () => {
     setIsStreaming(true)
 
     try {
-      // Send message via WebSocket with thread ID
-      await webSocket.sendMessage(userMessage.content, selectedAgent.type, messageId, threadId)
+      // Send message via WebSocket with thread ID and mode
+      // No agent_type needed - LangChain handles routing intelligently
+      console.log('🚀 Sending message with chatMode:', chatMode)
+      await webSocket.sendMessage(userMessage.content, null, messageId, threadId, chatMode)
     } catch (error) {
       console.error('Error sending message:', error)
 
@@ -547,45 +552,6 @@ const ChatInterface: React.FC = () => {
         transition: 'var(--transition-theme)'
       }}
     >
-      {/* Header */}
-      <div
-        className="px-8 py-4 border-b"
-        style={{
-          backgroundColor: 'var(--bg-card)',
-          borderColor: 'var(--border-subtle)'
-        }}
-      >
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div>
-            <h1
-              className="text-xl font-semibold"
-              style={{ color: 'var(--text-primary)' }}
-            >
-              Ekumen Assistant
-            </h1>
-            <p
-              className="text-sm"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              {currentAgent ? (
-                <span className="flex items-center gap-2">
-                  <span>{currentAgent.icon}</span>
-                  <span>{currentAgent.name} • {currentAgent.description}</span>
-                </span>
-              ) : (
-                'Posez votre question, je sélectionnerai l\'expert approprié'
-              )}
-            </p>
-          </div>
-          {isStreaming && (
-            <div className="flex items-center gap-2" style={{ color: 'var(--brand-600)' }}>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm">En cours...</span>
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto px-8 py-6">
         <div className="max-w-4xl mx-auto space-y-6">
@@ -596,15 +562,6 @@ const ChatInterface: React.FC = () => {
               <p className="text-secondary mb-6">
                 Posez vos questions agricoles, je sélectionnerai automatiquement l'expert le plus approprié.
               </p>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-w-2xl mx-auto">
-                {Object.values(agents).map((agent) => (
-                  <div key={agent.type} className="card text-center">
-                    <div className="text-2xl mb-1">{agent.icon}</div>
-                    <div className="text-sm font-medium text-primary">{agent.name}</div>
-                    <div className="text-xs text-secondary">{agent.description}</div>
-                  </div>
-                ))}
-              </div>
             </div>
           ) : (
             messages.map((message) => (
@@ -636,12 +593,6 @@ const ChatInterface: React.FC = () => {
                       boxShadow: message.sender === 'user' ? 'none' : 'var(--shadow-sm)'
                     }}
                   >
-                    {message.sender === 'assistant' && message.agentName && (
-                      <div className="text-xs mb-2 flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                        {agents[message.agent || '']?.icon}
-                        <span>{message.agentName}</span>
-                      </div>
-                    )}
 
                     {/* Mode Badge for User Messages */}
                     {message.sender === 'user' && message.mode && (
@@ -723,7 +674,7 @@ const ChatInterface: React.FC = () => {
         </div>
       </div>
 
-      {/* Input Area - At the bottom like normal chat */}
+      {/* Input Area - Clean ChatGPT-like Interface */}
       <div
         className="px-8 py-4 border-t"
         style={{
@@ -756,54 +707,61 @@ const ChatInterface: React.FC = () => {
             </div>
           )}
 
-          {/* Main Input Container */}
+          {/* Main Input Card - Clean Design */}
           <div
-            className="rounded-2xl border p-4"
+            className="rounded-2xl border shadow-lg"
             style={{
               backgroundColor: 'var(--bg-input)',
               borderColor: 'var(--border-default)'
             }}
           >
-            {/* Text Input */}
-            <div className="mb-3">
+            {/* Input Area */}
+            <div className="relative">
               <textarea
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Posez-moi vos questions sur votre exploitation ou vos fournisseurs"
-                className="w-full px-0 py-0 bg-transparent border-none resize-none focus:ring-0 focus:outline-none text-base text-primary"
+                placeholder="Posez votre question agricole..."
+                className="w-full bg-transparent px-6 py-8 text-lg rounded-t-2xl focus:outline-none transition-colors resize-none"
                 style={{
                   color: 'var(--text-primary)',
-                  '::placeholder': { color: 'var(--text-muted)' }
+                  minHeight: '120px'
                 }}
-                rows={3}
+                onFocus={(e) => {
+                  e.currentTarget.parentElement!.parentElement!.style.borderColor = 'var(--brand-600)'
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.parentElement!.parentElement!.style.borderColor = 'var(--border-default)'
+                }}
                 disabled={isLoading}
               />
             </div>
 
-            {/* Bottom Bar: Mode Buttons + Actions */}
-            <div className="flex items-center justify-between">
-              {/* Mode Selection Buttons */}
-              <div className="flex items-center gap-2">
+            {/* All Buttons at Bottom of Card */}
+            <div
+              className="flex items-center justify-between px-6 py-4 border-t"
+              style={{ borderColor: 'var(--border-subtle)' }}
+            >
+              {/* Mode Buttons - Left Side */}
+              <div className="flex items-center gap-3">
                 <button
                   onClick={() => setChatMode(chatMode === 'supplier' ? null : 'supplier')}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors border ${
                     chatMode === 'supplier'
-                      ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      ? 'bg-blue-100 text-blue-700 border-blue-300'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                   }`}
                   disabled={isLoading}
                 >
                   <Package className="h-4 w-4" />
                   <span>Mode Fournisseurs</span>
                 </button>
-
                 <button
                   onClick={() => setChatMode(chatMode === 'internet' ? null : 'internet')}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors border ${
                     chatMode === 'internet'
-                      ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      ? 'bg-blue-100 text-blue-700 border-blue-300'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                   }`}
                   disabled={isLoading}
                 >
@@ -812,8 +770,8 @@ const ChatInterface: React.FC = () => {
                 </button>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2">
+              {/* Action Buttons - Right Side */}
+              <div className="flex items-center gap-3">
                 {/* File Attachment Button */}
                 <input
                   ref={fileInputRef}
@@ -825,98 +783,192 @@ const ChatInterface: React.FC = () => {
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="p-2 rounded-lg transition-colors"
+                  className="flex items-center justify-center p-2 rounded-lg transition-colors border"
                   style={{
+                    backgroundColor: 'var(--bg-card)',
                     color: 'var(--text-secondary)',
-                    backgroundColor: 'transparent'
+                    borderColor: 'var(--border-default)'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)'
+                    e.currentTarget.style.color = 'var(--text-primary)'
+                    e.currentTarget.style.borderColor = 'var(--border-subtle)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--bg-card)'
+                    e.currentTarget.style.color = 'var(--text-secondary)'
+                    e.currentTarget.style.borderColor = 'var(--border-default)'
+                  }}
                   disabled={isLoading}
                   title="Attach files"
                 >
-                  <Paperclip className="h-5 w-5" />
+                  <Paperclip className="h-4 w-4" />
                 </button>
-
-                {/* Voice Interface Toggle */}
                 <button
                   onClick={toggleVoiceInterface}
-                  className="p-2 rounded-lg transition-colors"
-                  style={{
-                    backgroundColor: showVoiceInterface ? 'var(--brand-600)' : 'transparent',
-                    color: showVoiceInterface ? 'var(--text-inverse)' : 'var(--text-secondary)'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!showVoiceInterface) {
-                      e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!showVoiceInterface) {
-                      e.currentTarget.style.backgroundColor = 'transparent'
-                    }
-                  }}
+                  className={`flex items-center justify-center p-2 rounded-lg transition-colors border ${
+                    showVoiceInterface
+                      ? 'bg-green-100 text-green-700 border-green-300'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  }`}
                   disabled={isLoading}
                   title="Voice interface"
                 >
-                  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12 2C13.1 2 14 2.9 14 4V10C14 11.1 13.1 12 12 12S10 11.1 10 10V4C10 2.9 10.9 2 12 2M19 10V12C19 15.9 15.9 19 12 19S5 15.9 5 12V10H7V12C7 14.8 9.2 17 12 17S17 14.8 17 12V10H19Z"/>
                   </svg>
                 </button>
-
-                {/* Send Button */}
                 <button
                   onClick={handleSendMessage}
                   disabled={!inputValue.trim() || isLoading}
-                  className="p-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors border disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
                     backgroundColor: 'var(--brand-600)',
-                    color: 'var(--text-inverse)'
+                    color: 'var(--text-inverse)',
+                    borderColor: 'var(--brand-600)'
                   }}
                   onMouseEnter={(e) => {
                     if (!e.currentTarget.disabled) {
                       e.currentTarget.style.backgroundColor = 'var(--brand-700)'
+                      e.currentTarget.style.borderColor = 'var(--brand-700)'
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!e.currentTarget.disabled) {
                       e.currentTarget.style.backgroundColor = 'var(--brand-600)'
+                      e.currentTarget.style.borderColor = 'var(--brand-600)'
                     }
                   }}
                   title="Send message"
                 >
                   {isLoading ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Send className="h-5 w-5" />
+                    <Send className="h-4 w-4" />
                   )}
+                  <span>Envoyer</span>
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Agent Selection Indicator */}
-          {inputValue.trim() && !isLoading && (
-            <div
-              className="mt-3 text-sm flex items-center gap-2"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              <span>Agent suggéré:</span>
-              {(() => {
-                const suggestedAgent = selectAgentForMessage(inputValue)
-                return (
-                  <span
-                    className="flex items-center gap-1 px-2 py-1 rounded"
+
+          {/* Popular Suggestions Below Input */}
+          {messages.length === 0 && (
+            <div className="text-center mt-8">
+              <h3
+                className="text-sm mb-4 font-medium"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                Suggestions populaires
+              </h3>
+              <div className="flex flex-wrap justify-center gap-3">
+                <button
+                  className="px-4 py-2 rounded-full text-sm transition-colors border"
                     style={{
-                      backgroundColor: 'var(--bg-input)',
-                      color: 'var(--text-primary)'
-                    }}
-                  >
-                    <span>{suggestedAgent.icon}</span>
-                    <span>{suggestedAgent.name}</span>
-                  </span>
-                )
-              })()}
+                    backgroundColor: 'var(--bg-card)',
+                    color: 'var(--text-secondary)',
+                    borderColor: 'var(--border-default)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)'
+                    e.currentTarget.style.color = 'var(--text-primary)'
+                    e.currentTarget.style.borderColor = 'var(--border-subtle)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--bg-card)'
+                    e.currentTarget.style.color = 'var(--text-secondary)'
+                    e.currentTarget.style.borderColor = 'var(--border-default)'
+                  }}
+                  onClick={() => setInputValue("Quand traiter contre le mildiou ?")}
+                >
+                  "Quand traiter contre le mildiou ?"
+                </button>
+                <button
+                  className="px-4 py-2 rounded-full text-sm transition-colors border"
+                  style={{
+                    backgroundColor: 'var(--bg-card)',
+                    color: 'var(--text-secondary)',
+                    borderColor: 'var(--border-default)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)'
+                    e.currentTarget.style.color = 'var(--text-primary)'
+                    e.currentTarget.style.borderColor = 'var(--border-subtle)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--bg-card)'
+                    e.currentTarget.style.color = 'var(--text-secondary)'
+                    e.currentTarget.style.borderColor = 'var(--border-default)'
+                  }}
+                  onClick={() => setInputValue("Prix des semences 2024")}
+                >
+                  "Prix des semences 2024"
+                </button>
+                <button
+                  className="px-4 py-2 rounded-full text-sm transition-colors border"
+                  style={{
+                    backgroundColor: 'var(--bg-card)',
+                    color: 'var(--text-secondary)',
+                    borderColor: 'var(--border-default)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)'
+                    e.currentTarget.style.color = 'var(--text-primary)'
+                    e.currentTarget.style.borderColor = 'var(--border-subtle)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--bg-card)'
+                    e.currentTarget.style.color = 'var(--text-secondary)'
+                    e.currentTarget.style.borderColor = 'var(--border-default)'
+                  }}
+                  onClick={() => setInputValue("Météo pour les 7 prochains jours")}
+                >
+                  "Météo pour les 7 prochains jours"
+                </button>
+                <button
+                  className="px-4 py-2 rounded-full text-sm transition-colors border"
+                  style={{
+                    backgroundColor: 'var(--bg-card)',
+                    color: 'var(--text-secondary)',
+                    borderColor: 'var(--border-default)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)'
+                    e.currentTarget.style.color = 'var(--text-primary)'
+                    e.currentTarget.style.borderColor = 'var(--border-subtle)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--bg-card)'
+                    e.currentTarget.style.color = 'var(--text-secondary)'
+                    e.currentTarget.style.borderColor = 'var(--border-default)'
+                  }}
+                  onClick={() => setInputValue("Analyse de mes parcelles")}
+                >
+                  "Analyse de mes parcelles"
+                </button>
+                <button
+                  className="px-4 py-2 rounded-full text-sm transition-colors border"
+                  style={{
+                    backgroundColor: 'var(--bg-card)',
+                    color: 'var(--text-secondary)',
+                    borderColor: 'var(--border-default)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)'
+                    e.currentTarget.style.color = 'var(--text-primary)'
+                    e.currentTarget.style.borderColor = 'var(--border-subtle)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--bg-card)'
+                    e.currentTarget.style.color = 'var(--text-secondary)'
+                    e.currentTarget.style.borderColor = 'var(--border-default)'
+                  }}
+                  onClick={() => setInputValue("Fournisseurs locaux")}
+                >
+                  "Fournisseurs locaux"
+                </button>
+              </div>
             </div>
           )}
         </div>

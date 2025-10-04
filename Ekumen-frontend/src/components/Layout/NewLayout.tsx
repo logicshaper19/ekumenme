@@ -1,18 +1,15 @@
-import React, { useState } from 'react'
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { 
   Plus, 
   MessageCircle, 
   User, 
-  Sun, 
-  Moon,
   Mic,
   BarChart3,
   Beaker,
   MapPin,
   Bell,
-  Settings,
-  LogOut
+  TrendingUp
 } from 'lucide-react'
 
 // Components
@@ -20,37 +17,90 @@ import { ThemeToggle } from '@components/ThemeToggle'
 
 // Hooks
 import { useAuth } from '@hooks/useAuth'
-import { useTheme } from '@hooks/useTheme'
 
 interface NewLayoutProps {
   children?: React.ReactNode
 }
 
 const NewLayout: React.FC<NewLayoutProps> = ({ children }) => {
-  const { user, logout } = useAuth()
-  const { theme } = useTheme()
+  const { user } = useAuth()
   const navigate = useNavigate()
-  const [showUserMenu, setShowUserMenu] = useState(false)
+  const location = useLocation()
+  
+  // Check if we're on the Assistant page
+  const isAssistantPage = location.pathname === '/assistant'
 
-  const handleLogout = () => {
-    logout()
-    navigate('/login')
+  const handleNewConversation = () => {
+    // Navigate to assistant page to start a new conversation
+    navigate('/assistant')
+  }
+
+  const handleChatClick = (chatId: string) => {
+    // Navigate to assistant page with the specific conversation
+    navigate(`/assistant?conversation=${chatId}`)
   }
 
   const navigation = [
+    { name: 'Assistant', href: '/assistant', icon: MessageCircle },
     { name: 'Journal', href: '/journal', icon: Mic },
     { name: 'Activités', href: '/activities', icon: BarChart3 },
     { name: 'Traitements', href: '/treatments', icon: Beaker },
     { name: 'Parcelles', href: '/parcelles', icon: MapPin },
+          { name: 'Knowledge Base', href: '/knowledge-base', icon: TrendingUp },
   ]
 
-  // Mock chat history
-  const chatHistory = [
-    { id: 1, title: 'Sclérotinia et Cylindrosporiose', time: 'Il y a 2 heures', active: true },
-    { id: 2, title: 'Prévisions météo semaine', time: 'Hier', active: false },
-    { id: 3, title: 'Prix des semences maïs', time: '2 jours', active: false },
-    { id: 4, title: 'Traitement bio colza', time: '3 jours', active: false },
-  ]
+  // Real chat history from backend
+  const [chatHistory, setChatHistory] = useState<Array<{
+    id: string;
+    title: string;
+    time: string;
+    active: boolean;
+  }>>([])
+
+  // Load real conversations from backend
+  useEffect(() => {
+    const loadConversations = async () => {
+      try {
+        const token = localStorage.getItem('auth_token')
+        if (!token) return
+
+        const response = await fetch('/api/v1/chat/conversations?limit=20', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+
+        if (response.ok) {
+          const conversations = await response.json()
+          const formattedHistory = conversations.map((conv: any) => ({
+            id: conv.id,
+            title: conv.title,
+            time: formatTimeAgo(new Date(conv.updated_at)),
+            active: false // Will be set based on current route
+          }))
+          setChatHistory(formattedHistory)
+        }
+      } catch (error) {
+        console.error('Error loading conversations:', error)
+      }
+    }
+
+    if (user) {
+      loadConversations()
+    }
+  }, [user])
+
+  // Helper function to format time ago
+  const formatTimeAgo = (date: Date): string => {
+    const now = new Date()
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60))
+    
+    if (diffInHours < 1) return 'À l\'instant'
+    if (diffInHours < 24) return `Il y a ${diffInHours}h`
+    if (diffInHours < 48) return 'Hier'
+    const diffInDays = Math.floor(diffInHours / 24)
+    return `Il y a ${diffInDays} jours`
+  }
 
   return (
     <div
@@ -60,16 +110,18 @@ const NewLayout: React.FC<NewLayoutProps> = ({ children }) => {
         color: 'var(--text-primary)'
       }}
     >
-      {/* Sidebar - Start from top with padding for fixed header */}
-      <div
-        className="w-64 flex flex-col border-r pt-20"
-        style={{
-          borderColor: 'var(--border-subtle)'
-        }}
-      >
+      {/* Sidebar - Only show on Assistant page */}
+      {isAssistantPage && (
+        <div
+          className="w-64 flex flex-col border-r pt-20"
+          style={{
+            borderColor: 'var(--border-subtle)'
+          }}
+        >
         {/* Smaller New Chat Button */}
         <div className="p-4">
           <button
+            onClick={handleNewConversation}
             className="w-full py-2.5 px-4 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
             style={{
               backgroundColor: 'var(--brand-600)',
@@ -97,6 +149,7 @@ const NewLayout: React.FC<NewLayoutProps> = ({ children }) => {
             {chatHistory.map((chat) => (
               <div
                 key={chat.id}
+                onClick={() => handleChatClick(chat.id)}
                 className="p-3 rounded-lg cursor-pointer transition-all duration-200"
                 style={{
                   backgroundColor: chat.active ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
@@ -153,7 +206,8 @@ const NewLayout: React.FC<NewLayoutProps> = ({ children }) => {
             </div>
           </div>
         </div>
-      </div>
+        </div>
+      )}
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col">

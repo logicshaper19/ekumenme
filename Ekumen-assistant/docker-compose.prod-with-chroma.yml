@@ -1,0 +1,161 @@
+version: '3.8'
+
+services:
+  # ChromaDB Server (Production)
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: ekumen-chromadb-prod
+    environment:
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_HTTP_PORT=8001
+      - CHROMA_SERVER_AUTH_CREDENTIALS_PROVIDER=chromadb.auth.providers.HtpasswdConfigServerAuthCredentialsProvider
+      - CHROMA_SERVER_AUTH_CREDENTIALS_FILE=/chroma/auth/htpasswd
+      - CHROMA_SERVER_AUTH_TOKEN_TRANSPORT_HEADER=X-Chroma-Token
+      - CHROMA_SERVER_AUTH_PROVIDER=chromadb.auth.providers.HtpasswdConfigServerAuthCredentialsProvider
+      - CHROMA_SERVER_AUTH_CREDENTIALS=admin:${CHROMADB_PASSWORD}
+      - CHROMA_DB_IMPL=duckdb+parquet
+      - CHROMA_PERSIST_DIRECTORY=/chroma/chroma
+    ports:
+      - "8001:8001"
+    volumes:
+      - chromadb_data:/chroma/chroma
+      - ./chroma_auth:/chroma/auth
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # FastAPI Backend (Production)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ekumen-assistant-backend-prod
+    environment:
+      # Supabase Database (Production)
+      - DATABASE_URL=postgresql+asyncpg://postgres:${SUPABASE_DB_PASSWORD}@db.${SUPABASE_PROJECT_REF}.supabase.co:5432/postgres
+      - DATABASE_URL_SYNC=postgresql://postgres:${SUPABASE_DB_PASSWORD}@db.${SUPABASE_PROJECT_REF}.supabase.co:5432/postgres
+      
+      # Supabase Storage (Production)
+      - SUPABASE_URL=https://${SUPABASE_PROJECT_REF}.supabase.co
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      
+      # ChromaDB (Production)
+      - CHROMADB_URL=http://chromadb:8001
+      - CHROMADB_USERNAME=admin
+      - CHROMADB_PASSWORD=${CHROMADB_PASSWORD}
+      
+      # Redis (Production)
+      - REDIS_URL=${REDIS_URL}
+      
+      # API Keys
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
+      - WEATHER_API_KEY=${WEATHER_API_KEY}
+      
+      # Security
+      - SECRET_KEY=${SECRET_KEY}
+      - ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=60
+      
+      # Production Settings
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - WORKERS=4
+      
+    ports:
+      - "8000:8000"
+    depends_on:
+      chromadb:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Redis (Production)
+  redis:
+    image: redis:7-alpine
+    container_name: ekumen-redis-prod
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+
+  # Nginx Reverse Proxy (Production)
+  nginx:
+    image: nginx:alpine
+    container_name: ekumen-nginx-prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  chromadb_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  default:
+    name: ekumen-production

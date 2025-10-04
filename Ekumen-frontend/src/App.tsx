@@ -5,24 +5,22 @@ import { Toaster } from 'react-hot-toast'
 
 // Pages
 import LandingPage from '@pages/LandingPage'
-import Assistant from '@pages/Assistant'
 import ChatInterface from '@pages/ChatInterface'
-import NewChatInterface from '@pages/NewChatInterface'
 import VoiceJournal from '@pages/VoiceJournal'
 import Activities from '@pages/Activities'
 import Treatments from '@pages/Treatments'
 import Parcelles from '@pages/Parcelles'
 import FarmManagement from '@pages/FarmManagement'
+import KnowledgeBaseDashboard from '@pages/KnowledgeBaseDashboard'
 import Login from '@pages/Login'
 import Register from '@pages/Register'
 
 // Components
-import Layout from '@components/Layout'
 import NewLayout from '@components/Layout/NewLayout'
 import ProtectedRoute from '@components/ProtectedRoute'
 
 // Hooks
-import { useAuth, AuthProvider } from '@hooks/useAuth'
+import { AuthProvider } from '@hooks/useAuth'
 import { useTheme } from '@hooks/useTheme'
 
 // Styles
@@ -39,8 +37,6 @@ const queryClient = new QueryClient({
 })
 
 function AppContent() {
-  const { isAuthenticated } = useAuth()
-
   return (
     <Router>
       <div className="min-h-screen" style={{
@@ -60,7 +56,7 @@ function AppContent() {
               element={
                 <ProtectedRoute>
                   <NewLayout>
-                    <NewChatInterface />
+                    <ChatInterface />
                   </NewLayout>
                 </ProtectedRoute>
               }
@@ -70,7 +66,7 @@ function AppContent() {
               element={
                 <ProtectedRoute>
                   <NewLayout>
-                    <NewChatInterface />
+                    <ChatInterface />
                   </NewLayout>
                 </ProtectedRoute>
               }
@@ -121,6 +117,16 @@ function AppContent() {
                 <ProtectedRoute>
                   <NewLayout>
                     <FarmManagement />
+                  </NewLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/knowledge-base"
+              element={
+                <ProtectedRoute>
+                  <NewLayout>
+                    <KnowledgeBaseDashboard />
                   </NewLayout>
                 </ProtectedRoute>
               }

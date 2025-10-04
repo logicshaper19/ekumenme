@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { Menu, Bell, User, LogOut, Settings, Mic, BarChart3, Beaker, MapPin, ChevronDown } from 'lucide-react'
+import { Menu, Bell, User, LogOut, Settings, Mic, BarChart3, Beaker, MapPin, ChevronDown, MessageCircle } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 // Components
@@ -27,6 +27,12 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, user }) => {
 
   // Top navigation items
   const topNavigation = [
+    {
+      name: 'Assistant',
+      href: '/assistant',
+      icon: MessageCircle,
+      description: 'Assistant IA agricole'
+    },
     {
       name: 'Journal',
       href: '/journal',

@@ -4,13 +4,15 @@ Handles document workflow operations like approval, rejection, and renewal
 """
 
 import logging
+import uuid
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
+from pathlib import Path
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func, desc
 from sqlalchemy.orm import selectinload
 
-from app.models.knowledge_base import KnowledgeBaseDocument, KnowledgeBaseWorkflowAudit
+from app.models.knowledge_base import KnowledgeBaseDocument, KnowledgeBaseWorkflowAudit, DocumentStatus
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -30,7 +32,7 @@ class KnowledgeBaseWorkflowService:
         db: AsyncSession = None
     ) -> Dict[str, Any]:
         """
-        Approve a document after human review
+        Approve a document after human review and add to ChromaDB
         """
         try:
             # Get document
@@ -43,18 +45,52 @@ class KnowledgeBaseWorkflowService:
                 return {"error": "Document not found"}
             
             # Update document status
-            document.status = "approved"
+            document.submission_status = "approved"
             document.approved_by = approved_by
             document.approved_at = datetime.utcnow()
-            document.comments = comments
+            document.processing_status = DocumentStatus.PROCESSING
+            
+            await db.commit()
+            
+            # Process document and add to ChromaDB
+            try:
+                from app.services.knowledge_base.rag_service import RAGService
+                from app.services.knowledge_base.document_processing_service import DocumentProcessingService
+                
+                rag_service = RAGService()
+                processing_service = DocumentProcessingService()
+                
+                # Extract text content from the file
+                content = await processing_service.extract_text_from_file(
+                    document.file_path,
+                    document.file_type,
+                    document.filename
+                )
+                
+                # Add to vector store
+                success = await rag_service.add_document_to_vectorstore(document, content, db)
+                
+                if success:
+                    document.processing_status = DocumentStatus.COMPLETED
+                    logger.info(f"Document {document_id} added to ChromaDB successfully")
+                else:
+                    document.processing_status = DocumentStatus.FAILED
+                    logger.error(f"Failed to add document {document_id} to ChromaDB")
+                
+                await db.commit()
+                
+            except Exception as e:
+                logger.error(f"Error processing document for ChromaDB: {e}")
+                document.processing_status = DocumentStatus.FAILED
+                await db.commit()
             
             # Create audit record
             audit = KnowledgeBaseWorkflowAudit(
                 document_id=document_id,
                 action="approved",
                 performed_by=approved_by,
-                comments=comments,
-                timestamp=datetime.utcnow()
+                comments=comments or "Document approved and added to knowledge base",
+                performed_at=datetime.utcnow()
             )
             db.add(audit)
             
@@ -63,7 +99,8 @@ class KnowledgeBaseWorkflowService:
             return {
                 "success": True,
                 "message": "Document approved successfully",
-                "document_id": document_id
+                "document_id": document_id,
+                "processing_status": document.processing_status.value
             }
             
         except Exception as e:
@@ -122,22 +159,96 @@ class KnowledgeBaseWorkflowService:
     
     async def submit_document(
         self,
-        document_data: Dict[str, Any],
-        submitted_by: str,
+        organization_id: str,
+        uploaded_by: str,
+        file,
+        filename: str,
+        file_type: str,
+        document_type,
+        description: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        expiration_months: Optional[int] = None,
+        visibility: str = "internal",
+        shared_with_organizations: Optional[List[str]] = None,
+        shared_with_users: Optional[List[str]] = None,
         db: AsyncSession = None
     ) -> Dict[str, Any]:
         """
-        Submit a new document for review
+        Submit a new document for review with content-based file storage
         """
         try:
-            # Create new document
+            from app.services.knowledge_base.supabase_storage_service import create_storage_service
+            
+            # Initialize file storage service (Supabase for production, local for dev)
+            file_storage = create_storage_service()
+            
+            # Save file with content-based hashing
+            save_result = await file_storage.save_file(
+                file=file,
+                organization_id=organization_id,
+                user_id=uploaded_by,
+                db=db
+            )
+            
+            # Handle validation errors
+            if save_result["status"] == "validation_error":
+                return {
+                    "success": False,
+                    "error": "validation_error",
+                    "error_code": save_result.get("error_code", "VALIDATION_ERROR"),
+                    "message": save_result["message"]
+                }
+            
+            # Handle duplicate files
+            if save_result["status"] == "duplicate":
+                return {
+                    "success": False,
+                    "error": "duplicate_file",
+                    "message": save_result["message"],
+                    "existing_document_id": save_result["document_id"],
+                    "existing_filename": save_result["existing_filename"],
+                    "uploaded_at": save_result.get("uploaded_at")
+                }
+            
+            # Handle save errors
+            if save_result["status"] == "error":
+                return {
+                    "success": False,
+                    "error": "file_save_error",
+                    "error_code": save_result.get("error_code", "FILE_SAVE_ERROR"),
+                    "message": save_result["message"]
+                }
+            
+            # Calculate expiration date if provided
+            expiration_date = None
+            if expiration_months:
+                expiration_date = datetime.utcnow() + timedelta(days=expiration_months * 30)
+            
+            # Create document record
             document = KnowledgeBaseDocument(
-                title=document_data.get("title"),
-                content=document_data.get("content"),
-                document_type=document_data.get("document_type"),
-                status="pending",
-                submitted_by=submitted_by,
-                submitted_at=datetime.utcnow()
+                id=uuid.uuid4(),
+                organization_id=organization_id,
+                uploaded_by=uploaded_by,
+                filename=filename,  # Original filename preserved
+                file_path=save_result["file_path"],
+                file_type=file_type,
+                file_size_bytes=save_result["file_size"],
+                file_hash=save_result["file_hash"],  # Hash for per-org duplicate detection
+                document_type=document_type,
+                description=description,
+                tags=tags or [],
+                visibility=visibility,
+                shared_with_organizations=shared_with_organizations or [],
+                shared_with_users=shared_with_users or [],
+                processing_status="pending",
+                submission_status="pending",
+                expiration_date=expiration_date,
+                workflow_metadata={
+                    "submitted_at": datetime.utcnow().isoformat(),
+                    "original_filename": filename,
+                    "file_hash": save_result["file_hash"],
+                    "storage_method": "simple_per_org_hash"
+                }
             )
             
             db.add(document)
@@ -148,17 +259,22 @@ class KnowledgeBaseWorkflowService:
             audit = KnowledgeBaseWorkflowAudit(
                 document_id=str(document.id),
                 action="submitted",
-                performed_by=submitted_by,
+                performed_by=uploaded_by,
                 comments="Document submitted for review",
-                timestamp=datetime.utcnow()
+                performed_at=datetime.utcnow()
             )
             db.add(audit)
             await db.commit()
             
+            logger.info(f"Document submitted successfully: {document.id} (hash: {save_result['file_hash'][:8]}...)")
+            
             return {
                 "success": True,
                 "message": "Document submitted successfully",
-                "document_id": str(document.id)
+                "document_id": str(document.id),
+                "filename": filename,
+                "file_size": save_result["file_size"],
+                "file_hash": save_result["file_hash"]
             }
             
         except Exception as e:

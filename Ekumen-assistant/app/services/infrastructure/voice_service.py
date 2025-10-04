@@ -3,13 +3,17 @@ Voice service for agricultural chatbot
 Handles voice transcription and text-to-speech
 """
 
-from typing import Optional
+from typing import Optional, AsyncGenerator
 import asyncio
 import aiohttp
 import base64
-from io import BytesIO
+import io
+import logging
+from openai import AsyncOpenAI
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class VoiceTranscriptionResult:
@@ -22,46 +26,104 @@ class VoiceTranscriptionResult:
 
 
 class VoiceService:
-    """Service for voice processing (transcription and synthesis)"""
+    """Service for voice processing (transcription and synthesis) using OpenAI APIs"""
     
     def __init__(self):
+        self.openai_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         self.elevenlabs_api_key = settings.ELEVENLABS_API_KEY
         self.whisper_model = settings.WHISPER_MODEL
         self.elevenlabs_voice_id = settings.ELEVENLABS_VOICE_ID
     
     async def transcribe_audio(self, audio_file) -> VoiceTranscriptionResult:
-        """Transcribe audio file using Whisper API"""
+        """Transcribe audio file using OpenAI Whisper API"""
         try:
             # Read audio file
             audio_content = await audio_file.read()
             
-            # For now, return a mock transcription
-            # TODO: Implement actual Whisper API integration
+            # Create a file-like object from bytes
+            audio_io = io.BytesIO(audio_content)
+            audio_io.name = "audio.webm"
+            
+            # Transcribe using OpenAI Whisper
+            transcript = await self.openai_client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_io,
+                language="fr"  # French for agricultural context
+            )
+            
+            logger.info(f"Audio transcribed successfully: {len(transcript.text)} characters")
+            
             return VoiceTranscriptionResult(
-                text="Transcription en cours de développement",
-                confidence=0.95,
+                text=transcript.text,
+                confidence=0.95,  # Whisper doesn't provide confidence scores
                 language="fr",
-                duration=5.0
+                duration=None  # Could be calculated from audio file
             )
             
         except Exception as e:
+            logger.error(f"Error transcribing audio: {e}")
+            raise Exception(f"Erreur lors de la transcription: {str(e)}")
+    
+    async def transcribe_audio_bytes(self, audio_bytes: bytes) -> VoiceTranscriptionResult:
+        """Transcribe audio bytes using OpenAI Whisper API"""
+        try:
+            # Create a file-like object from bytes
+            audio_io = io.BytesIO(audio_bytes)
+            audio_io.name = "audio.webm"
+            
+            # Transcribe using OpenAI Whisper
+            transcript = await self.openai_client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_io,
+                language="fr"  # French for agricultural context
+            )
+            
+            logger.info(f"Audio bytes transcribed successfully: {len(transcript.text)} characters")
+            
+            return VoiceTranscriptionResult(
+                text=transcript.text,
+                confidence=0.95,
+                language="fr",
+                duration=None
+            )
+            
+        except Exception as e:
+            logger.error(f"Error transcribing audio bytes: {e}")
             raise Exception(f"Erreur lors de la transcription: {str(e)}")
     
     async def synthesize_speech(self, text: str, voice_id: Optional[str] = None) -> bytes:
-        """Convert text to speech using ElevenLabs API"""
+        """Convert text to speech using OpenAI TTS API"""
         try:
-            if not self.elevenlabs_api_key:
-                raise Exception("Clé API ElevenLabs non configurée")
+            # Use OpenAI TTS instead of ElevenLabs for better integration
+            response = await self.openai_client.audio.speech.create(
+                model="tts-1",  # Fast model for real-time
+                voice="nova",   # Good French voice
+                input=text,
+                response_format="opus"  # Best for streaming
+            )
             
-            voice_id = voice_id or self.elevenlabs_voice_id
-            
-            # For now, return mock audio data
-            # TODO: Implement actual ElevenLabs API integration
-            mock_audio = b"Mock audio data for text-to-speech"
-            return mock_audio
+            logger.info(f"Speech synthesized successfully: {len(text)} characters")
+            return response.content
             
         except Exception as e:
+            logger.error(f"Error synthesizing speech: {e}")
             raise Exception(f"Erreur lors de la synthèse vocale: {str(e)}")
+    
+    async def synthesize_speech_streaming(self, text: str, voice_id: Optional[str] = None) -> AsyncGenerator[bytes, None]:
+        """Stream text-to-speech using OpenAI TTS API"""
+        try:
+            # For streaming, we'll generate the full audio and yield it in chunks
+            audio_bytes = await self.synthesize_speech(text, voice_id)
+            
+            # Yield in chunks for streaming effect
+            chunk_size = 4096
+            for i in range(0, len(audio_bytes), chunk_size):
+                yield audio_bytes[i:i + chunk_size]
+                await asyncio.sleep(0.01)  # Small delay for streaming effect
+                
+        except Exception as e:
+            logger.error(f"Error in streaming speech synthesis: {e}")
+            raise Exception(f"Erreur lors de la synthèse vocale en streaming: {str(e)}")
     
     async def transcribe_audio_file(self, file_path: str) -> VoiceTranscriptionResult:
         """Transcribe audio file from file path"""

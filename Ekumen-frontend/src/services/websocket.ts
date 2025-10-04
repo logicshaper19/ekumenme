@@ -46,6 +46,135 @@ class WebSocketService {
     }
   }
 
+  // Farm data WebSocket connection
+  private farmSocket: WebSocket | null = null
+  private farmReconnectAttempts = 0
+  private maxFarmReconnectAttempts = 5
+  private farmReconnectDelay = 1000
+
+  connectToFarmUpdates() {
+    try {
+      // Get auth token from localStorage
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        throw new Error('No authentication token found. Please log in.')
+      }
+
+      const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000'
+      const url = `${wsUrl}/api/v1/farm/ws?token=${authToken}`
+
+      console.log('Connecting to Farm WebSocket:', url)
+      this.farmSocket = new WebSocket(url)
+      this.setupFarmEventListeners()
+    } catch (error) {
+      console.error('Failed to connect to Farm WebSocket:', error)
+      throw error
+    }
+  }
+
+  private setupFarmEventListeners() {
+    if (!this.farmSocket) return
+
+    this.farmSocket.onopen = () => {
+      console.log('Connected to Farm WebSocket server')
+      this.farmReconnectAttempts = 0
+      this.emit('farm:connect', {})
+    }
+
+    this.farmSocket.onclose = (event) => {
+      console.log('Disconnected from Farm WebSocket server:', event.reason)
+      this.emit('farm:disconnect', { reason: event.reason })
+      this.handleFarmReconnect()
+    }
+
+    this.farmSocket.onerror = (error) => {
+      console.error('Farm WebSocket error:', error)
+      this.emit('farm:error', { message: 'Farm WebSocket connection error' })
+    }
+
+    this.farmSocket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        this.handleFarmMessage(data)
+      } catch (error) {
+        console.error('Failed to parse Farm WebSocket message:', error)
+      }
+    }
+  }
+
+  private handleFarmMessage(data: any) {
+    switch (data.type) {
+      case 'connection':
+        this.emit('farm:connection', data)
+        break
+      case 'farm:data_update':
+        this.emit('farm:data_update', data.update)
+        break
+      case 'farm:subscription_confirmed':
+        this.emit('farm:subscription_confirmed', data)
+        break
+      case 'farm:unsubscription_confirmed':
+        this.emit('farm:unsubscription_confirmed', data)
+        break
+      case 'pong':
+        this.emit('farm:pong', data)
+        break
+      case 'error':
+        this.emit('farm:error', data)
+        break
+      default:
+        console.log('Unknown farm message type:', data.type, data)
+    }
+  }
+
+  private handleFarmReconnect() {
+    if (this.farmReconnectAttempts < this.maxFarmReconnectAttempts) {
+      this.farmReconnectAttempts++
+      setTimeout(() => {
+        console.log(`Attempting to reconnect to Farm WebSocket (${this.farmReconnectAttempts}/${this.maxFarmReconnectAttempts})...`)
+        this.connectToFarmUpdates()
+      }, this.farmReconnectDelay * this.farmReconnectAttempts)
+    } else {
+      console.error('Max Farm WebSocket reconnection attempts reached')
+    }
+  }
+
+  // Farm data methods
+  subscribeToFarmUpdates(subscription: any) {
+    if (!this.farmSocket || this.farmSocket.readyState !== WebSocket.OPEN) {
+      throw new Error('Farm WebSocket not connected')
+    }
+
+    this.farmSocket.send(JSON.stringify({
+      type: 'farm:subscribe',
+      subscription
+    }))
+  }
+
+  unsubscribeFromFarmUpdates(subscriptionId?: string) {
+    if (!this.farmSocket || this.farmSocket.readyState !== WebSocket.OPEN) {
+      throw new Error('Farm WebSocket not connected')
+    }
+
+    this.farmSocket.send(JSON.stringify({
+      type: 'farm:unsubscribe',
+      subscription_id: subscriptionId
+    }))
+  }
+
+  isFarmConnected(): boolean {
+    return this.farmSocket !== null && this.farmSocket.readyState === WebSocket.OPEN
+  }
+
+  disconnectFromFarmUpdates() {
+    if (this.farmSocket) {
+      this.farmReconnectAttempts = this.maxFarmReconnectAttempts
+      console.log('Disconnecting from Farm WebSocket')
+      this.farmSocket.close()
+      this.farmSocket = null
+    }
+  }
+
   private setupEventListeners() {
     if (!this.socket) return
 
@@ -192,7 +321,7 @@ class WebSocketService {
   }
 
   // Chat methods
-  async sendMessage(message: string, agentType?: string, messageId?: string, threadId?: string) {
+  async sendMessage(message: string, agentType?: string, messageId?: string, threadId?: string, mode?: string) {
     // Wait for connection to be established
     const isConnected = await this.waitForConnection()
     if (!isConnected) {
@@ -204,12 +333,14 @@ class WebSocketService {
       message,
       content: message, // Backend might expect 'content' instead of 'message'
       agent_type: agentType,
+      mode: mode, // Add mode parameter for Tavily routing
       message_id: messageId || `msg-${Date.now()}`,
       thread_id: threadId || `thread-${Date.now()}`,
       timestamp: new Date().toISOString()
     }
 
-    console.log('Sending WebSocket message:', messageData)
+    console.log('🚀 Sending WebSocket message:', messageData)
+    console.log('🚀 Mode parameter:', mode)
     this.socket!.send(JSON.stringify(messageData))
   }
 

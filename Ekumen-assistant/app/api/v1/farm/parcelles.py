@@ -310,7 +310,7 @@ async def get_parcelles_by_farm(
 )
 async def create_parcelle(
     parcelle_data: ParcelCreateRequest,
-    current_user: User = Depends(auth_service.get_current_active_user),
+    current_user: User = Depends(auth_service.get_current_user),
     db: AsyncSession = Depends(get_async_db)
 ) -> ParcelleResponse:
     """

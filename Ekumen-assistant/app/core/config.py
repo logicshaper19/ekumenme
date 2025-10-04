@@ -48,6 +48,11 @@ class Settings(BaseSettings):
         "postgresql://agri_user:agri_password@localhost:5432/agri_db"
     )
     
+    # Supabase Configuration (for file storage)
+    SUPABASE_URL: Optional[str] = os.getenv("SUPABASE_URL")
+    SUPABASE_SERVICE_KEY: Optional[str] = os.getenv("SUPABASE_SERVICE_KEY")
+    SUPABASE_ANON_KEY: Optional[str] = os.getenv("SUPABASE_ANON_KEY")
+    
     # Redis Configuration
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379")
     REDIS_PASSWORD: Optional[str] = os.getenv("REDIS_PASSWORD")

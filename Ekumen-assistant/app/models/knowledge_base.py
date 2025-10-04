@@ -2,7 +2,7 @@
 Knowledge Base models for document management and workflow
 """
 
-from sqlalchemy import Column, String, Boolean, DateTime, Text, ForeignKey, Enum as SQLEnum, Integer, Numeric
+from sqlalchemy import Column, String, Boolean, DateTime, Text, ForeignKey, Enum as SQLEnum, Integer, Numeric, UniqueConstraint, Index
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -47,10 +47,11 @@ class KnowledgeBaseDocument(Base):
     uploaded_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
     
     # Document information
-    filename = Column(String(500), nullable=False)
+    filename = Column(String(500), nullable=False)  # Original filename
     file_path = Column(String(500), nullable=False)  # Local file path
     file_type = Column(String(50), nullable=True)  # 'pdf', 'docx', 'txt', 'csv'
     file_size_bytes = Column(Integer, nullable=True)
+    file_hash = Column(String(64), nullable=True, index=True)  # SHA-256 hash for per-org duplicate detection
     
     # Processing status
     processing_status = Column(SQLEnum(DocumentStatus), default=DocumentStatus.PENDING, nullable=False)
@@ -96,6 +97,12 @@ class KnowledgeBaseDocument(Base):
     # Relationships
     organization = relationship("Organization", back_populates="knowledge_documents", lazy="select")
     uploader = relationship("User", foreign_keys=[uploaded_by], lazy="select")
+    
+    # Table constraints for per-org deduplication
+    __table_args__ = (
+        UniqueConstraint('organization_id', 'file_hash', name='uq_org_file_hash'),
+        Index('idx_org_hash', 'organization_id', 'file_hash'),
+    )
     
     def __repr__(self):
         return f"<KnowledgeBaseDocument(id={self.id}, filename={self.filename}, status={self.processing_status})>"

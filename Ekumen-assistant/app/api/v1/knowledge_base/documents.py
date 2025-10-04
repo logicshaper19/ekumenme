@@ -250,6 +250,41 @@ async def submit_document(
             db=db
         )
         
+        # Handle validation errors
+        if not result.get("success") and result.get("error") == "validation_error":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "error": "validation_error",
+                    "error_code": result.get("error_code", "VALIDATION_ERROR"),
+                    "message": result["message"]
+                }
+            )
+        
+        # Handle duplicate file response
+        if not result.get("success") and result.get("error") == "duplicate_file":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "error": "duplicate_file",
+                    "message": result["message"],
+                    "existing_document_id": result["existing_document_id"],
+                    "existing_filename": result["existing_filename"],
+                    "uploaded_at": result.get("uploaded_at")
+                }
+            )
+        
+        # Handle file save errors
+        if not result.get("success") and result.get("error") == "file_save_error":
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={
+                    "error": "file_save_error",
+                    "error_code": result.get("error_code", "FILE_SAVE_ERROR"),
+                    "message": result["message"]
+                }
+            )
+        
         return result
         
     except HTTPException:

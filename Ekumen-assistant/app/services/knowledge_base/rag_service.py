@@ -5,6 +5,8 @@ Enhanced with detailed source tracking and attribution
 """
 
 import logging
+import asyncio
+import hashlib
 from typing import Dict, Any, Optional, List, AsyncIterator, Tuple
 from datetime import datetime, timedelta
 import json
@@ -33,6 +35,8 @@ class RAGService:
         self.embeddings = None
         self.vectorstore = None
         self.workflow_service = KnowledgeBaseWorkflowService()
+        self._cache = {}  # Simple in-memory cache
+        self._cache_ttl = 300  # 5 minutes
         self._initialize_components()
     
     def _initialize_components(self):
@@ -70,7 +74,7 @@ class RAGService:
         query: str,
         user_id: str,
         organization_id: str,
-        db: AsyncSession = None,
+        db: AsyncSession,
         k: int = 5,
         include_ekumen_content: bool = True
     ) -> List[Document]:
@@ -93,6 +97,18 @@ class RAGService:
         """
         if not user_id or not organization_id:
             raise ValueError("Authentication required: user_id and organization_id must be provided")
+        
+        if not db:
+            raise ValueError("Database session is required")
+        
+        # Check cache first
+        cache_key = self._generate_cache_key(query, user_id, organization_id, k, include_ekumen_content)
+        if cache_key in self._cache:
+            cached_result, timestamp = self._cache[cache_key]
+            if (datetime.utcnow() - timestamp).total_seconds() < self._cache_ttl:
+                logger.info(f"Cache hit for query: {query[:50]}...")
+                return cached_result
+        
         try:
             # First, get all approved, active, non-expired documents the user can access
             accessible_docs = await self._get_accessible_documents(
@@ -108,28 +124,37 @@ class RAGService:
             
             # Perform vector search with document filtering
             try:
-                # Use metadata filtering if supported by vector store
+                # ChromaDB supports metadata filtering with proper syntax
+                # Get more results than needed to account for filtering
                 search_results = self.vectorstore.similarity_search(
                     query,
-                    k=k,
-                    filter={"document_id": {"$in": doc_ids}} if hasattr(self.vectorstore, 'similarity_search') else None
+                    k=min(k * 3, 50),  # Get more results to filter from
+                    filter={"document_id": {"$in": doc_ids}} if doc_ids else None
                 )
                 
-                # If metadata filtering not supported, filter results manually
-                if not hasattr(self.vectorstore, 'similarity_search') or not search_results:
-                    # Fallback: get all results and filter
-                    search_results = self.vectorstore.similarity_search(query, k=k*2)
-                    search_results = [doc for doc in search_results 
-                                    if doc.metadata.get("document_id") in doc_ids]
-                    search_results = search_results[:k]
+                # Filter results to only include accessible documents
+                filtered_results = []
+                for doc in search_results:
+                    doc_id = doc.metadata.get("document_id")
+                    if doc_id in doc_ids:
+                        filtered_results.append(doc)
+                        if len(filtered_results) >= k:
+                            break
+                
+                search_results = filtered_results
                 
                 # Enhance documents with workflow metadata
                 enhanced_docs = await self._enhance_documents_with_metadata(
                     search_results, accessible_docs, db
                 )
                 
-                # Track document analytics - update query count and last accessed
-                await self._track_document_analytics(enhanced_docs, db, query)
+                # Track document analytics asynchronously (non-blocking)
+                asyncio.create_task(
+                    self._track_document_analytics_async(enhanced_docs, query)
+                )
+                
+                # Cache the results
+                self._cache[cache_key] = (enhanced_docs, datetime.utcnow())
                 
                 return enhanced_docs
                 
@@ -162,7 +187,7 @@ class RAGService:
                     
                     # Document must not be expired
                     or_(
-                        KnowledgeBaseDocument.expiration_date == None,  # No expiration set
+                        KnowledgeBaseDocument.expiration_date.is_(None),  # No expiration set
                         KnowledgeBaseDocument.expiration_date > datetime.utcnow()
                     ),
                     
@@ -184,20 +209,10 @@ class RAGService:
                 and_(
                     KnowledgeBaseDocument.visibility == "shared",
                     or_(
-                        # Shared with all organizations
-                        func.jsonb_array_length(
-                            func.coalesce(
-                                KnowledgeBaseDocument.shared_with_organizations, 
-                                func.cast('[]', JSONB)
-                            )
-                        ) == 0,  # Empty array means shared with all
+                        # Shared with all organizations (no specific orgs listed)
+                        KnowledgeBaseDocument.shared_with_organizations.is_(None),
                         # Shared with specific organizations including user's org
-                        func.jsonb_array_length(
-                            func.coalesce(
-                                KnowledgeBaseDocument.shared_with_organizations, 
-                                func.cast('[]', JSONB)
-                            )
-                        ) > 0
+                        KnowledgeBaseDocument.shared_with_organizations.contains([organization_id])
                     )
                 )
             )
@@ -206,7 +221,7 @@ class RAGService:
             access_conditions.append(
                 and_(
                     KnowledgeBaseDocument.shared_with_users.isnot(None),
-                    func.jsonb_array_length(KnowledgeBaseDocument.shared_with_users) > 0
+                    KnowledgeBaseDocument.shared_with_users.contains([user_id])
                 )
             )
             
@@ -294,6 +309,8 @@ class RAGService:
                         "uploaded_by": str(document.uploaded_by),
                         "created_at": document.created_at.isoformat(),
                         "version": document.version,
+                        "visibility": document.visibility,
+                        "is_ekumen_provided": document.is_ekumen_provided,
                         "page_number": chunk_data.get("page_number"),
                         "section": chunk_data.get("section"),
                         "chunk_start": chunk_data.get("chunk_start", 0),
@@ -365,29 +382,58 @@ class RAGService:
     ) -> bool:
         """
         Remove a document from the vector store (e.g., when expired)
+        Actually removes chunks from ChromaDB, not just marks as inactive
         """
         try:
-            # Note: ChromaDB doesn't have a direct delete by metadata method
-            # This would require implementing a custom deletion strategy
-            # For now, we'll mark the document as inactive in the database
-            # and filter it out during retrieval
-            
+            # First, get the document to verify it exists
             result = await db.execute(
                 select(KnowledgeBaseDocument).where(KnowledgeBaseDocument.id == document_id)
             )
-            document = result.scalar_one()
+            document = result.scalar_one_or_none()
             
-            # Update document visibility
+            if not document:
+                logger.warning(f"Document {document_id} not found for removal")
+                return False
+            
+            # Remove from ChromaDB by querying and deleting chunks with this document_id
+            try:
+                # Get all chunks for this document
+                chunks_to_remove = self.vectorstore.get(
+                    where={"document_id": document_id}
+                )
+                
+                if chunks_to_remove and chunks_to_remove.get('ids'):
+                    # Delete chunks from ChromaDB
+                    self.vectorstore.delete(ids=chunks_to_remove['ids'])
+                    logger.info(f"Removed {len(chunks_to_remove['ids'])} chunks from vector store for document {document_id}")
+                else:
+                    logger.info(f"No chunks found in vector store for document {document_id}")
+                    
+            except Exception as e:
+                logger.error(f"Error removing chunks from ChromaDB: {e}")
+                # Fallback: mark as inactive in database
+                document.visibility = "internal"
+                if document.organization_metadata is None:
+                    document.organization_metadata = {}
+                document.organization_metadata["deactivated_at"] = datetime.utcnow().isoformat()
+                await db.commit()
+                return False
+            
+            # Update document status in database
             document.visibility = "internal"
+            if document.organization_metadata is None:
+                document.organization_metadata = {}
             document.organization_metadata["deactivated_at"] = datetime.utcnow().isoformat()
+            document.organization_metadata["removed_from_vectorstore"] = True
             
             await db.commit()
             
-            logger.info(f"Deactivated document {document_id} from vector store")
+            logger.info(f"Successfully removed document {document_id} from vector store")
             return True
             
         except Exception as e:
             logger.error(f"Error removing document from vector store: {e}")
+            await db.rollback()
             return False
     
     async def get_document_statistics(
@@ -398,6 +444,9 @@ class RAGService:
         """
         Get statistics about the knowledge base
         """
+        if not db:
+            raise ValueError("Database session is required")
+            
         try:
             # Build base query
             query = select(KnowledgeBaseDocument)
@@ -438,6 +487,30 @@ class RAGService:
             logger.error(f"Error getting document statistics: {e}")
             return {}
     
+    async def _track_document_analytics_async(
+        self,
+        documents: List[Document],
+        query: str = None
+    ) -> None:
+        """
+        Track document analytics asynchronously (non-blocking)
+        Creates a new database session for analytics operations
+        """
+        try:
+            from app.core.database import get_async_session
+            
+            async for db in get_async_session():
+                await self._track_document_analytics(documents, db, query)
+                break
+                
+        except Exception as e:
+            logger.error(f"Error in async analytics tracking: {e}")
+
+    def _generate_cache_key(self, query: str, user_id: str, organization_id: str, k: int, include_ekumen_content: bool) -> str:
+        """Generate a cache key for the query"""
+        cache_data = f"{query}:{user_id}:{organization_id}:{k}:{include_ekumen_content}"
+        return hashlib.md5(cache_data.encode()).hexdigest()
+
     async def _track_document_analytics(
         self,
         documents: List[Document],
@@ -750,23 +823,27 @@ class RAGService:
 
     def _extract_page_from_text(self, text: str) -> Optional[int]:
         """
-        Try to extract page number from text content
+        Extract page number from text content
+        Note: This is a fallback method. Page numbers should ideally come from PDF metadata
         """
-        # Look for common page indicators
+        # Look for explicit page indicators in text
         page_patterns = [
             r'page\s+(\d+)',
             r'p\.\s*(\d+)',
             r'^(\d+)\s*$',  # Line with just a number
-            r'^\s*(\d+)\s*$'  # Line with just a number and whitespace
         ]
         
         lines = text.split('\n')
-        for line in lines[:5]:  # Check first 5 lines
+        for line in lines[:3]:  # Check first 3 lines only
+            line = line.strip()
             for pattern in page_patterns:
                 match = re.search(pattern, line, re.IGNORECASE)
                 if match:
                     try:
-                        return int(match.group(1))
+                        page_num = int(match.group(1))
+                        # Sanity check: page numbers should be reasonable
+                        if 1 <= page_num <= 10000:
+                            return page_num
                     except ValueError:
                         continue
         
@@ -801,25 +878,15 @@ class RAGService:
     def _calculate_confidence_score(self, document: Document, query: str) -> float:
         """
         Calculate confidence score for how relevant this document is to the query
+        Uses vector similarity as primary signal with minimal text-based adjustments
         """
         try:
-            # Base score from vector similarity
+            # Primary score from vector similarity (most reliable)
             base_score = document.metadata.get("score", 0.0)
             
-            # Boost score based on text length (longer chunks often more informative)
-            length_boost = min(len(document.page_content) / 1000, 0.2)
-            
-            # Boost score based on keyword matching
-            query_words = set(query.lower().split())
-            text_words = set(document.page_content.lower().split())
-            keyword_overlap = len(query_words.intersection(text_words)) / len(query_words)
-            keyword_boost = min(keyword_overlap * 0.3, 0.3)
-            
-            # Combine scores
-            final_score = base_score + length_boost + keyword_boost
-            
-            # Normalize to 0-1 range
-            return min(max(final_score, 0.0), 1.0)
+            # Only use vector similarity - it's already semantic and reliable
+            # Text-based heuristics are redundant and can introduce noise
+            return min(max(base_score, 0.0), 1.0)
             
         except Exception as e:
             logger.error(f"Error calculating confidence score: {e}")

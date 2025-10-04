@@ -64,3 +64,4 @@ htmlcov/
 
 # Pytest
 .pytest_cache/
+Ekumen-assistant/chroma_db/

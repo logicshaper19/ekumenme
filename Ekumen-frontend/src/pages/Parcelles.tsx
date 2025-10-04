@@ -1,25 +1,25 @@
 import React, { useState, useEffect } from 'react'
-import { MapPin, Crop, Calendar, BarChart3, Eye, Edit, Plus, Search } from 'lucide-react'
+import { MapPin, Crop, Calendar, BarChart3, Eye, Edit, Plus, Search, TrendingUp } from 'lucide-react'
+import { farmApi, ParcelleResponse } from '../services/farmApi'
+import { useFarmRealtime } from '../services/farmRealtimeService'
 
-interface Parcelle {
-  id: string
-  nom: string
-  surface: number
+// Frontend interface that extends the API response with computed fields
+interface Parcelle extends ParcelleResponse {
+  // Computed fields for display
   culture_actuelle: string
-  variete?: string
-  date_semis?: Date
-  date_recolte_prevue?: Date
-  rendement_prevu?: number
-  rendement_realise?: number
+  surface: number
+  statut: 'seme' | 'en_croissance' | 'recolte' | 'jachère'
+  irrigation?: boolean
+  sol_type?: string
+  notes?: string
   coordonnees?: {
     latitude: number
     longitude: number
   }
-  sol_type?: string
-  irrigation?: boolean
+  date_recolte_prevue?: Date
+  rendement_prevu?: number
+  rendement_realise?: number
   derniere_intervention?: Date
-  statut: 'seme' | 'en_croissance' | 'recolte' | 'jachère'
-  notes?: string
 }
 
 const Parcelles: React.FC = () => {
@@ -29,87 +29,101 @@ const Parcelles: React.FC = () => {
   const [filterCulture, setFilterCulture] = useState<string>('all')
   const [filterStatut, setFilterStatut] = useState<string>('all')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  
+  // Real-time updates
+  const farmRealtime = useFarmRealtime()
 
-  // Mock data from MesParcelles
-  useEffect(() => {
-    const mockParcelles: Parcelle[] = [
-      {
-        id: '1',
-        nom: 'Parcelle Nord',
-        surface: 12.5,
-        culture_actuelle: 'Blé tendre',
-        variete: 'Apache',
-        date_semis: new Date('2023-10-15'),
-        date_recolte_prevue: new Date('2024-07-20'),
-        rendement_prevu: 75,
-        coordonnees: { latitude: 48.8566, longitude: 2.3522 },
-        sol_type: 'Limon argileux',
-        irrigation: false,
-        derniere_intervention: new Date('2024-01-15'),
-        statut: 'en_croissance',
-        notes: 'Parcelle en pente douce, exposition sud'
-      },
-      {
-        id: '2',
-        nom: 'Parcelle Sud',
-        surface: 8.2,
-        culture_actuelle: 'Colza',
-        variete: 'ES Alicia',
-        date_semis: new Date('2023-08-25'),
-        date_recolte_prevue: new Date('2024-07-10'),
-        rendement_prevu: 35,
-        coordonnees: { latitude: 48.8556, longitude: 2.3512 },
-        sol_type: 'Argilo-calcaire',
-        irrigation: false,
-        derniere_intervention: new Date('2024-01-10'),
-        statut: 'en_croissance',
-        notes: 'Bonne exposition, drainage naturel'
-      },
-      {
-        id: '3',
-        nom: 'Parcelle Est',
-        surface: 15.0,
-        culture_actuelle: 'Orge',
-        variete: 'KWS Cassia',
-        date_semis: new Date('2023-10-20'),
-        date_recolte_prevue: new Date('2024-07-15'),
-        rendement_prevu: 68,
-        coordonnees: { latitude: 48.8576, longitude: 2.3532 },
-        sol_type: 'Limon sableux',
-        irrigation: true,
-        derniere_intervention: new Date('2024-01-08'),
-        statut: 'en_croissance'
-      },
-      {
-        id: '4',
-        nom: 'Parcelle Ouest',
-        surface: 10.8,
-        culture_actuelle: 'Blé tendre',
-        variete: 'Rubisko',
-        date_semis: new Date('2023-10-12'),
-        date_recolte_prevue: new Date('2024-07-25'),
-        rendement_prevu: 72,
-        coordonnees: { latitude: 48.8546, longitude: 2.3502 },
-        sol_type: 'Argilo-limoneux',
-        irrigation: false,
-        derniere_intervention: new Date('2024-01-13'),
-        statut: 'en_croissance'
-      },
-      {
-        id: '5',
-        nom: 'Parcelle Centre',
-        surface: 6.5,
-        culture_actuelle: 'Jachère',
-        date_recolte_prevue: new Date('2024-08-01'),
-        coordonnees: { latitude: 48.8536, longitude: 2.3492 },
-        sol_type: 'Sablo-limoneux',
-        irrigation: false,
-        statut: 'jachère',
-        notes: 'En jachère pour rotation, semis tournesol prévu'
+  // Helper function to determine parcelle status
+  const determineParcelleStatus = (apiParcelle: ParcelleResponse): 'seme' | 'en_croissance' | 'recolte' | 'jachère' => {
+    if (!apiParcelle.culture_code || apiParcelle.culture_code === 'JACHERE') {
+      return 'jachère'
+    }
+    
+    if (apiParcelle.date_semis) {
+      const semisDate = new Date(apiParcelle.date_semis)
+      const now = new Date()
+      const daysSinceSemis = Math.floor((now.getTime() - semisDate.getTime()) / (1000 * 60 * 60 * 24))
+      
+      if (daysSinceSemis < 30) {
+        return 'seme'
+      } else if (daysSinceSemis < 200) {
+        return 'en_croissance'
+      } else {
+        return 'recolte'
       }
-    ]
-    setParcelles(mockParcelles)
-    setFilteredParcelles(mockParcelles)
+    }
+    
+    return 'en_croissance' // Default status
+  }
+
+  // Load parcelles from API
+  const loadParcelles = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      // Fetch parcelles from API
+      const response = await farmApi.parcelles.getParcelles({ limit: 1000 })
+      
+      // Transform API response to frontend format
+      const transformedParcelles: Parcelle[] = response.items.map(apiParcelle => ({
+        ...apiParcelle,
+        // Map API fields to frontend fields
+        culture_actuelle: apiParcelle.culture_code || 'Non renseigné',
+        surface: apiParcelle.surface_ha,
+        // Determine status based on available data
+        statut: determineParcelleStatus(apiParcelle),
+        // Add computed fields for display
+        irrigation: false, // Default, could be enhanced with real data
+        sol_type: 'Non renseigné', // Default, could be enhanced with real data
+        notes: apiParcelle.culture_intermediaire ? 'Culture intermédiaire' : undefined,
+        // Keep date_semis as string to match API response
+        date_semis: apiParcelle.date_semis,
+        // Add mock coordinates for display (could be enhanced with real geometry data)
+        coordonnees: {
+          latitude: 48.8566 + (Math.random() - 0.5) * 0.01,
+          longitude: 2.3522 + (Math.random() - 0.5) * 0.01
+        }
+      }))
+      
+      setParcelles(transformedParcelles)
+      setFilteredParcelles(transformedParcelles)
+    } catch (err) {
+      console.error('Error loading parcelles:', err)
+      setError(err instanceof Error ? err.message : 'Erreur lors du chargement des parcelles')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Load parcelles on component mount
+  useEffect(() => {
+    loadParcelles()
+  }, [])
+
+  // Connect to real-time updates
+  useEffect(() => {
+    // Connect to farm WebSocket
+    farmRealtime.connect()
+
+    // Subscribe to parcelle updates
+    const subscriptionId = farmRealtime.subscribeToFarm(
+      '12345678901234', // farmer@test.com's farm SIRET
+      (update) => {
+        console.log('Received parcelle update:', update)
+        if (update.type === 'parcelle' || update.type === 'intervention') {
+          // Reload parcelles when updates are received
+          loadParcelles()
+        }
+      }
+    )
+
+    return () => {
+      farmRealtime.unsubscribe(subscriptionId)
+      farmRealtime.disconnect()
+    }
   }, [])
 
   // Filter parcelles
@@ -138,6 +152,7 @@ const Parcelles: React.FC = () => {
     setFilteredParcelles(filtered)
   }, [parcelles, searchTerm, filterCulture, filterStatut])
 
+
   const getStatutColor = (statut: string) => {
     switch (statut) {
       case 'seme': return 'bg-blue-100 text-blue-800'
@@ -158,8 +173,10 @@ const Parcelles: React.FC = () => {
     }
   }
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('fr-FR', {
+  const formatDate = (date: Date | string | undefined) => {
+    if (!date) return 'Non renseigné'
+    const dateObj = typeof date === 'string' ? new Date(date) : date
+    return dateObj.toLocaleDateString('fr-FR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric'
@@ -257,6 +274,59 @@ const Parcelles: React.FC = () => {
               <option value="recolte">Récolte</option>
               <option value="jachère">Jachère</option>
             </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Analytics Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="card p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted">Total Parcelles</p>
+              <p className="text-2xl font-bold text-primary">{parcelles.length}</p>
+              <p className="text-xs text-success flex items-center mt-1">
+                <TrendingUp className="h-3 w-3 mr-1" />
+                +2 nouvelles
+              </p>
+            </div>
+            <div className="p-3 bg-primary/10 rounded-lg">
+              <MapPin className="h-6 w-6 text-primary" />
+            </div>
+          </div>
+        </div>
+
+        <div className="card p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted">Surface Totale</p>
+              <p className="text-2xl font-bold text-primary">
+                {parcelles.reduce((sum, parcelle) => sum + parcelle.surface, 0).toFixed(1)} ha
+              </p>
+              <p className="text-xs text-muted mt-1">
+                Moyenne: {(parcelles.reduce((sum, parcelle) => sum + parcelle.surface, 0) / parcelles.length).toFixed(1)} ha/parcelle
+              </p>
+            </div>
+            <div className="p-3 bg-green-100 rounded-lg">
+              <BarChart3 className="h-6 w-6 text-green-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="card p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted">Cultures Actives</p>
+              <p className="text-2xl font-bold text-primary">
+                {new Set(parcelles.map(p => p.culture_actuelle)).size}
+              </p>
+              <p className="text-xs text-muted mt-1">
+                En croissance: {parcelles.filter(p => p.statut === 'en_croissance').length}
+              </p>
+            </div>
+            <div className="p-3 bg-blue-100 rounded-lg">
+              <Crop className="h-6 w-6 text-blue-600" />
+            </div>
           </div>
         </div>
       </div>

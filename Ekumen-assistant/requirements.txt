@@ -17,6 +17,9 @@ asyncpg==0.29.0
 redis==5.0.1
 aioredis==2.0.1
 
+# Supabase for production storage
+supabase==2.3.4
+
 # LangChain and AI
 langchain==0.0.350
 langchain-openai==0.0.2

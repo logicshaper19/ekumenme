@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { Beaker, Calendar, MapPin, AlertTriangle, Search, Filter, Download, Eye, ExternalLink } from 'lucide-react'
+import { Beaker, Calendar, MapPin, AlertTriangle, Search, Filter, Download, Eye, ExternalLink, BarChart3, TrendingUp, Activity, Loader2, AlertCircle } from 'lucide-react'
+import { farmApi, InterventionResponse } from '../services/farmApi'
 
 interface Treatment {
   id: string
@@ -26,8 +27,54 @@ const Treatments: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterPeriod, setFilterPeriod] = useState<string>('month')
   const [filterParcelle, setFilterParcelle] = useState<string>('all')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Mock data from EPHY database
+  // Load treatments from API
+  useEffect(() => {
+    const loadTreatments = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        
+        // Fetch interventions from API
+        const response = await farmApi.interventions.getInterventions({ limit: 1000 })
+        
+        // Transform API response to frontend format
+        const transformedTreatments: Treatment[] = response.items.map(apiIntervention => ({
+          id: apiIntervention.id,
+          date: new Date(apiIntervention.date_intervention),
+          parcelle: `Parcelle ${apiIntervention.parcelle_id.slice(-4)}`, // Use last 4 chars of parcelle ID
+          culture: 'Non renseigné', // Could be enhanced with parcelle data
+          produit: apiIntervention.produit_utilise || 'Non renseigné',
+          amm: 'Non renseigné', // Could be enhanced with product data
+          dose: apiIntervention.dose_totale || 0,
+          unite: apiIntervention.unite_dose || 'L/ha',
+          surface: apiIntervention.surface_traitee_ha || 0,
+          volume_bouillie: 0, // Could be calculated from dose and surface
+          conditions_meteo: apiIntervention.conditions_meteo || 'Non renseigné',
+          operateur: 'Non renseigné', // Could be enhanced with user data
+          znt: 5, // Default ZNT, could be enhanced with product data
+          delai_reentree: 6, // Default, could be enhanced with product data
+          delai_recolte: 42, // Default, could be enhanced with product data
+          notes: apiIntervention.notes || undefined
+        }))
+        
+        setTreatments(transformedTreatments)
+        setFilteredTreatments(transformedTreatments)
+      } catch (err) {
+        console.error('Error loading treatments:', err)
+        setError(err instanceof Error ? err.message : 'Erreur lors du chargement des traitements')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadTreatments()
+  }, [])
+
+  // Mock data from EPHY database (commented out - now using real API)
+  /*
   useEffect(() => {
     const mockTreatments: Treatment[] = [
       {
@@ -106,6 +153,7 @@ const Treatments: React.FC = () => {
     setTreatments(mockTreatments)
     setFilteredTreatments(mockTreatments)
   }, [])
+  */
 
   // Filter treatments
   useEffect(() => {
@@ -174,6 +222,31 @@ const Treatments: React.FC = () => {
           Historique des produits phytosanitaires utilisés sur vos parcelles
         </p>
       </div>
+
+      {/* Loading State */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <div className="flex items-center space-x-2">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <span className="text-secondary">Chargement des traitements...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center space-x-2">
+            <AlertCircle className="h-5 w-5 text-red-500" />
+            <span className="text-red-700 font-medium">Erreur</span>
+          </div>
+          <p className="text-red-600 mt-1">{error}</p>
+        </div>
+      )}
+
+      {/* Content - only show when not loading and no error */}
+      {!loading && !error && (
+        <>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -246,6 +319,59 @@ const Treatments: React.FC = () => {
             <Download className="h-4 w-4" />
             Registre
           </button>
+        </div>
+      </div>
+
+      {/* Analytics Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="card p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted">Total Traitements</p>
+              <p className="text-2xl font-bold text-primary">{treatments.length}</p>
+              <p className="text-xs text-success flex items-center mt-1">
+                <TrendingUp className="h-3 w-3 mr-1" />
+                +12% ce mois
+              </p>
+            </div>
+            <div className="p-3 bg-primary/10 rounded-lg">
+              <Beaker className="h-6 w-6 text-primary" />
+            </div>
+          </div>
+        </div>
+
+        <div className="card p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted">Surface Totale</p>
+              <p className="text-2xl font-bold text-primary">
+                {treatments.reduce((sum, treatment) => sum + treatment.surface, 0).toFixed(1)} ha
+              </p>
+              <p className="text-xs text-muted mt-1">
+                Moyenne: {(treatments.reduce((sum, treatment) => sum + treatment.surface, 0) / treatments.length).toFixed(1)} ha/traitement
+              </p>
+            </div>
+            <div className="p-3 bg-green-100 rounded-lg">
+              <MapPin className="h-6 w-6 text-green-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="card p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted">Produits Uniques</p>
+              <p className="text-2xl font-bold text-primary">
+                {new Set(treatments.map(t => t.produit)).size}
+              </p>
+              <p className="text-xs text-muted mt-1">
+                Moyenne: {(treatments.reduce((sum, treatment) => sum + treatment.dose, 0) / treatments.length).toFixed(1)} L/ha
+              </p>
+            </div>
+            <div className="p-3 bg-blue-100 rounded-lg">
+              <BarChart3 className="h-6 w-6 text-blue-600" />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -362,6 +488,8 @@ const Treatments: React.FC = () => {
           )}
         </div>
       </div>
+        </>
+      )}
     </div>
   )
 }

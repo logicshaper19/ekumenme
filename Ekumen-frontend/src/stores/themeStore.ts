@@ -85,12 +85,9 @@ export const useThemeStore = create<ThemeState>()(
           }
         }
         
-        // Fall back to system preference
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const systemTheme: Theme = prefersDark ? 'dark' : 'light';
-        
-        get().setTheme(systemTheme);
-        console.log(`Initialized theme from system preference: ${systemTheme}`);
+        // Fall back to default theme (light)
+        get().setTheme(THEME_CONFIG.defaultTheme);
+        console.log(`Initialized theme to default: ${THEME_CONFIG.defaultTheme}`);
       },
       
       isEnabled: () => THEME_CONFIG.enabled,

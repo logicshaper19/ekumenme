@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { Calendar, MapPin, Clock, Filter, Search, Download, Eye } from 'lucide-react'
+import { Calendar, MapPin, Clock, Filter, Search, Download, Eye, BarChart3, TrendingUp, Activity, Loader2, AlertCircle } from 'lucide-react'
+import { farmApi, InterventionResponse } from '../services/farmApi'
 
 interface Activity {
   id: string
@@ -21,8 +22,64 @@ const Activities: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterPeriod, setFilterPeriod] = useState<string>('month')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Mock data from MesParcelles
+  // Load activities from API
+  useEffect(() => {
+    const loadActivities = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        
+        // Fetch interventions from API
+        const response = await farmApi.interventions.getInterventions({ limit: 1000 })
+        
+        // Transform API response to frontend format
+        const transformedActivities: Activity[] = response.items.map(apiIntervention => ({
+          id: apiIntervention.id,
+          date: new Date(apiIntervention.date_intervention),
+          parcelle: `Parcelle ${apiIntervention.parcelle_id.slice(-4)}`, // Use last 4 chars of parcelle ID
+          culture: 'Non renseigné', // Could be enhanced with parcelle data
+          intervention: apiIntervention.type_intervention || 'Intervention',
+          produits: apiIntervention.produit_utilise ? [apiIntervention.produit_utilise] : undefined,
+          surface: apiIntervention.surface_traitee_ha || 0,
+          cout: apiIntervention.cout_total || undefined,
+          operateur: 'Non renseigné', // Could be enhanced with user data
+          statut: determineActivityStatus(apiIntervention),
+          notes: apiIntervention.notes || undefined
+        }))
+        
+        setActivities(transformedActivities)
+        setFilteredActivities(transformedActivities)
+      } catch (err) {
+        console.error('Error loading activities:', err)
+        setError(err instanceof Error ? err.message : 'Erreur lors du chargement des activités')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadActivities()
+  }, [])
+
+  // Helper function to determine activity status
+  const determineActivityStatus = (apiIntervention: InterventionResponse): 'planifie' | 'en_cours' | 'termine' | 'reporte' => {
+    const interventionDate = new Date(apiIntervention.date_intervention)
+    const now = new Date()
+    const daysDiff = Math.floor((now.getTime() - interventionDate.getTime()) / (1000 * 60 * 60 * 24))
+    
+    if (daysDiff < 0) {
+      return 'planifie' // Future intervention
+    } else if (daysDiff === 0) {
+      return 'en_cours' // Today's intervention
+    } else {
+      return 'termine' // Past intervention
+    }
+  }
+
+  // Mock data from MesParcelles (commented out - now using real API)
+  /*
   useEffect(() => {
     const mockActivities: Activity[] = [
       {
@@ -89,6 +146,7 @@ const Activities: React.FC = () => {
     setActivities(mockActivities)
     setFilteredActivities(mockActivities)
   }, [])
+  */
 
   // Filter activities
   useEffect(() => {
@@ -169,6 +227,31 @@ const Activities: React.FC = () => {
         </p>
       </div>
 
+      {/* Loading State */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <div className="flex items-center space-x-2">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <span className="text-secondary">Chargement des activités...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center space-x-2">
+            <AlertCircle className="h-5 w-5 text-red-500" />
+            <span className="text-red-700 font-medium">Erreur</span>
+          </div>
+          <p className="text-red-600 mt-1">{error}</p>
+        </div>
+      )}
+
+      {/* Content - only show when not loading and no error */}
+      {!loading && !error && (
+        <>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="card p-4">
@@ -241,6 +324,59 @@ const Activities: React.FC = () => {
             <Download className="h-4 w-4" />
             Exporter
           </button>
+        </div>
+      </div>
+
+      {/* Analytics Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="card p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted">Total Activités</p>
+              <p className="text-2xl font-bold text-primary">{activities.length}</p>
+              <p className="text-xs text-success flex items-center mt-1">
+                <TrendingUp className="h-3 w-3 mr-1" />
+                +8% ce mois
+              </p>
+            </div>
+            <div className="p-3 bg-primary/10 rounded-lg">
+              <Activity className="h-6 w-6 text-primary" />
+            </div>
+          </div>
+        </div>
+
+        <div className="card p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted">Surface Totale</p>
+              <p className="text-2xl font-bold text-primary">
+                {activities.reduce((sum, activity) => sum + activity.surface, 0).toFixed(1)} ha
+              </p>
+              <p className="text-xs text-muted mt-1">
+                Moyenne: {(activities.reduce((sum, activity) => sum + activity.surface, 0) / activities.length).toFixed(1)} ha/activité
+              </p>
+            </div>
+            <div className="p-3 bg-green-100 rounded-lg">
+              <MapPin className="h-6 w-6 text-green-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="card p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted">Coût Total</p>
+              <p className="text-2xl font-bold text-primary">
+                {formatCurrency(activities.reduce((sum, activity) => sum + (activity.cout || 0), 0))}
+              </p>
+              <p className="text-xs text-muted mt-1">
+                Moyenne: {formatCurrency(activities.reduce((sum, activity) => sum + (activity.cout || 0), 0) / activities.length)}
+              </p>
+            </div>
+            <div className="p-3 bg-blue-100 rounded-lg">
+              <BarChart3 className="h-6 w-6 text-blue-600" />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -323,6 +459,8 @@ const Activities: React.FC = () => {
           )}
         </div>
       </div>
+        </>
+      )}
     </div>
   )
 }

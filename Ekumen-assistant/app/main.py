@@ -27,7 +27,7 @@ except ImportError:
 
 from app.core.config import settings
 from app.core.database import init_db, close_db
-from app.api.v1 import auth, journal, products, feedback, admin, farm
+from app.api.v1 import auth, journal, products, feedback, admin, farm, voice, monitoring
 from app.api.v1.chat import router as chat_router
 from app.api.v1.knowledge_base import router as knowledge_base_router
 
@@ -83,6 +83,8 @@ app.include_router(feedback.router, prefix="/api/v1/feedback", tags=["feedback"]
 app.include_router(admin.router, prefix="/api/v1", tags=["super-admin"])
 app.include_router(knowledge_base_router, prefix="/api/v1")
 app.include_router(farm.router, prefix="/api/v1", tags=["farm"])
+app.include_router(voice.voice_websocket_router, prefix="/api/v1/voice", tags=["voice"])
+app.include_router(monitoring.router, prefix="/api/v1/monitoring", tags=["monitoring"])
 
 # Health check endpoint
 @app.get("/health")

@@ -20,7 +20,7 @@ export interface ThemeConfig {
 
 const THEME_CONFIG: ThemeConfig = {
   enabled: import.meta.env.VITE_THEME_SWITCH_ENABLED === 'true',
-  defaultTheme: 'dark' as const, // Default to dark theme
+  defaultTheme: 'light' as const, // Default to light theme
   storageKey: 'ekumen-theme',
   dataAttribute: 'data-theme'
 } as const;
