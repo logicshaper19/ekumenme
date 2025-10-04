@@ -56,7 +56,7 @@ class DocumentProcessingService:
         try:
             # Try to import PyPDF2 or similar PDF processing library
             try:
-                import PyPDF2
+                import PyPDF2  # type: ignore
                 
                 with open(file_path, 'rb') as file:
                     pdf_reader = PyPDF2.PdfReader(file)
@@ -94,7 +94,7 @@ class DocumentProcessingService:
         """Extract text from DOCX files"""
         try:
             try:
-                from docx import Document
+                from docx import Document  # type: ignore
                 
                 doc = Document(file_path)
                 text = ""

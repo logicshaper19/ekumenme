@@ -49,7 +49,7 @@ class RAGService:
             
             # Initialize vector store
             try:
-                from langchain_chroma import Chroma as ChromaNew
+                from langchain_chroma import Chroma as ChromaNew  # type: ignore[import-untyped]
                 self.vectorstore = ChromaNew(
                     embedding_function=self.embeddings,
                     persist_directory="./chroma_db"
