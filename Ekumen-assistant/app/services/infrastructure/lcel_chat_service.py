@@ -496,7 +496,7 @@ Utilise l'historique de la conversation pour fournir des réponses cohérentes e
         """
         logger.info(f"🔧 create_tavily_chain called with mode: {mode}")
         from langchain.tools import Tool
-        from app.services.tavily_service import get_tavily_service
+        from app.services.external.tavily_service import get_tavily_service
         
         tavily_service = get_tavily_service()
         
