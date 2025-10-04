@@ -4,7 +4,7 @@ Specialized prompts for voice journal entry processing and validation
 """
 
 from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 # Journal-specific system prompt
 JOURNAL_SYSTEM_PROMPT = """Tu es un assistant agricole expert spécialisé dans le traitement des entrées de journal agricole enregistrées par voix.

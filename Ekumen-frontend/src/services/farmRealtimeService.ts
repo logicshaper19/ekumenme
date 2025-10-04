@@ -114,7 +114,7 @@ class FarmRealtimeService {
   private resubscribeAll() {
     if (!this.isConnected) return
 
-    this.subscriptions.forEach((subscription, key) => {
+    this.subscriptions.forEach((subscription) => {
       this.sendSubscription(subscription)
     })
   }

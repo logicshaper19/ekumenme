@@ -9,6 +9,7 @@ from app.services.infrastructure.voice_service import VoiceService
 from app.services.shared.chat_service import ChatService
 from app.services.shared.tool_registry_service import get_tool_registry
 from app.services.journal_service import JournalService
+from app.services.validation.intervention_checker import InterventionChecker
 import logging
 import json
 import asyncio
@@ -26,6 +27,7 @@ voice_service = VoiceService()
 chat_service = ChatService()
 tool_registry = get_tool_registry()
 journal_service = JournalService()
+intervention_checker = InterventionChecker()
 
 # Initialize OpenAI client
 openai_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)

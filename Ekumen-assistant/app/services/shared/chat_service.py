@@ -641,7 +641,7 @@ class ChatService:
                     "agent_type": conversation.agent_type,
                     "confidence": 0.0,
                     "processing_method": "error_fallback",
-                    "metadata": basic_result.get("metadata", {})
+                    "metadata": {}
                 }
 
             # Save messages with memory enhancement

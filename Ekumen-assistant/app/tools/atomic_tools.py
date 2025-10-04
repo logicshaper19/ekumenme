@@ -16,6 +16,7 @@ from app.core.database import get_async_db
 from app.models.intervention import VoiceJournalEntry
 from app.models.mesparcelles import Parcelle
 from app.services.monitoring.voice_monitoring import voice_monitor
+from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
 

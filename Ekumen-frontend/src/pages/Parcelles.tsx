@@ -190,6 +190,41 @@ const Parcelles: React.FC = () => {
     .reduce((sum, p) => sum + (p.rendement_prevu || 0), 0) / 
     filteredParcelles.filter(p => p.rendement_prevu).length || 0
 
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="flex justify-center items-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-secondary">Chargement des parcelles...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="flex justify-center items-center h-64">
+          <div className="text-center">
+            <div className="text-red-500 text-6xl mb-4">⚠️</div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Erreur de chargement</h2>
+            <p className="text-secondary mb-4">{error}</p>
+            <button
+              onClick={loadParcelles}
+              className="btn-primary"
+            >
+              Réessayer
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6 p-6">
       <div className="flex justify-between items-center">
