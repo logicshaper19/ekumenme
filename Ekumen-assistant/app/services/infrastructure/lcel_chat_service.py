@@ -587,14 +587,37 @@ Utilise l'historique de la conversation pour fournir des réponses cohérentes e
         """
         from langchain.agents import create_openai_functions_agent, AgentExecutor
         
-        # Create prompt with tools
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", f"""{BASE_AGRICULTURAL_SYSTEM_PROMPT}
+        # Create specialized prompt for supplier mode
+        if any(tool.name == "find_agricultural_suppliers" for tool in tools):
+            # Supplier-specific prompt
+            system_prompt = """Tu es un assistant spécialisé dans la recherche de fournisseurs agricoles.
+
+TON RÔLE:
+- Trouver des fournisseurs, distributeurs et vendeurs de produits agricoles
+- Fournir des informations pratiques sur les produits et services
+- Donner des conseils pour contacter les fournisseurs
+
+OUTILS DISPONIBLES:
+Tu as accès à un outil de recherche de fournisseurs agricoles qui te permet de trouver des informations en temps réel sur le web.
+
+INSTRUCTIONS:
+1. Utilise TOUJOURS l'outil de recherche pour trouver des fournisseurs
+2. Fournis des informations concrètes et pratiques
+3. Inclus les coordonnées et sites web des fournisseurs
+4. Donne des conseils pour contacter les fournisseurs
+5. Sois direct et orienté résultats
+
+Réponds en français et sois utile pour l'agriculteur."""
+        else:
+            # General tool prompt
+            system_prompt = f"""{BASE_AGRICULTURAL_SYSTEM_PROMPT}
 
 OUTILS DISPONIBLES:
 Tu as accès à des outils spécialisés pour obtenir des données réelles.
-Utilise-les de manière proactive pour enrichir tes réponses.
-"""),
+Utilise-les de manière proactive pour enrichir tes réponses."""
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{input}"),
             MessagesPlaceholder(variable_name="agent_scratchpad"),
