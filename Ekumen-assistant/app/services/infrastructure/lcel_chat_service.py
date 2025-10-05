@@ -294,43 +294,41 @@ Utilise l'historique de la conversation pour fournir des réponses cohérentes e
                 full_answer = ""
                 source_docs = []
                 
-                # Use ainvoke to get the final result directly, then stream it
+                # Use astream_events for real-time streaming like RAG mode
                 try:
-                    # Get the final result from the agent executor
-                    final_result = await chain.ainvoke(
+                    reformulated_query = None
+                    async for event in chain.astream_events(
                         {"input": message},
-                        config={"configurable": {"session_id": conversation_id}}
-                    )
-                    
-                    # Extract the final response
-                    final_response = ""
-                    if isinstance(final_result, dict):
-                        if "output" in final_result:
-                            content = final_result["output"]
-                            if hasattr(content, "content"):
-                                content = content.content
-                            if content and isinstance(content, str) and content.strip():
-                                final_response = content
-                    elif hasattr(final_result, "content"):
-                        final_response = final_result.content
-                    elif isinstance(final_result, str):
-                        final_response = final_result
-                    
-                    # Stream the final response in chunks for better UX
-                    if final_response:
-                        full_answer = final_response
-                        # Stream the response in larger chunks for better readability
-                        words = final_response.split()
-                        for i in range(0, len(words), 8):  # Stream 8 words at a time for better flow
-                            chunk = " ".join(words[i:i+8])
-                            if i + 8 < len(words):
-                                chunk += " "
-                            yield chunk
-                    else:
-                        # Fallback: return a generic message
-                        fallback_msg = "Je n'ai pas pu trouver d'informations spécifiques sur les fournisseurs demandés. Veuillez essayer avec des termes plus généraux."
-                        full_answer = fallback_msg
-                        yield fallback_msg
+                        config={"configurable": {"session_id": conversation_id}},
+                        version="v2"
+                    ):
+                        kind = event.get("event")
+                        event_tags = event.get("tags", [])
+                        
+                        # Only process chat model stream events to avoid duplicates
+                        if kind == "on_chat_model_stream" and "seq:step:3" in event_tags:
+                            chunk_data = event.get("data", {})
+                            if "chunk" in chunk_data:
+                                chunk = chunk_data["chunk"]
+                                if hasattr(chunk, "content") and chunk.content:
+                                    content = chunk.content
+                                    if content and isinstance(content, str) and content.strip():
+                                        full_answer += content
+                                        yield content
+                        
+                        # Capture reformulated query if available
+                        elif kind == "on_chat_model_stream" and "seq:step:2" in event_tags:
+                            chunk_data = event.get("data", {})
+                            if "chunk" in chunk_data:
+                                chunk = chunk_data["chunk"]
+                                if hasattr(chunk, "content") and chunk.content:
+                                    reformulated_query = chunk.content
+                        
+                        # Capture tool execution results for sources
+                        elif kind == "on_tool_end":
+                            tool_output = event.get("data", {}).get("output", {})
+                            if isinstance(tool_output, dict) and "sources" in tool_output:
+                                source_docs.extend(tool_output["sources"])
                         
                 except Exception as e:
                     logger.error(f"Error in agent execution: {e}")
@@ -340,8 +338,26 @@ Utilise l'historique de la conversation pour fournir des réponses cohérentes e
                 
                 # Extract sources from tools after execution
                 for tool in tools:
-                    # Handle both function-based tools and class-based tools
-                    if hasattr(tool, 'func') and hasattr(tool.func, '_last_sources'):
+                    # Handle supplier search tool specifically
+                    if hasattr(tool, 'name') and tool.name == "find_agricultural_suppliers":
+                        # Access the global supplier service to get sources
+                        try:
+                            from app.tools.supplier_agent.supplier_search_tool import _supplier_service
+                            sources = _supplier_service.get_last_sources()
+                            if sources:
+                                for source in sources:
+                                    source_docs.append({
+                                        "title": source.get("name", "Source web"),
+                                        "url": source.get("url", ""),
+                                        "snippet": source.get("description", "")[:500],
+                                        "relevance": source.get("relevance_score", 0.0),
+                                        "type": "web"
+                                    })
+                        except Exception as e:
+                            logger.warning(f"Could not extract sources from supplier tool: {e}")
+                    
+                    # Handle other function-based tools
+                    elif hasattr(tool, 'func') and hasattr(tool.func, '_last_sources'):
                         # Function-based tool (internet search)
                         sources = tool.func._last_sources
                         if sources:
@@ -354,7 +370,7 @@ Utilise l'historique de la conversation pour fournir des réponses cohérentes e
                                     "type": "web"
                                 })
                     elif hasattr(tool, 'get_last_sources'):
-                        # Class-based tool with proper method (supplier tool)
+                        # Class-based tool with proper method
                         sources = tool.get_last_sources()
                         if sources:
                             for source in sources:
@@ -366,8 +382,8 @@ Utilise l'historique de la conversation pour fournir des réponses cohérentes e
                                     "type": "web"
                                 })
                 
-                # Emit final event so callers can persist citations
-                yield {"final": {"answer": full_answer, "context": source_docs}}
+                # Emit final event so callers can persist citations and reformulated query
+                yield {"final": {"answer": full_answer, "context": source_docs, "reformulated_query": reformulated_query}}
                 
             elif use_rag:
                 logger.info(f"🔍 Using RAG chain (mode was: {mode})")
