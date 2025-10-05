@@ -118,12 +118,15 @@ async def websocket_chat(
                 await websocket.send_json({"type": "llm_start", "message_id": assistant_message_id})
 
                 # Use LCEL service with mode-aware tools
+                # For supplier/internet modes, use Tavily only (no RAG)
+                # For other modes, use RAG
+                use_rag = mode not in ["supplier", "internet"]
                 reformulated_query = None
                 async for event in chat_service.lcel_service.stream_message(
                     db_session=db,
                     conversation_id=conversation_id,
                     message=message_content,
-                    use_rag=True,
+                    use_rag=use_rag,
                     organization_id=org_id,
                     mode=mode  # Pass mode to LCEL service for tool selection
                 ):
